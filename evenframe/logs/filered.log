@@ -1,0 +1,64 @@
+{}{
+    "appointment": TableConfig {
+        struct_config: StructConfig {
+            name: "appointment",
+            fields: [
+                TableField {
+                    field_name: "recurrence_rule",
+                    field_type: Struct(
+                        [
+                            (
+                                "additional_instances",
+                                Option(
+                                    Vec(
+                                        Other(
+                                            "Appointment",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                    edge_config: None,
+                    define_config: None,
+                    format: None,
+                    validators: None,
+                    always_regenerate: false,
+                },
+            ],
+        },
+        relation: None,
+        permissions: Some(
+            PermissionsConfig {
+                all_permissions: None,
+                select_permissions: Some(
+                    "WHERE $auth.permissions.data.any('Appointment') = true",
+                ),
+                update_permissions: Some(
+                    "WHERE $auth.permissions.data.any('Appointment') = true",
+                ),
+                delete_permissions: Some(
+                    "WHERE $auth.permissions.data.any('Appointment') = true",
+                ),
+                create_permissions: Some(
+                    "WHERE $auth.permissions.data.any('Appointment') = true",
+                ),
+            },
+        ),
+        mock_generation_config: Some(
+            MockGenerationConfig {
+                n: 13,
+                table_level_override: None,
+                coordination_rules: [],
+                preserve_unchanged: false,
+                preserve_modified: false,
+                batch_size: 1000,
+                regenerate_fields: [
+                    "updated_at",
+                    "created_at",
+                ],
+                preservation_mode: None,
+            },
+        ),
+    },
+}

@@ -1,0 +1,143 @@
+Statement 1: -- ------------------------------
+
+Statement 2: -- OPTION
+
+Statement 3: -- ------------------------------
+
+Statement 4: 
+
+Statement 5: OPTION IMPORT;
+
+Statement 6: 
+
+Statement 7: -- ------------------------------
+
+Statement 8: -- TABLE: empty_table
+
+Statement 9: -- ------------------------------
+
+Statement 10: 
+
+Statement 11: DEFINE TABLE empty_table TYPE NORMAL SCHEMAFULL PERMISSIONS FULL;
+
+Statement 12: 
+
+Statement 13: DEFINE FIELD `value` ON empty_table TYPE any PERMISSIONS FULL;
+
+Statement 14: 
+
+Statement 15: 
+
+Statement 16: 
+
+Statement 17: -- ------------------------------
+
+Statement 18: -- TABLE DATA: empty_table
+
+Statement 19: -- ------------------------------
+
+Statement 20: 
+
+Statement 21: INSERT [ { id: empty_table:kwj5o4zequbgc96nr9nr, value: 'nrhAJ3bR' }, { id: empty_table:oliaainu2o1lu7e6tmtt, value: 'V4XLvE9v' }, { id: empty_table:qbaj0nyhzzwyodc51wba, value: 'cXuGz55e' } ];
+
+Statement 22: 
+
+Statement 23: -- ------------------------------
+
+Statement 24: -- TABLE: large_count
+
+Statement 25: -- ------------------------------
+
+Statement 26: 
+
+Statement 27: DEFINE TABLE large_count TYPE NORMAL SCHEMAFULL PERMISSIONS FULL;
+
+Statement 28: 
+
+Statement 29: DEFINE FIELD index ON large_count TYPE any PERMISSIONS FULL;
+
+Statement 30: 
+
+Statement 31: 
+
+Statement 32: 
+
+Statement 33: -- ------------------------------
+
+Statement 34: -- TABLE DATA: large_count
+
+Statement 35: -- ------------------------------
+
+Statement 36: 
+
+Statement 37: INSERT [ { id: large_count:1d0qpwiyicqms575rq61, index: 54 }, { id: large_count:5y2at9cu5oiy9o1kh6wt, index: 70 } ];
+
+Statement 38: 
+
+Statement 39: -- ------------------------------
+
+Statement 40: -- TABLE: optional_fields
+
+Statement 41: -- ------------------------------
+
+Statement 42: 
+
+Statement 43: DEFINE TABLE optional_fields TYPE NORMAL SCHEMAFULL PERMISSIONS FULL;
+
+Statement 44: 
+
+Statement 45: DEFINE FIELD maybe_age ON optional_fields TYPE any PERMISSIONS FULL;
+
+Statement 46: DEFINE FIELD maybe_name ON optional_fields TYPE any PERMISSIONS FULL;
+
+Statement 47: DEFINE FIELD maybe_tags ON optional_fields TYPE any PERMISSIONS FULL;
+
+Statement 48: DEFINE FIELD required_field ON optional_fields TYPE any PERMISSIONS FULL;
+
+Statement 49: 
+
+Statement 50: 
+
+Statement 51: 
+
+Statement 52: -- ------------------------------
+
+Statement 53: -- TABLE DATA: optional_fields
+
+Statement 54: -- ------------------------------
+
+Statement 55: 
+
+Statement 56: INSERT [ { id: optional_fields:38cyaslkzrgje9wqrbx9, maybe_age: 'Null', maybe_name: 'Null', maybe_tags: {  }, required_field: 'QrKaHeax' }, { id: optional_fields:3r5308sfi0ttfysom5lw, maybe_age: 'Null', maybe_name: 'Null', maybe_tags: {  }, required_field: 'W6nRuS9v' }, { id: optional_fields:rtdy8bzra300ipz769ka, maybe_age: 56, maybe_name: 'Null', maybe_tags: {  }, required_field: 'giOFEX7e' }, { id: optional_fields:v8nap4wmtk5hs2r8561z, maybe_age: 97, maybe_name: '60TbnfoX', maybe_tags: 'Null', required_field: 'uT458gdv' } ];
+
+Statement 57: 
+
+Statement 58: -- ------------------------------
+
+Statement 59: -- TABLE: verify_context
+
+Statement 60: -- ------------------------------
+
+Statement 61: 
+
+Statement 62: DEFINE TABLE verify_context TYPE NORMAL SCHEMAFULL PERMISSIONS FULL;
+
+Statement 63: 
+
+Statement 64: 
+
+Statement 65: 
+
+Statement 66: 
+
+Statement 67: -- ------------------------------
+
+Statement 68: -- TABLE DATA: verify_context
+
+Statement 69: -- ------------------------------
+
+Statement 70: 
+
+Statement 71: 
+
+

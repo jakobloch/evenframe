@@ -1,0 +1,17 @@
+Schema Changes Detected:
+========================
+
+New Tables (1):
+  - LargeCount
+
+Removed Tables (4):
+  - empty_table
+  - optional_fields
+  - large_count
+  - verify_context
+
+
+Summary:
+New tables: LargeCount
+Removed tables: empty_table, optional_fields, large_count, verify_context
+

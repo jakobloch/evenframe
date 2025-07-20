@@ -1,0 +1,23 @@
+SchemaChanges {
+    new_tables: [],
+    removed_tables: [],
+    modified_tables: [
+        TableChanges {
+            table_name: "appointment",
+            new_fields: [],
+            removed_fields: [],
+            modified_fields: [
+                FieldChange {
+                    field_name: "recurrence_rule.additional_instances",
+                    old_type: "",
+                    new_type: "null | array<record<appointment>>",
+                    change_type: Added,
+                    required_changed: false,
+                    default_changed: false,
+                },
+            ],
+            permission_changed: false,
+            schema_type_changed: false,
+        },
+    ],
+}
