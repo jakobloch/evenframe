@@ -15,30 +15,30 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
             if type_path.qself.is_none() && type_path.path.segments.len() == 1 {
                 let ident = &type_path.path.segments.first().unwrap().ident;
                 match ident.to_string().as_str() {
-                    "String" => quote! { helpers::evenframe::schemasync::FieldType::String },
-                    "char" => quote! { helpers::evenframe::schemasync::FieldType::Char },
-                    "bool" => quote! { helpers::evenframe::schemasync::FieldType::Bool },
-                    "f32" => quote! { helpers::evenframe::schemasync::FieldType::F32 },
-                    "f64" => quote! { helpers::evenframe::schemasync::FieldType::F64 },
-                    "i8" => quote! { helpers::evenframe::schemasync::FieldType::I8 },
-                    "i16" => quote! { helpers::evenframe::schemasync::FieldType::I16 },
-                    "i32" => quote! { helpers::evenframe::schemasync::FieldType::I32 },
-                    "i64" => quote! { helpers::evenframe::schemasync::FieldType::I64 },
-                    "i128" => quote! { helpers::evenframe::schemasync::FieldType::I128 },
-                    "isize" => quote! { helpers::evenframe::schemasync::FieldType::Isize },
-                    "u8" => quote! { helpers::evenframe::schemasync::FieldType::U8 },
-                    "u16" => quote! { helpers::evenframe::schemasync::FieldType::U16 },
-                    "u32" => quote! { helpers::evenframe::schemasync::FieldType::U32 },
-                    "u64" => quote! { helpers::evenframe::schemasync::FieldType::U64 },
-                    "u128" => quote! { helpers::evenframe::schemasync::FieldType::U128 },
-                    "usize" => quote! { helpers::evenframe::schemasync::FieldType::Usize },
+                    "String" => quote! { ::helpers::evenframe::schemasync::FieldType::String },
+                    "char" => quote! { ::helpers::evenframe::schemasync::FieldType::Char },
+                    "bool" => quote! { ::helpers::evenframe::schemasync::FieldType::Bool },
+                    "f32" => quote! { ::helpers::evenframe::schemasync::FieldType::F32 },
+                    "f64" => quote! { ::helpers::evenframe::schemasync::FieldType::F64 },
+                    "i8" => quote! { ::helpers::evenframe::schemasync::FieldType::I8 },
+                    "i16" => quote! { ::helpers::evenframe::schemasync::FieldType::I16 },
+                    "i32" => quote! { ::helpers::evenframe::schemasync::FieldType::I32 },
+                    "i64" => quote! { ::helpers::evenframe::schemasync::FieldType::I64 },
+                    "i128" => quote! { ::helpers::evenframe::schemasync::FieldType::I128 },
+                    "isize" => quote! { ::helpers::evenframe::schemasync::FieldType::Isize },
+                    "u8" => quote! { ::helpers::evenframe::schemasync::FieldType::U8 },
+                    "u16" => quote! { ::helpers::evenframe::schemasync::FieldType::U16 },
+                    "u32" => quote! { ::helpers::evenframe::schemasync::FieldType::U32 },
+                    "u64" => quote! { ::helpers::evenframe::schemasync::FieldType::U64 },
+                    "u128" => quote! { ::helpers::evenframe::schemasync::FieldType::U128 },
+                    "usize" => quote! { ::helpers::evenframe::schemasync::FieldType::Usize },
                     "EvenframeRecordId" => {
-                        quote! { helpers::evenframe::schemasync::FieldType::EvenframeRecordId }
+                        quote! { ::helpers::evenframe::schemasync::FieldType::EvenframeRecordId }
                     }
-                    "DateTime" => quote! { helpers::evenframe::schemasync::FieldType::DateTime },
-                    "Duration" => quote! { helpers::evenframe::schemasync::FieldType::Duration },
-                    "Tz" => quote! { helpers::evenframe::schemasync::FieldType::Timezone },
-                    "()" => quote! { helpers::evenframe::schemasync::FieldType::Unit },
+                    "DateTime" => quote! { ::helpers::evenframe::schemasync::FieldType::DateTime },
+                    "Duration" => quote! { ::helpers::evenframe::schemasync::FieldType::Duration },
+                    "Tz" => quote! { ::helpers::evenframe::schemasync::FieldType::Timezone },
+                    "()" => quote! { ::helpers::evenframe::schemasync::FieldType::Unit },
                     _ => {
                         // Check if this is a path with generic arguments
                         let args = &type_path.path.segments.first().unwrap().arguments;
@@ -50,14 +50,14 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                     angle_args.args.first()
                                 {
                                     let inner_parsed = parse_data_type(inner_ty);
-                                    return quote! { helpers::evenframe::schemasync::FieldType::Option(Box::new(#inner_parsed)) };
+                                    return quote! { ::helpers::evenframe::schemasync::FieldType::Option(Box::new(#inner_parsed)) };
                                 }
                             } else if ident_str == "Vec" && angle_args.args.len() == 1 {
                                 if let Some(GenericArgument::Type(inner_ty)) =
                                     angle_args.args.first()
                                 {
                                     let inner_parsed = parse_data_type(inner_ty);
-                                    return quote! { helpers::evenframe::schemasync::FieldType::Vec(Box::new(#inner_parsed)) };
+                                    return quote! { ::helpers::evenframe::schemasync::FieldType::Vec(Box::new(#inner_parsed)) };
                                 }
                             } else if ident_str == "HashMap" && angle_args.args.len() == 2 {
                                 let mut args_iter = angle_args.args.iter();
@@ -68,7 +68,7 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                 {
                                     let key_parsed = parse_data_type(key_ty);
                                     let value_parsed = parse_data_type(value_ty);
-                                    return quote! { helpers::evenframe::schemasync::FieldType::HashMap(Box::new(#key_parsed), Box::new(#value_parsed)) };
+                                    return quote! { ::helpers::evenframe::schemasync::FieldType::HashMap(Box::new(#key_parsed), Box::new(#value_parsed)) };
                                 }
                             } else if ident_str == "BTreeMap" && angle_args.args.len() == 2 {
                                 let mut args_iter = angle_args.args.iter();
@@ -79,21 +79,21 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                 {
                                     let key_parsed = parse_data_type(key_ty);
                                     let value_parsed = parse_data_type(value_ty);
-                                    return quote! { helpers::evenframe::schemasync::FieldType::BTreeMap(Box::new(#key_parsed), Box::new(#value_parsed)) };
+                                    return quote! { ::helpers::evenframe::schemasync::FieldType::BTreeMap(Box::new(#key_parsed), Box::new(#value_parsed)) };
                                 }
                             } else if ident_str == "RecordLink" && angle_args.args.len() == 1 {
                                 if let Some(GenericArgument::Type(inner_ty)) =
                                     angle_args.args.first()
                                 {
                                     let inner_parsed = parse_data_type(inner_ty);
-                                    return quote! { helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) };
+                                    return quote! { ::helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) };
                                 }
                             } else if ident_str == "DateTime" {
                                 // Handle DateTime<Utc> and similar types
-                                return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
+                                return quote! { ::helpers::evenframe::schemasync::FieldType::DateTime };
                             } else if ident_str == "Duration" {
                                 // Handle Duration and similar types
-                                return quote! { helpers::evenframe::schemasync::FieldType::Duration };
+                                return quote! { ::helpers::evenframe::schemasync::FieldType::Duration };
                             }
                         }
 
@@ -113,18 +113,18 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                 if outer == "Option" {
                                     if let Ok(inner_ty) = syn::parse_str::<Type>(inner) {
                                         let inner_parsed = parse_data_type(&inner_ty);
-                                        quote! { helpers::evenframe::schemasync::FieldType::Option(Box::new(#inner_parsed)) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Option(Box::new(#inner_parsed)) }
                                     } else {
                                         let lit = syn::LitStr::new(&type_str, ty.span());
-                                        quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                     }
                                 } else if outer == "Vec" {
                                     if let Ok(inner_ty) = syn::parse_str::<Type>(inner) {
                                         let inner_parsed = parse_data_type(&inner_ty);
-                                        quote! { helpers::evenframe::schemasync::FieldType::Vec(Box::new(#inner_parsed)) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Vec(Box::new(#inner_parsed)) }
                                     } else {
                                         let lit = syn::LitStr::new(&type_str, ty.span());
-                                        quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                     }
                                 } else if outer == "HashMap" {
                                     // Parse HashMap<K, V>
@@ -138,14 +138,14 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                         ) {
                                             let key_parsed = parse_data_type(&key_ty);
                                             let value_parsed = parse_data_type(&value_ty);
-                                            quote! { helpers::evenframe::schemasync::FieldType::HashMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
+                                            quote! { ::helpers::evenframe::schemasync::FieldType::HashMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
                                         } else {
                                             let lit = syn::LitStr::new(&type_str, ty.span());
-                                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                         }
                                     } else {
                                         let lit = syn::LitStr::new(&type_str, ty.span());
-                                        quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                     }
                                 } else if outer == "BTreeMap" {
                                     // Parse BTreeMap<K, V>
@@ -159,41 +159,41 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                         ) {
                                             let key_parsed = parse_data_type(&key_ty);
                                             let value_parsed = parse_data_type(&value_ty);
-                                            quote! { helpers::evenframe::schemasync::FieldType::BTreeMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
+                                            quote! { ::helpers::evenframe::schemasync::FieldType::BTreeMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
                                         } else {
                                             let lit = syn::LitStr::new(&type_str, ty.span());
-                                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                         }
                                     } else {
                                         let lit = syn::LitStr::new(&type_str, ty.span());
-                                        quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                     }
                                 } else if outer == "RecordLink" {
                                     // Parse RecordLink<T>
                                     if let Ok(inner_ty) = syn::parse_str::<Type>(inner) {
                                         let inner_parsed = parse_data_type(&inner_ty);
-                                        quote! { helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) }
                                     } else {
                                         let lit = syn::LitStr::new(&type_str, ty.span());
-                                        quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                        quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                     }
                                 } else if outer == "DateTime" {
                                     // Handle DateTime<Utc> and similar types
-                                    quote! { helpers::evenframe::schemasync::FieldType::DateTime }
+                                    quote! { ::helpers::evenframe::schemasync::FieldType::DateTime }
                                 } else if outer == "Duration" {
                                     // Handle Duration and similar types
-                                    quote! { helpers::evenframe::schemasync::FieldType::Duration }
+                                    quote! { ::helpers::evenframe::schemasync::FieldType::Duration }
                                 } else {
                                     let lit = syn::LitStr::new(&type_str, ty.span());
-                                    quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                    quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                 }
                             } else {
                                 let lit = syn::LitStr::new(&type_str, ty.span());
-                                quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                             }
                         } else {
                             let lit = syn::LitStr::new(&type_str, ty.span());
-                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
                     }
                 }
@@ -209,7 +209,7 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     .map(|s| s.ident == "DateTime")
                     .unwrap_or(false)
                 {
-                    return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
+                    return quote! { ::helpers::evenframe::schemasync::FieldType::DateTime };
                 }
                 // Check if this is a Duration type (e.g., chrono::Duration)
                 if type_path
@@ -219,7 +219,7 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     .map(|s| s.ident == "Duration")
                     .unwrap_or(false)
                 {
-                    return quote! { helpers::evenframe::schemasync::FieldType::Duration };
+                    return quote! { ::helpers::evenframe::schemasync::FieldType::Duration };
                 }
                 // Check if this is a Tz type (e.g., chrono_tz::Tz)
                 if type_path
@@ -229,17 +229,17 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     .map(|s| s.ident == "Tz")
                     .unwrap_or(false)
                 {
-                    return quote! { helpers::evenframe::schemasync::FieldType::Timezone };
+                    return quote! { ::helpers::evenframe::schemasync::FieldType::Timezone };
                 }
 
                 let lit = syn::LitStr::new(&type_str, ty.span());
-                quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
             }
         }
         // For tuple types, recursively convert each element.
         Type::Tuple(tuple) => {
             let elems = tuple.elems.iter().map(|elem| parse_data_type(elem));
-            quote! { helpers::evenframe::schemasync::FieldType::Tuple(vec![ #(#elems),* ]) }
+            quote! { ::helpers::evenframe::schemasync::FieldType::Tuple(vec![ #(#elems),* ]) }
         }
         // Fallback for any other type.
         _ => {
@@ -259,18 +259,18 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     if outer == "Option" {
                         if let Ok(inner_ty) = syn::parse_str::<Type>(inner) {
                             let inner_parsed = parse_data_type(&inner_ty);
-                            quote! { helpers::evenframe::schemasync::FieldType::Option(Box::new(#inner_parsed)) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Option(Box::new(#inner_parsed)) }
                         } else {
                             let lit = syn::LitStr::new(&type_str, ty.span());
-                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
                     } else if outer == "Vec" {
                         if let Ok(inner_ty) = syn::parse_str::<Type>(inner) {
                             let inner_parsed = parse_data_type(&inner_ty);
-                            quote! { helpers::evenframe::schemasync::FieldType::Vec(Box::new(#inner_parsed)) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Vec(Box::new(#inner_parsed)) }
                         } else {
                             let lit = syn::LitStr::new(&type_str, ty.span());
-                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
                     } else if outer == "HashMap" {
                         // Parse HashMap<K, V>
@@ -284,14 +284,14 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                             ) {
                                 let key_parsed = parse_data_type(&key_ty);
                                 let value_parsed = parse_data_type(&value_ty);
-                                quote! { helpers::evenframe::schemasync::FieldType::HashMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
+                                quote! { ::helpers::evenframe::schemasync::FieldType::HashMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
                             } else {
                                 let lit = syn::LitStr::new(&type_str, ty.span());
-                                quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                             }
                         } else {
                             let lit = syn::LitStr::new(&type_str, ty.span());
-                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
                     } else if outer == "BTreeMap" {
                         // Parse BTreeMap<K, V>
@@ -305,41 +305,41 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                             ) {
                                 let key_parsed = parse_data_type(&key_ty);
                                 let value_parsed = parse_data_type(&value_ty);
-                                quote! { helpers::evenframe::schemasync::FieldType::BTreeMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
+                                quote! { ::helpers::evenframe::schemasync::FieldType::BTreeMap(Box::new(#key_parsed), Box::new(#value_parsed)) }
                             } else {
                                 let lit = syn::LitStr::new(&type_str, ty.span());
-                                quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                                quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                             }
                         } else {
                             let lit = syn::LitStr::new(&type_str, ty.span());
-                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
                     } else if outer == "RecordLink" {
                         // Parse RecordLink<T>
                         if let Ok(inner_ty) = syn::parse_str::<Type>(inner) {
                             let inner_parsed = parse_data_type(&inner_ty);
-                            quote! { helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) }
                         } else {
                             let lit = syn::LitStr::new(&type_str, ty.span());
-                            quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                            quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
                     } else if outer == "DateTime" || outer.ends_with("DateTime") {
                         // Handle DateTime<Utc> and similar types, including chrono::DateTime
-                        quote! { helpers::evenframe::schemasync::FieldType::DateTime }
+                        quote! { ::helpers::evenframe::schemasync::FieldType::DateTime }
                     } else if outer == "Duration" || outer.ends_with("Duration") {
                         // Handle Duration and similar types, including chrono::Duration
-                        quote! { helpers::evenframe::schemasync::FieldType::Duration }
+                        quote! { ::helpers::evenframe::schemasync::FieldType::Duration }
                     } else {
                         let lit = syn::LitStr::new(&type_str, ty.span());
-                        quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                        quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                     }
                 } else {
                     let lit = syn::LitStr::new(&type_str, ty.span());
-                    quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                    quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                 }
             } else {
                 let lit = syn::LitStr::new(&type_str, ty.span());
-                quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
+                quote! { ::helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
             }
         }
     }
@@ -420,7 +420,7 @@ fn parse_table_validators(attrs: &[Attribute]) -> Vec<String> {
 
 fn parse_relation_attribute(
     attrs: &[Attribute],
-) -> Option<helpers::evenframe::schemasync::EdgeConfig> {
+) -> Option<::helpers::evenframe::schemasync::EdgeConfig> {
     for attr in attrs {
         if attr.path().is_ident("relation") {
             let result: Result<syn::punctuated::Punctuated<Meta, syn::Token![,]>, _> =
@@ -464,8 +464,8 @@ fn parse_relation_attribute(
                             }) = &nv.value
                             {
                                 direction = match lit.value().as_str() {
-                                    "from" => Some(helpers::evenframe::schemasync::Direction::From),
-                                    "to" => Some(helpers::evenframe::schemasync::Direction::To),
+                                    "from" => Some(::helpers::evenframe::schemasync::Direction::From),
+                                    "to" => Some(::helpers::evenframe::schemasync::Direction::To),
                                     _ => None,
                                 };
                             }
@@ -477,7 +477,7 @@ fn parse_relation_attribute(
                 if let (Some(edge_name), Some(from), Some(to), Some(direction)) =
                     (edge_name, from, to, direction)
                 {
-                    return Some(helpers::evenframe::schemasync::EdgeConfig {
+                    return Some(::helpers::evenframe::schemasync::EdgeConfig {
                         edge_name,
                         from,
                         to,
@@ -507,15 +507,15 @@ fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStream> 
                     // Parse string validators
                     if expr_str.contains("email") {
                         validator_tokens.push(quote! {
-                            helpers::evenframe::validator::Validator::StringValidator(
-                                helpers::evenframe::validator::StringValidator::Email
+                            ::helpers::evenframe::validator::Validator::StringValidator(
+                                ::helpers::evenframe::validator::StringValidator::Email
                             )
                         });
                     }
                     if expr_str.contains("date_iso") {
                         validator_tokens.push(quote! {
-                            helpers::evenframe::validator::Validator::StringValidator(
-                                helpers::evenframe::validator::StringValidator::DateIso
+                            ::helpers::evenframe::validator::Validator::StringValidator(
+                                ::helpers::evenframe::validator::StringValidator::DateIso
                             )
                         });
                     }
@@ -524,8 +524,8 @@ fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStream> 
                         if let Some(regex_end) = expr_str[regex_start..].find("\"") {
                             let regex = &expr_str[regex_start..regex_start + regex_end];
                             validator_tokens.push(quote! {
-                                helpers::evenframe::validator::Validator::StringValidator(
-                                    helpers::evenframe::validator::StringValidator::RegexLiteral(#regex.to_string())
+                                ::helpers::evenframe::validator::Validator::StringValidator(
+                                    ::helpers::evenframe::validator::StringValidator::RegexLiteral(#regex.to_string())
                                 )
                             });
                         }
@@ -535,8 +535,8 @@ fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStream> 
                         if let Some(length_end) = expr_str[length_start..].find("\"") {
                             let length = &expr_str[length_start..length_start + length_end];
                             validator_tokens.push(quote! {
-                                helpers::evenframe::validator::Validator::StringValidator(
-                                    helpers::evenframe::validator::StringValidator::Length(#length.to_string())
+                                ::helpers::evenframe::validator::Validator::StringValidator(
+                                    ::helpers::evenframe::validator::StringValidator::Length(#length.to_string())
                                 )
                             });
                         }
@@ -556,7 +556,7 @@ fn parse_format_attribute(attrs: &[Attribute]) -> Option<proc_macro2::TokenStrea
             if let Ok(format_ident) = attr.parse_args::<syn::Ident>() {
                 let _format_str = format_ident.to_string();
                 return Some(quote! {
-                    helpers::evenframe::schemasync::format::Format::#format_ident
+                    ::helpers::evenframe::schemasync::format::Format::#format_ident
                 });
             }
         }
@@ -608,7 +608,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
 
             // Parse struct-level attributes
             let permissions_config =
-                match helpers::evenframe::schemasync::PermissionsConfig::parse(&input.attrs) {
+                match ::helpers::evenframe::schemasync::PermissionsConfig::parse(&input.attrs) {
                     Ok(config) => config,
                     Err(err) => return err.to_compile_error().into(),
                 };
@@ -643,13 +643,13 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                 let field_type = parse_data_type(ty);
 
                 // Parse any edge attribute.
-                let edge_config = match helpers::evenframe::schemasync::EdgeConfig::parse(field) {
+                let edge_config = match ::helpers::evenframe::schemasync::EdgeConfig::parse(field) {
                     Ok(details) => details,
                     Err(err) => return err.to_compile_error().into(),
                 };
 
                 // Parse any define details.
-                let define_config = match helpers::evenframe::schemasync::DefineConfig::parse(field)
+                let define_config = match ::helpers::evenframe::schemasync::DefineConfig::parse(field)
                 {
                     Ok(details) => details,
                     Err(err) => return err.to_compile_error().into(),
@@ -680,13 +680,13 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                     subqueries.push(subquery_value.value());
                 } else if let Some(ref details) = edge_config {
                     let subquery = if details.direction
-                        == helpers::evenframe::schemasync::Direction::From
+                        == ::helpers::evenframe::schemasync::Direction::From
                     {
                         format!(
                             "(SELECT ->{}.* AS data FROM $parent.id FETCH data.out)[0].data as {}",
                             details.edge_name, field_name
                         )
-                    } else if details.direction == helpers::evenframe::schemasync::Direction::To {
+                    } else if details.direction == ::helpers::evenframe::schemasync::Direction::To {
                         format!(
                             "(SELECT <-{}.* AS data FROM $parent.id FETCH data.in)[0].data as {}",
                             details.edge_name, field_name
@@ -734,7 +734,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                 };
 
                 table_field_tokens.push(quote! {
-                    helpers::evenframe::schemasync::TableField {
+                    ::helpers::evenframe::schemasync::StructField {
                         field_name: #field_name_trim.to_string(),
                         field_type: #field_type,
                         edge_config: #edge_config_tokens,
@@ -793,8 +793,8 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                 let validator_strings = table_validators.iter().map(|v| quote! { #v.to_string() });
                 quote! {
                     vec![
-                        #(helpers::evenframe::validator::Validator::StringValidator(
-                            helpers::evenframe::validator::StringValidator::StringEmbedded(#validator_strings)
+                        #(::helpers::evenframe::validator::Validator::StringValidator(
+                            ::helpers::evenframe::validator::StringValidator::StringEmbedded(#validator_strings)
                         )),*
                     ]
                 }
@@ -810,7 +810,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                 };
 
                 quote! {
-                    Some(helpers::evenframe::schemasync::mock::MockGenerationConfig {
+                    Some(::helpers::evenframe::schemasync::mock::MockGenerationConfig {
                         n: #n,
                         table_level_override: None, // TODO: parse overrides
                         coordination_rules: #coord_rules,
@@ -818,7 +818,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                         preserve_modified: false,
                         batch_size: 1000,
                         regenerate_fields: vec!["updated_at".to_string(), "created_at".to_string()],
-                        preservation_mode: helpers::evenframe::schemasync::merge::PreservationMode::None,
+                        preservation_mode: ::helpers::evenframe::schemasync::merge::PreservationMode::None,
                     })
                 }
             } else {
@@ -833,34 +833,34 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
 
             let evenframe_persistable_struct_impl = {
                 quote! {
-                    impl helpers::evenframe::traits::EvenframePersistableStruct for #ident {
+                    impl ::helpers::evenframe::traits::EvenframePersistableStruct for #ident {
                         fn name() -> String {
                             #struct_name.to_string()
                         }
 
-                        fn validators() -> Vec<helpers::evenframe::validator::Validator> {
+                        fn validators() -> Vec<::helpers::evenframe::validator::Validator> {
                             #table_validators_tokens
                         }
 
-                        fn permissions_config() -> Option<helpers::evenframe::schemasync::PermissionsConfig> {
+                        fn permissions_config() -> Option<::helpers::evenframe::schemasync::PermissionsConfig> {
                             #permissions_config_tokens
                         }
 
-                        fn struct_config() -> helpers::evenframe::schemasync::StructConfig {
-                            helpers::evenframe::schemasync::StructConfig {
+                        fn struct_config() -> ::helpers::evenframe::schemasync::StructConfig {
+                            ::helpers::evenframe::schemasync::StructConfig {
                                 name: helpers::case::to_snake_case(#struct_name),
                                 fields: vec![ #(#table_field_tokens),* ],
                                 validators: vec![],
                             }
                         }
 
-                        fn table_fields() -> Vec<helpers::evenframe::schemasync::TableField> {
+                        fn table_fields() -> Vec<::helpers::evenframe::schemasync::StructField> {
                             vec![ #(#table_field_tokens),* ]
                         }
 
-                        fn table_config() -> Option<helpers::evenframe::schemasync::TableConfig> {
-                            Some(helpers::evenframe::schemasync::TableConfig {
-                                struct_config: helpers::evenframe::schemasync::StructConfig {
+                        fn table_config() -> Option<::helpers::evenframe::schemasync::TableConfig> {
+                            Some(::helpers::evenframe::schemasync::TableConfig {
+                                struct_config: ::helpers::evenframe::schemasync::StructConfig {
                                     name: helpers::case::to_snake_case(#struct_name),
                                     fields: vec![ #(#table_field_tokens),* ],
                                     validators: vec![],
@@ -871,12 +871,12 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                             })
                         }
 
-                        fn get_table_config(&self) -> Option<helpers::evenframe::schemasync::TableConfig> {
+                        fn get_table_config(&self) -> Option<::helpers::evenframe::schemasync::TableConfig> {
                             Self::table_config()
                         }
 
 
-                        fn mock_generation_config() -> Option<helpers::evenframe::schemasync::mock::MockGenerationConfig> {
+                        fn mock_generation_config() -> Option<::helpers::evenframe::schemasync::mock::MockGenerationConfig> {
                             #mock_data_tokens
                         }
 
@@ -923,7 +923,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                         Json(payload): Json<#ident>,
                     ) -> Result<(StatusCode, Json<#ident>), Error> {
                         dotenv::dotenv().ok(); // Load .env file
-                        let query = helpers::evenframe::schemasync::generate_query(helpers::evenframe::schemasync::QueryType::Create, &payload.get_table_config().unwrap(), &payload, None);
+                        let query = ::helpers::evenframe::schemasync::generate_query(::helpers::evenframe::schemasync::QueryType::Create, &payload.get_table_config().unwrap(), &payload, None);
                         let _ = ureq::post("http://localhost:8000/sql")
                         .header("Authorization", &format!("Bearer {}", &jar.get("auth_token").unwrap().to_string()[11..]))
                             .header("Accept", "application/json")
@@ -954,7 +954,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                         Json(payload): Json<#ident>,
                     ) -> Result<(StatusCode, Json<#ident>), Error> {
                         dotenv::dotenv().ok(); // Load .env file
-                        let query = helpers::evenframe::schemasync::generate_query(helpers::evenframe::schemasync::QueryType::Update, &payload.get_table_config().unwrap(), &payload, None);
+                        let query = ::helpers::evenframe::schemasync::generate_query(::helpers::evenframe::schemasync::QueryType::Update, &payload.get_table_config().unwrap(), &payload, None);
                         let subdomain = &helpers::subdomain::Subdomain::get_subdomain(&host);
                         let db_name = &state.clients.get(subdomain).unwrap().0;
 
@@ -1003,7 +1003,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                         State(state): State<helpers::app_state::AppState>,
                         jar: axum_extra::extract::PrivateCookieJar,
                         axum_extra::TypedHeader(host): axum_extra::TypedHeader<headers::Host>,
-                        Json(payload): Json<helpers::evenframe::wrappers::EvenframeRecordId>,
+                        Json(payload): Json<::helpers::evenframe::wrappers::EvenframeRecordId>,
                     ) -> Result<(StatusCode, Json<#ident>), Error> {
                         dotenv::dotenv().ok(); // Load .env file
                         let query = format!("{}{}{}", #query_read1_lit, payload.to_string().replace("⟩", "").replace("⟨", ""), #query_read2_lit);
@@ -1078,20 +1078,20 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
             // Generate EvenframeAppStruct trait implementation
             let evenframe_app_struct_impl = {
                 quote! {
-                    impl helpers::evenframe::traits::EvenframeAppStruct for #ident {
+                    impl ::helpers::evenframe::traits::EvenframeAppStruct for #ident {
                         fn name() -> String {
                             #struct_name.to_string()
                         }
 
-                        fn struct_config() -> helpers::evenframe::schemasync::StructConfig {
-                            helpers::evenframe::schemasync::StructConfig {
+                        fn struct_config() -> ::helpers::evenframe::schemasync::StructConfig {
+                            ::helpers::evenframe::schemasync::StructConfig {
                                 name: helpers::case::to_snake_case(#struct_name),
                                 fields: vec![ #(#table_field_tokens),* ],
                                 validators: vec![],
                             }
                         }
 
-                        fn table_fields() -> Vec<helpers::evenframe::schemasync::TableField> {
+                        fn table_fields() -> Vec<::helpers::evenframe::schemasync::StructField> {
                             vec![ #(#table_field_tokens),* ]
                         }
                     }
@@ -1101,7 +1101,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
             let output = if has_id {
                 quote! {
                     // Import the trait so it's available for method calls
-                    use helpers::evenframe::traits::EvenframePersistableStruct as _;
+                    use ::helpers::evenframe::traits::EvenframePersistableStruct as _;
 
                     #evenframe_persistable_struct_impl
                     impl #ident {
@@ -1111,7 +1111,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
             } else {
                 quote! {
                     // Import the trait so it's available for method calls
-                    use helpers::evenframe::traits::EvenframeAppStruct as _;
+                    use ::helpers::evenframe::traits::EvenframeAppStruct as _;
 
                     #evenframe_app_struct_impl
                 }
@@ -1132,25 +1132,63 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                             if fields.unnamed.len() == 1 {
                                 let ty = &fields.unnamed.first().unwrap().ty;
                                 let field_type = parse_data_type(ty);
-                                quote! { Some(#field_type) }
+                                quote! { Some(::helpers::evenframe::schemasync::VariantData::DataStructureRef(#field_type)) }
                             } else {
                                 let field_types =
                                     fields.unnamed.iter().map(|f| parse_data_type(&f.ty));
-                                quote! { Some(helpers::evenframe::schemasync::FieldType::Tuple(vec![ #(#field_types),* ])) }
+                                quote! { Some(::helpers::evenframe::schemasync::VariantData::DataStructureRef(::helpers::evenframe::schemasync::FieldType::Tuple(vec![ #(#field_types),* ]))) }
                             }
                         }
                         syn::Fields::Named(fields) => {
-                            let field_types = fields.named.iter().map(|f| {
-                                let fname = f.ident.as_ref().unwrap().to_string();
-                                let ftype = parse_data_type(&f.ty);
-                                quote! { (#fname.to_string(), #ftype) }
+                            // Create an inline struct for named fields
+                            let struct_name = format!("{}_{}", &ident.to_string(), &variant_name);
+                            let struct_fields = fields.named.iter().map(|f| {
+                                let field_name = f.ident.as_ref().unwrap().to_string();
+                                let field_type = parse_data_type(&f.ty);
+                                
+                                // Parse field attributes (format, validators, etc.)
+                                let format = parse_format_attribute(&f.attrs);
+                                let validators = parse_field_validators(&f.attrs);
+                                
+                                let format_tokens = if let Some(ref fmt) = format {
+                                    quote! { Some(#fmt) }
+                                } else {
+                                    quote! { None }
+                                };
+                                
+                                let validators_tokens = if validators.is_empty() {
+                                    quote! { vec![] }
+                                } else {
+                                    quote! { vec![#(#validators),*] }
+                                };
+                                
+                                quote! {
+                                    ::helpers::evenframe::schemasync::StructField {
+                                        field_name: #field_name.to_string(),
+                                        field_type: #field_type,
+                                        edge_config: None,
+                                        define_config: None,
+                                        format: #format_tokens,
+                                        validators: #validators_tokens,
+                                        always_regenerate: false
+                                    }
+                                }
                             });
-                            quote! { Some(helpers::evenframe::schemasync::FieldType::Struct(vec![ #(#field_types),* ])) }
+                            
+                            quote! { 
+                                Some(::helpers::evenframe::schemasync::VariantData::InlineStruct(
+                                    ::helpers::evenframe::schemasync::StructConfig {
+                                        name: #struct_name.to_string(),
+                                        fields: vec![ #(#struct_fields),* ],
+                                        validators: vec![],
+                                    }
+                                ))
+                            }
                         }
                     };
 
                     quote! {
-                        helpers::evenframe::schemasync::Variant {
+                        ::helpers::evenframe::schemasync::Variant {
                             name: #variant_name.to_string(),
                             data: #data_tokens,
                         }
@@ -1160,8 +1198,8 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
 
             let enum_impl = quote! {
                 impl #ident {
-                    pub fn variants() -> helpers::evenframe::schemasync::TaggedUnion {
-                        helpers::evenframe::schemasync::TaggedUnion {
+                    pub fn variants() -> ::helpers::evenframe::schemasync::TaggedUnion {
+                        ::helpers::evenframe::schemasync::TaggedUnion {
                             enum_name: #enum_name_lit.to_string(),
                             variants: vec![ #(#variant_tokens),* ],
                         }
@@ -1169,18 +1207,83 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                 }
             };
 
+            // Collect inline structs from variants with named fields
+            let inline_structs_tokens: Vec<_> = data_enum
+                .variants
+                .iter()
+                .filter_map(|variant| {
+                    match &variant.fields {
+                        syn::Fields::Named(fields) => {
+                            let variant_name = variant.ident.to_string();
+                            let struct_name = format!("{}_{}", &ident.to_string(), &variant_name);
+                            let struct_fields = fields.named.iter().map(|f| {
+                                let field_name = f.ident.as_ref().unwrap().to_string();
+                                let field_type = parse_data_type(&f.ty);
+                                
+                                // Parse field attributes (format, validators, etc.)
+                                let format = parse_format_attribute(&f.attrs);
+                                let validators = parse_field_validators(&f.attrs);
+                                
+                                let format_tokens = if let Some(ref fmt) = format {
+                                    quote! { Some(#fmt) }
+                                } else {
+                                    quote! { None }
+                                };
+                                
+                                let validators_tokens = if validators.is_empty() {
+                                    quote! { vec![] }
+                                } else {
+                                    quote! { vec![#(#validators),*] }
+                                };
+                                
+                                quote! {
+                                    ::helpers::evenframe::schemasync::StructField {
+                                        field_name: #field_name.to_string(),
+                                        field_type: #field_type,
+                                        edge_config: None,
+                                        define_config: None,
+                                        format: #format_tokens,
+                                        validators: #validators_tokens,
+                                        always_regenerate: false
+                                    }
+                                }
+                            });
+                            
+                            Some(quote! {
+                                ::helpers::evenframe::schemasync::StructConfig {
+                                    name: #struct_name.to_string(),
+                                    fields: vec![ #(#struct_fields),* ],
+                                    validators: vec![],
+                                }
+                            })
+                        }
+                        _ => None
+                    }
+                })
+                .collect();
+            
+            let inline_structs_impl = if inline_structs_tokens.is_empty() {
+                quote! { None }
+            } else {
+                quote! { Some(vec![ #(#inline_structs_tokens),* ]) }
+            };
+
             // Generate EvenframeEnum trait implementation
             let evenframe_enum_impl = quote! {
-                impl helpers::evenframe::traits::EvenframeEnum for #ident {
+                impl ::helpers::evenframe::traits::EvenframeEnum for #ident {
                     fn name() -> String {
                         #enum_name_lit.to_string()
                     }
 
-                    fn variants() -> Vec<helpers::evenframe::schemasync::Variant> {
+                    fn variants() -> Vec<::helpers::evenframe::schemasync::Variant> {
                         vec![ #(#variant_tokens),* ]
                     }
 
-                    fn tagged_union() -> helpers::evenframe::schemasync::TaggedUnion {
+                    fn inline_structs() -> Option<Vec<::helpers::evenframe::schemasync::StructConfig>> {
+                        #inline_structs_impl
+                    }
+
+                    fn tagged_union() -> ::helpers::evenframe::schemasync::TaggedUnion {
                         #ident::variants()
                     }
                 }
@@ -1188,7 +1291,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
 
             let output = quote! {
                 // Import the trait so it's available for method calls
-                use helpers::evenframe::traits::EvenframeEnum as _;
+                use ::helpers::evenframe::traits::EvenframeEnum as _;
 
                 #enum_impl
                 #evenframe_enum_impl

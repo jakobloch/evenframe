@@ -1,9 +1,8 @@
 use dotenv::dotenv;
 use handlers::{
-    account::{Account, Ordered},
+    account::{Account, AccountName, Ordered},
     appointment::{
-        Appointment, Colors, DailyRecurrenceRule, Interval, MonthlyRecurrenceRule, RecurrenceEnd,
-        RecurrenceRule, Status, WeekOfMonth, Weekday, WeeklyRecurrenceRule, YearlyRecurrenceRule,
+        Appointment, Colors, Interval, RecurrenceEnd, RecurrenceRule, Status, WeekOfMonth, Weekday,
     },
     company::Company,
     db::Table,
@@ -80,10 +79,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     insert_app_struct_config!(ServiceDefaults);
     insert_app_struct_config!(ProductDefaults);
     insert_app_struct_config!(RecurrenceRule);
-    insert_app_struct_config!(MonthlyRecurrenceRule);
-    insert_app_struct_config!(WeeklyRecurrenceRule);
-    insert_app_struct_config!(DailyRecurrenceRule);
-    insert_app_struct_config!(YearlyRecurrenceRule);
     insert_app_struct_config!(AppPermissions);
 
     // Persistable structs (with ID field)
@@ -122,6 +117,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     enum_configs.insert(Page::name(), Page::tagged_union());
     enum_configs.insert(Applications::name(), Applications::tagged_union());
     enum_configs.insert(UserRole::name(), UserRole::tagged_union());
+    enum_configs.insert(AccountName::name(), AccountName::tagged_union());
+
+    // Merge inline structs from enums into struct_configs for type generation
+    macro_rules! merge_enum_inline_structs_to_configs {
+        ($enum_type:ty) => {
+            if let Some(inline_structs) = <$enum_type as EvenframeEnum>::inline_structs() {
+                for inline_struct in inline_structs {
+                    struct_configs.insert(
+                        to_snake_case(&inline_struct.name),
+                        inline_struct,
+                    );
+                }
+            }
+        };
+    }
+
+    // Merge inline structs from all enums
+    merge_enum_inline_structs_to_configs!(Sector);
+    merge_enum_inline_structs_to_configs!(LeadStage);
+    merge_enum_inline_structs_to_configs!(NextStep);
+    merge_enum_inline_structs_to_configs!(Priority);
+    merge_enum_inline_structs_to_configs!(OrderStage);
+    merge_enum_inline_structs_to_configs!(Item);
+    merge_enum_inline_structs_to_configs!(Status);
+    merge_enum_inline_structs_to_configs!(WeekOfMonth);
+    merge_enum_inline_structs_to_configs!(Weekday);
+    merge_enum_inline_structs_to_configs!(RecurrenceEnd);
+    merge_enum_inline_structs_to_configs!(Interval);
+    merge_enum_inline_structs_to_configs!(Table);
+    merge_enum_inline_structs_to_configs!(Page);
+    merge_enum_inline_structs_to_configs!(Applications);
+    merge_enum_inline_structs_to_configs!(UserRole);
+    merge_enum_inline_structs_to_configs!(AccountName);
 
     if generate_arktype_types {
         std::fs::write(
@@ -338,22 +366,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     <RecurrenceRule as EvenframeAppStruct>::struct_config(),
                 );
                 objects.insert(
-                    <MonthlyRecurrenceRule as EvenframeAppStruct>::name(),
-                    <MonthlyRecurrenceRule as EvenframeAppStruct>::struct_config(),
-                );
-                objects.insert(
-                    <WeeklyRecurrenceRule as EvenframeAppStruct>::name(),
-                    <WeeklyRecurrenceRule as EvenframeAppStruct>::struct_config(),
-                );
-                objects.insert(
-                    <DailyRecurrenceRule as EvenframeAppStruct>::name(),
-                    <DailyRecurrenceRule as EvenframeAppStruct>::struct_config(),
-                );
-                objects.insert(
-                    <YearlyRecurrenceRule as EvenframeAppStruct>::name(),
-                    <YearlyRecurrenceRule as EvenframeAppStruct>::struct_config(),
-                );
-                objects.insert(
                     <AppPermissions as EvenframeAppStruct>::name(),
                     <AppPermissions as EvenframeAppStruct>::struct_config(),
                 );
@@ -376,6 +388,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 enums.insert(Page::name(), Page::tagged_union());
                 enums.insert(Applications::name(), Applications::tagged_union());
                 enums.insert(UserRole::name(), UserRole::tagged_union());
+                enums.insert(AccountName::name(), AccountName::tagged_union());
+
+                // Merge inline structs from enums into objects
+                macro_rules! merge_enum_inline_structs {
+                    ($enum_type:ty) => {
+                        if let Some(inline_structs) = <$enum_type as EvenframeEnum>::inline_structs() {
+                            for inline_struct in inline_structs {
+                                objects.insert(inline_struct.name.clone(), inline_struct);
+                            }
+                        }
+                    };
+                }
+
+                // Merge inline structs from all enums
+                merge_enum_inline_structs!(Sector);
+                merge_enum_inline_structs!(LeadStage);
+                merge_enum_inline_structs!(NextStep);
+                merge_enum_inline_structs!(Priority);
+                merge_enum_inline_structs!(OrderStage);
+                merge_enum_inline_structs!(Item);
+                merge_enum_inline_structs!(Status);
+                merge_enum_inline_structs!(WeekOfMonth);
+                merge_enum_inline_structs!(Weekday);
+                merge_enum_inline_structs!(RecurrenceEnd);
+                merge_enum_inline_structs!(Interval);
+                merge_enum_inline_structs!(Table);
+                merge_enum_inline_structs!(Page);
+                merge_enum_inline_structs!(Applications);
+                merge_enum_inline_structs!(UserRole);
+                merge_enum_inline_structs!(AccountName);
 
                 run_schemasync(db, &tables, &objects, &enums, config.schemasync.clone()).await?;
             }

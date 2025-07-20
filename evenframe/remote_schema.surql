@@ -10,17 +10,15 @@ OPTION IMPORT;
 
 DEFINE TABLE account TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Account') = true;
 
+DEFINE FIELD account_name ON account TYPE { company_name: string } | { first_name: string, last_name: string } DEFAULT { company_name: '' } PERMISSIONS FULL;
 DEFINE FIELD account_type ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD colors ON account TYPE { active: string, hover: string, main: string } DEFAULT { active: '', hover: '', main: '' } PERMISSIONS FULL;
-DEFINE FIELD company_name ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD custom_fields ON account FLEXIBLE TYPE object DEFAULT {  } PERMISSIONS FULL;
 DEFINE FIELD custom_fields[*] ON account TYPE string PERMISSIONS FULL;
-DEFINE FIELD date_added ON account TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date_added ON account TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD email ON account TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FULL;
-DEFINE FIELD first_name ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD has_alert ON account TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD is_tax_exempt ON account TYPE bool DEFAULT false PERMISSIONS FULL;
-DEFINE FIELD last_name ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD lead_source ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD memo ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD needs_review ON account TYPE bool DEFAULT false PERMISSIONS FULL;
@@ -43,18 +41,18 @@ DEFINE FIELD tax_rate ON account TYPE record<tax_rate> DEFAULT NULL PERMISSIONS 
 DEFINE TABLE appointment TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Appointment') = true;
 
 DEFINE FIELD all_day ON appointment TYPE bool DEFAULT false PERMISSIONS FULL;
-DEFINE FIELD begins ON appointment TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD begins ON appointment TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD colors ON appointment TYPE { active: string, hover: string, main: string } DEFAULT { active: '', hover: '', main: '' } PERMISSIONS FULL;
 DEFINE FIELD description ON appointment TYPE null | string DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD duration ON appointment TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD duration ON appointment TYPE duration DEFAULT duration::from::nanos(0) PERMISSIONS FULL;
 DEFINE FIELD employees ON appointment TYPE array<record<employee>> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD employees[*] ON appointment TYPE record<employee> PERMISSIONS FULL;
 DEFINE FIELD location ON appointment TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD multi_day ON appointment TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD offset_ms ON appointment TYPE int DEFAULT 0 PERMISSIONS FULL;
-DEFINE FIELD recurrence_rule ON appointment TYPE null | { cancelled_instances: null | array<string>, interval: { quantity_of_days: int } | { quantity_of_weeks: int, weekdays: array<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'> } | { day: int, name: string, quantity_of_months: int } | { quantity_of_years: int }, recurrence_begins: string, recurrence_ends: null | int | string } DEFAULT NULL PERMISSIONS FULL;
+DEFINE FIELD recurrence_rule ON appointment TYPE null | { additional_instances: null | array<record<appointment>>, cancelled_instances: null | array<string>, interval: { quantity_of_days: int } | { quantity_of_weeks: int, weekdays: array<'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday'> } | { day: int, name: string, quantity_of_months: int } | { quantity_of_years: int }, recurrence_begins: datetime, recurrence_ends: null | int | datetime } DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD status ON appointment TYPE 'Scheduled' | 'OnDeck' | 'Waiting' DEFAULT 'Scheduled' PERMISSIONS FULL;
-DEFINE FIELD timezone ON appointment TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD timezone ON appointment TYPE string DEFAULT 'UTC' PERMISSIONS FULL;
 DEFINE FIELD title ON appointment TYPE string DEFAULT '' PERMISSIONS FULL;
 
 
@@ -216,7 +214,7 @@ DEFINE FIELD upsale ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
 
 DEFINE TABLE ordered TYPE RELATION IN account OUT order SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Ordered') = true;
 
-DEFINE FIELD date ON ordered TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date ON ordered TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD in ON ordered TYPE record<account> PERMISSIONS FULL;
 DEFINE FIELD out ON ordered TYPE record<order> PERMISSIONS FULL;
 

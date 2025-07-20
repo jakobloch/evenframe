@@ -1,3 +1,102 @@
+DEFINE TABLE OVERWRITE appointment SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Appointment') = true FOR update WHERE $auth.permissions.data.any('Appointment') = true FOR create WHERE $auth.permissions.data.any('Appointment') = true FOR delete WHERE $auth.permissions.data.any('Appointment') = true;
+DEFINE FIELD OVERWRITE title ON TABLE appointment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE status ON TABLE appointment TYPE "Scheduled" | "OnDeck" | "Waiting" DEFAULT 'Scheduled' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE begins ON TABLE appointment TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE duration ON TABLE appointment TYPE duration DEFAULT duration::from::nanos(0) PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE timezone ON TABLE appointment TYPE string DEFAULT 'UTC' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE offset_ms ON TABLE appointment TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE all_day ON TABLE appointment TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE multi_day ON TABLE appointment TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE employees ON TABLE appointment TYPE array<record<employee>> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE location ON TABLE appointment TYPE record<site> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE description ON TABLE appointment TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE colors ON TABLE appointment TYPE { main: string, hover: string, active: string } DEFAULT { main: '', hover: '', active: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE recurrence_rule ON TABLE appointment TYPE null | { interval: { quantity_of_days: int } | { quantity_of_weeks: int, weekdays: array<"Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"> } | { quantity_of_months: int, day: int, name: string } | { quantity_of_years: int }, recurrence_begins: datetime, recurrence_ends: null | int | datetime, cancelled_instances: null | array<string>, additional_instances: null | array<record<appointment>> } DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE route SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Route') = true FOR update WHERE $auth.permissions.data.any('Route') = true FOR create WHERE $auth.permissions.data.any('Route') = true FOR delete WHERE $auth.permissions.data.any('Route') = true;
+DEFINE FIELD OVERWRITE techs ON TABLE route TYPE null | array<record<employee>> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE active ON TABLE route TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE name ON TABLE route TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE phone ON TABLE route TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE position ON TABLE route TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE service_route ON TABLE route TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE default_duration_hours ON TABLE route TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE tags ON TABLE route TYPE array<string> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE icon ON TABLE route TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE color ON TABLE route TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE employee SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Employee') = true FOR update WHERE $auth.permissions.data.any('Employee') = true FOR create WHERE $auth.permissions.data.any('Employee') = true FOR delete WHERE $auth.permissions.data.any('Employee') = true;
+DEFINE FIELD OVERWRITE image_url ON TABLE employee TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE name ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE phones ON TABLE employee TYPE array<{ main: bool, phone_type: string, number: string, can_text: bool, can_call: bool }> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE role ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE title ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE email ON TABLE employee TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE address ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE username ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE route ON TABLE employee TYPE record<route> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE rate_per_hour ON TABLE employee TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE active ON TABLE employee TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE is_technician ON TABLE employee TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE is_sales_rep ON TABLE employee TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE description ON TABLE employee TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE linkedin_url ON TABLE employee TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE attendance ON TABLE employee TYPE array<string> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE settings ON TABLE employee TYPE { appointment_notifications: null | { personal_schedule_change_notifications: string, all_schedule_change_notifications: string }, commissions: null | { technician: string, sales_rep: string }, home_page: null | "SalesHomeDashboard" | "SalesHomeProducts" | "SalesHomeServices" | "SalesHomePackages" | "SalesHomeTaxRates" | "SalesLeadsOverview" | "SalesLeadsActivities" | "SalesLeadsCampaigns" | "SalesLeadsDripCampaigns" | "SalesLeadsOpportunities" | "SalesLeadsPromotions" | "SalesAccountsOverview" | "SalesAccountsActivities" | "SalesAccountsBilling" | "SalesAccountsContracts" | "SalesOrdersOverview" | "SalesOrdersActivities" | "SalesOrdersPayments" | "SalesOrdersCommissions" | "SalesSchedulingSchedule" | "SalesSchedulingAppointments" | "SalesSchedulingRecurring" | "SalesSchedulingRoutes" | "SalesSchedulingReminders" | "UserHome" } DEFAULT { appointment_notifications: NULL, commissions: NULL, home_page: NULL } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE service SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Service') = true FOR update WHERE $auth.permissions.data.any('Service') = true FOR create WHERE $auth.permissions.data.any('Service') = true FOR delete WHERE $auth.permissions.data.any('Service') = true;
+DEFINE FIELD OVERWRITE name ON TABLE service TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE quick_code ON TABLE service TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE group ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE subgroup ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE unit ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE active ON TABLE service TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE commission ON TABLE service TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE favorite ON TABLE service TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE average_time ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE defaults ON TABLE service TYPE { price: float, description: string } DEFAULT { price: 0, description: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE payment SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Payment') = true FOR update WHERE $auth.permissions.data.any('Payment') = true FOR create WHERE $auth.permissions.data.any('Payment') = true FOR delete WHERE $auth.permissions.data.any('Payment') = true;
+DEFINE FIELD OVERWRITE date ON TABLE payment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE product SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Product') = true FOR update WHERE $auth.permissions.data.any('Product') = true FOR create WHERE $auth.permissions.data.any('Product') = true FOR delete WHERE $auth.permissions.data.any('Product') = true;
+DEFINE FIELD OVERWRITE name ON TABLE product TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE quick_code ON TABLE product TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE group ON TABLE product TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE subgroup ON TABLE product TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE unit ON TABLE product TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE active ON TABLE product TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE commission ON TABLE product TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE favorite ON TABLE product TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE defaults ON TABLE product TYPE { price: float, description: string } DEFAULT { price: 0, description: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE package SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Package') = true FOR update WHERE $auth.permissions.data.any('Package') = true FOR create WHERE $auth.permissions.data.any('Package') = true FOR delete WHERE $auth.permissions.data.any('Package') = true;
+DEFINE FIELD OVERWRITE date ON TABLE package TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE represents SCHEMAFULL TYPE RELATION FROM employee TO account CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Represents') = true FOR update WHERE $auth.permissions.data.any('Represents') = true FOR create WHERE $auth.permissions.data.any('Represents') = true FOR delete WHERE $auth.permissions.data.any('Represents') = true;
+DEFINE FIELD OVERWRITE date_started ON TABLE represents TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
+DEFINE TABLE OVERWRITE account SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Account') = true FOR update WHERE $auth.permissions.data.any('Account') = true FOR create WHERE $auth.permissions.data.any('Account') = true FOR delete WHERE $auth.permissions.data.any('Account') = true;
+DEFINE FIELD OVERWRITE tax_rate ON TABLE account TYPE record<tax_rate> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE site ON TABLE account TYPE record<site> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE custom_fields ON TABLE account FLEXIBLE TYPE object DEFAULT {};
+DEFINE FIELD custom_fields.* ON TABLE account TYPE string;
+DEFINE FIELD OVERWRITE account_name ON TABLE account TYPE { company_name: string } | { first_name: string, last_name: string } DEFAULT { company_name: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE sector ON TABLE account TYPE "Residential" | "Commercial" DEFAULT 'Residential' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE memo ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE phones ON TABLE account TYPE array<{ main: bool, phone_type: string, number: string, can_text: bool, can_call: bool }> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE email ON TABLE account TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE lead_source ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE colors ON TABLE account TYPE { main: string, hover: string, active: string } DEFAULT { main: '', hover: '', active: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE needs_review ON TABLE account TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_alert ON TABLE account TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE account_type ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE subtype ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE is_tax_exempt ON TABLE account TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE payment_terms ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE tags ON TABLE account TYPE array<string> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE date_added ON TABLE account TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+
 DEFINE TABLE OVERWRITE site SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Site') = true FOR update WHERE $auth.permissions.data.any('Site') = true FOR create WHERE $auth.permissions.data.any('Site') = true FOR delete WHERE $auth.permissions.data.any('Site') = true;
 DEFINE FIELD OVERWRITE address_line1 ON TABLE site TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 DEFINE FIELD OVERWRITE address_line2 ON TABLE site TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
@@ -11,31 +110,33 @@ DEFINE FIELD OVERWRITE postal_code ON TABLE site TYPE string DEFAULT '' PERMISSI
 DEFINE FIELD OVERWRITE postal_code_suffix ON TABLE site TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 DEFINE FIELD OVERWRITE coordinates ON TABLE site TYPE { lat: float, lng: float } DEFAULT { lat: 0, lng: 0 } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 
-DEFINE TABLE OVERWRITE appointment SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Appointment') = true FOR update WHERE $auth.permissions.data.any('Appointment') = true FOR create WHERE $auth.permissions.data.any('Appointment') = true FOR delete WHERE $auth.permissions.data.any('Appointment') = true;
-DEFINE FIELD OVERWRITE title ON TABLE appointment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE status ON TABLE appointment TYPE "Scheduled" | "OnDeck" | "Waiting" DEFAULT 'Scheduled' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE begins ON TABLE appointment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE duration ON TABLE appointment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE timezone ON TABLE appointment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE offset_ms ON TABLE appointment TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE all_day ON TABLE appointment TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE multi_day ON TABLE appointment TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE employees ON TABLE appointment TYPE array<record<employee>> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE location ON TABLE appointment TYPE record<site> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE description ON TABLE appointment TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE colors ON TABLE appointment TYPE { main: string, hover: string, active: string } DEFAULT { main: '', hover: '', active: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE recurrence_rule ON TABLE appointment TYPE null | { interval: { quantity_of_days: int } | { quantity_of_weeks: int, weekdays: array<"Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"> } | { quantity_of_months: int, day: int, name: string } | { quantity_of_years: int }, recurrence_begins: string, recurrence_ends: null | int | string, cancelled_instances: null | array<string>, additional_instances: null | array<record<appointment>> } DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE product SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Product') = true FOR update WHERE $auth.permissions.data.any('Product') = true FOR create WHERE $auth.permissions.data.any('Product') = true FOR delete WHERE $auth.permissions.data.any('Product') = true;
-DEFINE FIELD OVERWRITE name ON TABLE product TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE quick_code ON TABLE product TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE group ON TABLE product TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE subgroup ON TABLE product TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE unit ON TABLE product TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE active ON TABLE product TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE commission ON TABLE product TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE favorite ON TABLE product TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE defaults ON TABLE product TYPE { price: float, description: string } DEFAULT { price: 0, description: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE TABLE OVERWRITE company SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Company') = true FOR update WHERE $auth.permissions.data.any('Company') = true FOR create WHERE $auth.permissions.data.any('Company') = true FOR delete WHERE $auth.permissions.data.any('Company') = true;
+DEFINE FIELD OVERWRITE legal_name ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE phones ON TABLE company TYPE array<{ main: bool, phone_type: string, number: string, can_text: bool, can_call: bool }> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE fax ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE email ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE website ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE tax_id ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE reference_number ON TABLE company TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE postal_code_lookup ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE time_zone ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE default_tax ON TABLE company TYPE record<tax_rate> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE default_tax_location ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE default_area_code ON TABLE company TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE default_account_type ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE lookup_formatting ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE account_name_format ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE merchant_service_provider ON TABLE company TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE date_display_style ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_auto_commission ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_auto_daylight_savings ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_auto_fms_tracking ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_notifications ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_required_lead_source ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_required_email ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_sort_service_items_alphabetically ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE has_attach_order_to_appointment_emails ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE schedule_interval ON TABLE company TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 
 DEFINE TABLE OVERWRITE user SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('User') = true FOR update WHERE $auth.permissions.data.any('User') = true FOR create WHERE $auth.permissions.data.any('User') = true FOR delete WHERE $auth.permissions.data.any('User') = true;
 DEFINE FIELD OVERWRITE email ON TABLE user TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
@@ -48,40 +149,11 @@ DEFINE FIELD OVERWRITE settings ON TABLE user TYPE { appointment_notifications: 
 DEFINE FIELD OVERWRITE role ON TABLE user TYPE "Administrator" | "SalesRepresentative" | "Technician" | "HumanResources" | "InformationTechnology" DEFAULT "Technician";
 DEFINE FIELD OVERWRITE permissions ON TABLE user TYPE { applications: array<"Sales" | "Accounting" | "Errand" | "HumanResources" | "Logistics" | "Marketing" | "Website">, pages: array<"SalesHomeDashboard" | "SalesHomeProducts" | "SalesHomeServices" | "SalesHomePackages" | "SalesHomeTaxRates" | "SalesLeadsOverview" | "SalesLeadsActivities" | "SalesLeadsCampaigns" | "SalesLeadsDripCampaigns" | "SalesLeadsOpportunities" | "SalesLeadsPromotions" | "SalesAccountsOverview" | "SalesAccountsActivities" | "SalesAccountsBilling" | "SalesAccountsContracts" | "SalesOrdersOverview" | "SalesOrdersActivities" | "SalesOrdersPayments" | "SalesOrdersCommissions" | "SalesSchedulingSchedule" | "SalesSchedulingAppointments" | "SalesSchedulingRecurring" | "SalesSchedulingRoutes" | "SalesSchedulingReminders" | "UserHome">, data: array<"Account" | "Appointment" | "Lead" | "TaxRate" | "Site" | "Employee" | "Route" | "Company" | "Product" | "Service" | "User" | "Order" | "Payment" | "Package" | "Promotion" | "Represents" | "Ordered"> } DEFAULT {applications: [], pages: [], data:["Account","Appointment","Lead","TaxRate","Site","Employee","Route","Company","Product","Service","User","Order","Payment","Package","Promotion","Represents","Ordered"]};
 
-DEFINE TABLE OVERWRITE account SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Account') = true FOR update WHERE $auth.permissions.data.any('Account') = true FOR create WHERE $auth.permissions.data.any('Account') = true FOR delete WHERE $auth.permissions.data.any('Account') = true;
-DEFINE FIELD OVERWRITE tax_rate ON TABLE account TYPE record<tax_rate> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE sector ON TABLE account TYPE "Residential" | "Commercial" DEFAULT 'Residential' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE first_name ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE last_name ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE company_name ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE phones ON TABLE account TYPE array<{ main: bool, phone_type: string, number: string, can_text: bool, can_call: bool }> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE email ON TABLE account TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE lead_source ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE site ON TABLE account TYPE record<site> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE memo ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE date_added ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE colors ON TABLE account TYPE { main: string, hover: string, active: string } DEFAULT { main: '', hover: '', active: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE needs_review ON TABLE account TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_alert ON TABLE account TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE account_type ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE subtype ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE is_tax_exempt ON TABLE account TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE payment_terms ON TABLE account TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE tags ON TABLE account TYPE array<string> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE custom_fields ON TABLE account FLEXIBLE TYPE object DEFAULT {};
-DEFINE FIELD custom_fields.* ON TABLE account TYPE string;
+DEFINE TABLE OVERWRITE promotion SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Promotion') = true FOR update WHERE $auth.permissions.data.any('Promotion') = true FOR create WHERE $auth.permissions.data.any('Promotion') = true FOR delete WHERE $auth.permissions.data.any('Promotion') = true;
+DEFINE FIELD OVERWRITE date ON TABLE promotion TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 
-DEFINE TABLE OVERWRITE tax_rate SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('TaxRate') = true FOR update WHERE $auth.permissions.data.any('TaxRate') = true FOR create WHERE $auth.permissions.data.any('TaxRate') = true FOR delete WHERE $auth.permissions.data.any('TaxRate') = true;
-DEFINE FIELD OVERWRITE name ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE tax_agency ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE zip ON TABLE tax_rate TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE city ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE county ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE state ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE is_active ON TABLE tax_rate TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE description ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE tax_components ON TABLE tax_rate TYPE object DEFAULT {} PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD tax_components.* ON TABLE tax_rate TYPE float;
+DEFINE TABLE OVERWRITE ordered SCHEMAFULL TYPE RELATION FROM account TO order CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Ordered') = true FOR update WHERE $auth.permissions.data.any('Ordered') = true FOR create WHERE $auth.permissions.data.any('Ordered') = true FOR delete WHERE $auth.permissions.data.any('Ordered') = true;
+DEFINE FIELD OVERWRITE date ON TABLE ordered TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 
 DEFINE TABLE OVERWRITE lead SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Lead') = true FOR update WHERE $auth.permissions.data.any('Lead') = true FOR create WHERE $auth.permissions.data.any('Lead') = true FOR delete WHERE $auth.permissions.data.any('Lead') = true;
 DEFINE FIELD OVERWRITE number ON TABLE lead TYPE null | int DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
@@ -118,52 +190,6 @@ DEFINE FIELD OVERWRITE tags ON TABLE lead TYPE array<string> DEFAULT [] PERMISSI
 DEFINE FIELD OVERWRITE custom_fields ON TABLE lead TYPE object DEFAULT {} PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 DEFINE FIELD custom_fields.* ON TABLE lead TYPE string;
 
-DEFINE TABLE OVERWRITE company SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Company') = true FOR update WHERE $auth.permissions.data.any('Company') = true FOR create WHERE $auth.permissions.data.any('Company') = true FOR delete WHERE $auth.permissions.data.any('Company') = true;
-DEFINE FIELD OVERWRITE legal_name ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE phones ON TABLE company TYPE array<{ main: bool, phone_type: string, number: string, can_text: bool, can_call: bool }> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE fax ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE email ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE website ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE tax_id ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE reference_number ON TABLE company TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE postal_code_lookup ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE time_zone ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE default_tax ON TABLE company TYPE record<tax_rate> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE default_tax_location ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE default_area_code ON TABLE company TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE default_account_type ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE lookup_formatting ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE account_name_format ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE merchant_service_provider ON TABLE company TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE date_display_style ON TABLE company TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_auto_commission ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_auto_daylight_savings ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_auto_fms_tracking ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_notifications ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_required_lead_source ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_required_email ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_sort_service_items_alphabetically ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE has_attach_order_to_appointment_emails ON TABLE company TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE schedule_interval ON TABLE company TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE service SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Service') = true FOR update WHERE $auth.permissions.data.any('Service') = true FOR create WHERE $auth.permissions.data.any('Service') = true FOR delete WHERE $auth.permissions.data.any('Service') = true;
-DEFINE FIELD OVERWRITE name ON TABLE service TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE quick_code ON TABLE service TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE group ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE subgroup ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE unit ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE active ON TABLE service TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE commission ON TABLE service TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE favorite ON TABLE service TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE average_time ON TABLE service TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE defaults ON TABLE service TYPE { price: float, description: string } DEFAULT { price: 0, description: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE promotion SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Promotion') = true FOR update WHERE $auth.permissions.data.any('Promotion') = true FOR create WHERE $auth.permissions.data.any('Promotion') = true FOR delete WHERE $auth.permissions.data.any('Promotion') = true;
-DEFINE FIELD OVERWRITE date ON TABLE promotion TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE ordered SCHEMAFULL TYPE RELATION FROM account TO order CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Ordered') = true FOR update WHERE $auth.permissions.data.any('Ordered') = true FOR create WHERE $auth.permissions.data.any('Ordered') = true FOR delete WHERE $auth.permissions.data.any('Ordered') = true;
-DEFINE FIELD OVERWRITE date ON TABLE ordered TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
 DEFINE TABLE OVERWRITE order SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Order') = true FOR update WHERE $auth.permissions.data.any('Order') = true FOR create WHERE $auth.permissions.data.any('Order') = true FOR delete WHERE $auth.permissions.data.any('Order') = true;
 DEFINE FIELD OVERWRITE account ON TABLE order TYPE record<account> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 DEFINE FIELD OVERWRITE stage ON TABLE order TYPE "Estimate" | "Active" | "Invoice" DEFAULT 'Estimate' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
@@ -194,43 +220,15 @@ DEFINE FIELD OVERWRITE discount ON TABLE order TYPE float DEFAULT 0 PERMISSIONS 
 DEFINE FIELD OVERWRITE tip ON TABLE order TYPE float DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 DEFINE FIELD OVERWRITE commissions ON TABLE order TYPE array<float> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
 
-DEFINE TABLE OVERWRITE package SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Package') = true FOR update WHERE $auth.permissions.data.any('Package') = true FOR create WHERE $auth.permissions.data.any('Package') = true FOR delete WHERE $auth.permissions.data.any('Package') = true;
-DEFINE FIELD OVERWRITE date ON TABLE package TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE route SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Route') = true FOR update WHERE $auth.permissions.data.any('Route') = true FOR create WHERE $auth.permissions.data.any('Route') = true FOR delete WHERE $auth.permissions.data.any('Route') = true;
-DEFINE FIELD OVERWRITE techs ON TABLE route TYPE null | array<record<employee>> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE active ON TABLE route TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE name ON TABLE route TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE phone ON TABLE route TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE position ON TABLE route TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE service_route ON TABLE route TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE default_duration_hours ON TABLE route TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE tags ON TABLE route TYPE array<string> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE icon ON TABLE route TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE color ON TABLE route TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE represents SCHEMAFULL TYPE RELATION FROM employee TO account CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Represents') = true FOR update WHERE $auth.permissions.data.any('Represents') = true FOR create WHERE $auth.permissions.data.any('Represents') = true FOR delete WHERE $auth.permissions.data.any('Represents') = true;
-DEFINE FIELD OVERWRITE date_started ON TABLE represents TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE payment SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Payment') = true FOR update WHERE $auth.permissions.data.any('Payment') = true FOR create WHERE $auth.permissions.data.any('Payment') = true FOR delete WHERE $auth.permissions.data.any('Payment') = true;
-DEFINE FIELD OVERWRITE date ON TABLE payment TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-
-DEFINE TABLE OVERWRITE employee SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('Employee') = true FOR update WHERE $auth.permissions.data.any('Employee') = true FOR create WHERE $auth.permissions.data.any('Employee') = true FOR delete WHERE $auth.permissions.data.any('Employee') = true;
-DEFINE FIELD OVERWRITE image_url ON TABLE employee TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE name ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE phones ON TABLE employee TYPE array<{ main: bool, phone_type: string, number: string, can_text: bool, can_call: bool }> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE role ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE title ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE email ON TABLE employee TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE address ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE username ON TABLE employee TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE route ON TABLE employee TYPE record<route> DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE rate_per_hour ON TABLE employee TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE active ON TABLE employee TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE is_technician ON TABLE employee TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE is_sales_rep ON TABLE employee TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE description ON TABLE employee TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE linkedin_url ON TABLE employee TYPE null | string DEFAULT NULL PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE attendance ON TABLE employee TYPE array<string> DEFAULT [] PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
-DEFINE FIELD OVERWRITE settings ON TABLE employee TYPE { appointment_notifications: null | { personal_schedule_change_notifications: string, all_schedule_change_notifications: string }, commissions: null | { technician: string, sales_rep: string }, home_page: null | "SalesHomeDashboard" | "SalesHomeProducts" | "SalesHomeServices" | "SalesHomePackages" | "SalesHomeTaxRates" | "SalesLeadsOverview" | "SalesLeadsActivities" | "SalesLeadsCampaigns" | "SalesLeadsDripCampaigns" | "SalesLeadsOpportunities" | "SalesLeadsPromotions" | "SalesAccountsOverview" | "SalesAccountsActivities" | "SalesAccountsBilling" | "SalesAccountsContracts" | "SalesOrdersOverview" | "SalesOrdersActivities" | "SalesOrdersPayments" | "SalesOrdersCommissions" | "SalesSchedulingSchedule" | "SalesSchedulingAppointments" | "SalesSchedulingRecurring" | "SalesSchedulingRoutes" | "SalesSchedulingReminders" | "UserHome" } DEFAULT { appointment_notifications: NULL, commissions: NULL, home_page: NULL } PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE TABLE OVERWRITE tax_rate SCHEMAFULL TYPE NORMAL CHANGEFEED 3d PERMISSIONS FOR select WHERE $auth.permissions.data.any('TaxRate') = true FOR update WHERE $auth.permissions.data.any('TaxRate') = true FOR create WHERE $auth.permissions.data.any('TaxRate') = true FOR delete WHERE $auth.permissions.data.any('TaxRate') = true;
+DEFINE FIELD OVERWRITE name ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE tax_agency ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE zip ON TABLE tax_rate TYPE int DEFAULT 0 PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE city ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE county ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE state ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE is_active ON TABLE tax_rate TYPE bool DEFAULT false PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE description ON TABLE tax_rate TYPE string DEFAULT '' PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD OVERWRITE tax_components ON TABLE tax_rate TYPE object DEFAULT {} PERMISSIONS FOR select FULL FOR create FULL FOR update FULL;
+DEFINE FIELD tax_components.* ON TABLE tax_rate TYPE float;
 
