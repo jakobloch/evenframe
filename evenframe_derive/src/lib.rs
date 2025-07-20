@@ -32,8 +32,8 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     "u64" => quote! { helpers::evenframe::schemasync::FieldType::U64 },
                     "u128" => quote! { helpers::evenframe::schemasync::FieldType::U128 },
                     "usize" => quote! { helpers::evenframe::schemasync::FieldType::Usize },
-                    "SpectaRecordId" => {
-                        quote! { helpers::evenframe::schemasync::FieldType::SpectaRecordId }
+                    "EvenframeRecordId" => {
+                        quote! { helpers::evenframe::schemasync::FieldType::EvenframeRecordId }
                     }
                     "DateTime" => quote! { helpers::evenframe::schemasync::FieldType::DateTime },
                     "Duration" => quote! { helpers::evenframe::schemasync::FieldType::Duration },
@@ -200,20 +200,38 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
             } else {
                 // For complex type paths, check if it's DateTime
                 let type_str = quote! { #ty }.to_string();
-                
+
                 // Check if this is a DateTime type (e.g., chrono::DateTime<Utc>)
-                if type_path.path.segments.last().map(|s| s.ident == "DateTime").unwrap_or(false) {
+                if type_path
+                    .path
+                    .segments
+                    .last()
+                    .map(|s| s.ident == "DateTime")
+                    .unwrap_or(false)
+                {
                     return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
                 }
                 // Check if this is a Duration type (e.g., chrono::Duration)
-                if type_path.path.segments.last().map(|s| s.ident == "Duration").unwrap_or(false) {
+                if type_path
+                    .path
+                    .segments
+                    .last()
+                    .map(|s| s.ident == "Duration")
+                    .unwrap_or(false)
+                {
                     return quote! { helpers::evenframe::schemasync::FieldType::Duration };
                 }
                 // Check if this is a Tz type (e.g., chrono_tz::Tz)
-                if type_path.path.segments.last().map(|s| s.ident == "Tz").unwrap_or(false) {
+                if type_path
+                    .path
+                    .segments
+                    .last()
+                    .map(|s| s.ident == "Tz")
+                    .unwrap_or(false)
+                {
                     return quote! { helpers::evenframe::schemasync::FieldType::Timezone };
                 }
-                
+
                 let lit = syn::LitStr::new(&type_str, ty.span());
                 quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
             }
@@ -985,7 +1003,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                         State(state): State<helpers::app_state::AppState>,
                         jar: axum_extra::extract::PrivateCookieJar,
                         axum_extra::TypedHeader(host): axum_extra::TypedHeader<headers::Host>,
-                        Json(payload): Json<helpers::specta_wrappers::SpectaRecordId>,
+                        Json(payload): Json<helpers::evenframe::wrappers::EvenframeRecordId>,
                     ) -> Result<(StatusCode, Json<#ident>), Error> {
                         dotenv::dotenv().ok(); // Load .env file
                         let query = format!("{}{}{}", #query_read1_lit, payload.to_string().replace("⟩", "").replace("⟨", ""), #query_read2_lit);

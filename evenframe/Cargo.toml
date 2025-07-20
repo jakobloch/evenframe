@@ -7,7 +7,6 @@ edition = "2021"
 [dependencies]
 handlers = { path = "../handlers" }
 helpers = { path = "../helpers" }
-specta = { workspace = true }
 surrealdb = { workspace = true }
 tokio = { workspace = true }
 regex = { workspace = true }
