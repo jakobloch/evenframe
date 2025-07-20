@@ -37,6 +37,7 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     }
                     "DateTime" => quote! { helpers::evenframe::schemasync::FieldType::DateTime },
                     "Duration" => quote! { helpers::evenframe::schemasync::FieldType::Duration },
+                    "Tz" => quote! { helpers::evenframe::schemasync::FieldType::Timezone },
                     "()" => quote! { helpers::evenframe::schemasync::FieldType::Unit },
                     _ => {
                         // Check if this is a path with generic arguments
@@ -207,6 +208,10 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                 // Check if this is a Duration type (e.g., chrono::Duration)
                 if type_path.path.segments.last().map(|s| s.ident == "Duration").unwrap_or(false) {
                     return quote! { helpers::evenframe::schemasync::FieldType::Duration };
+                }
+                // Check if this is a Tz type (e.g., chrono_tz::Tz)
+                if type_path.path.segments.last().map(|s| s.ident == "Tz").unwrap_or(false) {
+                    return quote! { helpers::evenframe::schemasync::FieldType::Timezone };
                 }
                 
                 let lit = syn::LitStr::new(&type_str, ty.span());
