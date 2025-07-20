@@ -35,6 +35,7 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     "SpectaRecordId" => {
                         quote! { helpers::evenframe::schemasync::FieldType::SpectaRecordId }
                     }
+                    "DateTime" => quote! { helpers::evenframe::schemasync::FieldType::DateTime },
                     "()" => quote! { helpers::evenframe::schemasync::FieldType::Unit },
                     _ => {
                         // Check if this is a path with generic arguments
@@ -85,6 +86,9 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                     let inner_parsed = parse_data_type(inner_ty);
                                     return quote! { helpers::evenframe::schemasync::FieldType::RecordLink(Box::new(#inner_parsed)) };
                                 }
+                            } else if ident_str == "DateTime" {
+                                // Handle DateTime<Utc> and similar types
+                                return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
                             }
                         }
 
@@ -168,6 +172,9 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                         let lit = syn::LitStr::new(&type_str, ty.span());
                                         quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                                     }
+                                } else if outer == "DateTime" {
+                                    // Handle DateTime<Utc> and similar types
+                                    quote! { helpers::evenframe::schemasync::FieldType::DateTime }
                                 } else {
                                     let lit = syn::LitStr::new(&type_str, ty.span());
                                     quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
@@ -183,8 +190,14 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     }
                 }
             } else {
-                // For complex type paths, fallback to using their string representation as a literal.
+                // For complex type paths, check if it's DateTime
                 let type_str = quote! { #ty }.to_string();
+                
+                // Check if this is a DateTime type (e.g., chrono::DateTime<Utc>)
+                if type_path.path.segments.last().map(|s| s.ident == "DateTime").unwrap_or(false) {
+                    return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
+                }
+                
                 let lit = syn::LitStr::new(&type_str, ty.span());
                 quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
             }
@@ -276,6 +289,9 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                             let lit = syn::LitStr::new(&type_str, ty.span());
                             quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
                         }
+                    } else if outer == "DateTime" || outer.ends_with("DateTime") {
+                        // Handle DateTime<Utc> and similar types, including chrono::DateTime
+                        quote! { helpers::evenframe::schemasync::FieldType::DateTime }
                     } else {
                         let lit = syn::LitStr::new(&type_str, ty.span());
                         quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
@@ -437,7 +453,7 @@ fn parse_relation_attribute(
     None
 }
 
-fn parse_field_validators(attrs: &[Attribute]) -> Option<Vec<proc_macro2::TokenStream>> {
+fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStream> {
     for attr in attrs {
         if attr.path().is_ident("validators") {
             let result = attr.parse_args::<syn::ExprParen>();
@@ -490,13 +506,11 @@ fn parse_field_validators(attrs: &[Attribute]) -> Option<Vec<proc_macro2::TokenS
                     }
                 }
 
-                if !validator_tokens.is_empty() {
-                    return Some(validator_tokens);
-                }
+                return validator_tokens;
             }
         }
     }
-    None
+    vec![]
 }
 
 fn parse_format_attribute(attrs: &[Attribute]) -> Option<proc_macro2::TokenStream> {
@@ -676,10 +690,10 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                 };
 
                 // Build validators token for this field
-                let validators_tokens = if let Some(ref validators) = field_validators {
-                    quote! { Some(vec![#(#validators),*]) }
+                let validators_tokens = if field_validators.is_empty() {
+                    quote! { vec![] }
                 } else {
-                    quote! { None }
+                    quote! { vec![#(#field_validators),*] }
                 };
 
                 table_field_tokens.push(quote! {
@@ -799,6 +813,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                             helpers::evenframe::schemasync::StructConfig {
                                 name: helpers::case::to_snake_case(#struct_name),
                                 fields: vec![ #(#table_field_tokens),* ],
+                                validators: vec![],
                             }
                         }
 
@@ -811,6 +826,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                                 struct_config: helpers::evenframe::schemasync::StructConfig {
                                     name: helpers::case::to_snake_case(#struct_name),
                                     fields: vec![ #(#table_field_tokens),* ],
+                                    validators: vec![],
                                 },
                                 relation: #relation_tokens,
                                 permissions: #permissions_config_tokens,
@@ -1034,6 +1050,7 @@ pub fn schemasync_derive(input: TokenStream) -> TokenStream {
                             helpers::evenframe::schemasync::StructConfig {
                                 name: helpers::case::to_snake_case(#struct_name),
                                 fields: vec![ #(#table_field_tokens),* ],
+                                validators: vec![],
                             }
                         }
 

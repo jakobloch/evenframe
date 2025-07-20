@@ -1462,6 +1462,7 @@ fn field_type_to_arktype(
         | FieldType::U128
         | FieldType::Usize => "'number'".to_string(),
         FieldType::SpectaRecordId => r#""string""#.to_string(),
+        FieldType::DateTime => r#""string""#.to_string(),
 
         FieldType::Tuple(types) => {
             let types_str = types
@@ -1588,6 +1589,7 @@ fn field_type_to_effect_schema(
         | FieldType::U128
         | FieldType::Usize => "Schema.Number".to_string(),
         FieldType::SpectaRecordId => "Schema.String".to_string(),
+        FieldType::DateTime => "Schema.String".to_string(),
         FieldType::Option(i) => format!("Schema.Option({})", field(i)),
         FieldType::Vec(i) => format!("Schema.Array({})", field(i)),
         FieldType::Tuple(v) => format!(
@@ -1659,6 +1661,7 @@ pub fn field_type_to_default_value(
         | FieldType::U128
         | FieldType::Usize => "0".to_string(),
         FieldType::SpectaRecordId => "''".to_string(),
+        FieldType::DateTime => r#"new Date().toISOString()"#.to_string(),
         FieldType::Tuple(inner_types) => {
             let tuple_defaults: Vec<String> = inner_types
                 .iter()
