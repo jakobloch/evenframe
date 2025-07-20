@@ -36,6 +36,7 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                         quote! { helpers::evenframe::schemasync::FieldType::SpectaRecordId }
                     }
                     "DateTime" => quote! { helpers::evenframe::schemasync::FieldType::DateTime },
+                    "Duration" => quote! { helpers::evenframe::schemasync::FieldType::Duration },
                     "()" => quote! { helpers::evenframe::schemasync::FieldType::Unit },
                     _ => {
                         // Check if this is a path with generic arguments
@@ -89,6 +90,9 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                             } else if ident_str == "DateTime" {
                                 // Handle DateTime<Utc> and similar types
                                 return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
+                            } else if ident_str == "Duration" {
+                                // Handle Duration and similar types
+                                return quote! { helpers::evenframe::schemasync::FieldType::Duration };
                             }
                         }
 
@@ -175,6 +179,9 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                                 } else if outer == "DateTime" {
                                     // Handle DateTime<Utc> and similar types
                                     quote! { helpers::evenframe::schemasync::FieldType::DateTime }
+                                } else if outer == "Duration" {
+                                    // Handle Duration and similar types
+                                    quote! { helpers::evenframe::schemasync::FieldType::Duration }
                                 } else {
                                     let lit = syn::LitStr::new(&type_str, ty.span());
                                     quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
@@ -196,6 +203,10 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                 // Check if this is a DateTime type (e.g., chrono::DateTime<Utc>)
                 if type_path.path.segments.last().map(|s| s.ident == "DateTime").unwrap_or(false) {
                     return quote! { helpers::evenframe::schemasync::FieldType::DateTime };
+                }
+                // Check if this is a Duration type (e.g., chrono::Duration)
+                if type_path.path.segments.last().map(|s| s.ident == "Duration").unwrap_or(false) {
+                    return quote! { helpers::evenframe::schemasync::FieldType::Duration };
                 }
                 
                 let lit = syn::LitStr::new(&type_str, ty.span());
@@ -292,6 +303,9 @@ fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                     } else if outer == "DateTime" || outer.ends_with("DateTime") {
                         // Handle DateTime<Utc> and similar types, including chrono::DateTime
                         quote! { helpers::evenframe::schemasync::FieldType::DateTime }
+                    } else if outer == "Duration" || outer.ends_with("Duration") {
+                        // Handle Duration and similar types, including chrono::Duration
+                        quote! { helpers::evenframe::schemasync::FieldType::Duration }
                     } else {
                         let lit = syn::LitStr::new(&type_str, ty.span());
                         quote! { helpers::evenframe::schemasync::FieldType::Other(#lit.to_string()) }
