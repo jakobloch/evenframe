@@ -1,15 +1,15 @@
 [package]
 name = "evenframe_derive" # Name of your crate
 version = "0.1.0"
-edition = "2021"     # Recommended edition (2021 is the latest as of now)
+edition = "2021"          # Recommended edition (2021 is the latest as of now)
 
 [lib]
 proc-macro = true # Enables procedural macro functionality
 
 [dependencies]
 proc-macro2 = { workspace = true }
-quote = { workspace = true }                     # For generating Rust code
-syn = { workspace = true }                       # For parsing Rust code
+quote = { workspace = true }       # For generating Rust code
+syn = { workspace = true }         # For parsing Rust code
 helpers = { path = "../helpers" }
 serde_json.workspace = true
 regex = { workspace = true }
