@@ -31,7 +31,7 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                     }
                     syn::Fields::Named(fields) => {
                         // Create an inline struct for named fields
-                        let struct_name = format!("{}_{}", &ident.to_string(), &variant_name);
+                        let struct_name = variant_name.clone();
                         let struct_fields = fields.named.iter().map(|f| {
                             let field_name = f.ident.as_ref().unwrap().to_string();
                             let field_type = parse_data_type(&f.ty);
@@ -105,7 +105,7 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                 match &variant.fields {
                     syn::Fields::Named(fields) => {
                         let variant_name = variant.ident.to_string();
-                        let struct_name = format!("{}_{}", &ident.to_string(), &variant_name);
+                        let struct_name = variant_name.clone();
                         let struct_fields = fields.named.iter().map(|f| {
                             let field_name = f.ident.as_ref().unwrap().to_string();
                             let field_type = parse_data_type(&f.ty);
