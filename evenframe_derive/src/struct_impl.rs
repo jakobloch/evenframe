@@ -55,7 +55,10 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         let mut fetch_fields = Vec::new(); // For fields marked with #[fetch]
         let mut subqueries: Vec<String> = Vec::new();
         for field in fields_named.named.iter() {
-            let field_ident = field.ident.as_ref().unwrap();
+            let field_ident = field.ident.as_ref().expect(&format!(
+                "Something went wrong getting the syn::Ident for this field: {:#?}",
+                field
+            ));
             let field_name = field_ident.to_string();
             let field_name_trim = field_name.trim_start_matches("r#");
 

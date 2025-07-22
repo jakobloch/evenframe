@@ -33,7 +33,12 @@ use toml;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv().ok(); // Load .env file
+    if dotenv().is_err() {
+        // Try loading from parent directories if not found in current
+        if dotenv::from_path("../../.env").is_err() {
+            eprintln!("Warning: Could not load .env file from current directory or ../../.env");
+        }
+    }
 
     // Load configuration
     let config = load_config()?;
@@ -174,8 +179,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match Surreal::new::<Http>(&config.schemasync.database.url).await {
             Ok(db) => {
                 // Try to get credentials from env vars, otherwise use defaults
-                let username = env::var("SURREAL_USER").unwrap_or_else(|_| "root".to_string());
-                let password = env::var("SURREAL_PASSWORD").unwrap_or_else(|_| "root".to_string());
+                let username = env::var("SURREALDB_USER").expect("SURREALDB_USER not set");
+                let password = env::var("SURREALDB_PASSWORD").expect("SURREALDB_PASSWORD not set");
 
                 db.signin(Root {
                     username: &username,
@@ -462,9 +467,9 @@ fn substitute_env_vars(value: &str) -> String {
 
     for cap in re.captures_iter(value) {
         let var_name = &cap[1];
-        let default_value = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        let _default_value = cap.get(2).map(|m| m.as_str()).unwrap_or("");
 
-        let replacement = env::var(var_name).unwrap_or_else(|_| default_value.to_string());
+        let replacement = env::var(var_name).expect(&format!("{} was not set", var_name));
         let full_match = &cap[0];
         result = result.replace(full_match, &replacement);
     }
