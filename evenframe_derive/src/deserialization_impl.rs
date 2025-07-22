@@ -28,10 +28,13 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
 
     // Generate field deserialization with validation
     let field_deserializations = fields.iter().map(|field| {
-        let field_name = field.ident.as_ref().unwrap();
+        let field_name = field.ident.as_ref().expect(&format!(
+            "Something went wrong getting the syn::Ident for this field: {:#?}",
+            field
+        ));
         let field_type = &field.ty;
         let enum_variant = quote::format_ident!("{}", to_pascal_case(&field_name.to_string()));
-        
+
         // Create a temporary variable name for validation
         let temp_var_name = format!("__temp_{}", field_name);
 
@@ -67,10 +70,16 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
     });
 
     let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
-    let enum_variants: Vec<_> = fields.iter().map(|f| {
-        let name = f.ident.as_ref().unwrap();
-        quote::format_ident!("{}", to_pascal_case(&name.to_string()))
-    }).collect();
+    let enum_variants: Vec<_> = fields
+        .iter()
+        .map(|f| {
+            let name = f.ident.as_ref().expect(&format!(
+                "Something went wrong getting the syn::Ident for this field: {:#?}",
+                f
+            ));
+            quote::format_ident!("{}", to_pascal_case(&name.to_string()))
+        })
+        .collect();
 
     quote! {
         // Import the trait

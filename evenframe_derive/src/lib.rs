@@ -2,7 +2,6 @@ mod attributes;
 mod coordinate_parsing;
 mod deserialization_impl;
 mod enum_impl;
-mod handlers;
 mod struct_impl;
 mod type_parser;
 mod validator_parser;

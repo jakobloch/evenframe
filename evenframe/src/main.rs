@@ -124,10 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ($enum_type:ty) => {
             if let Some(inline_structs) = <$enum_type as EvenframeEnum>::inline_structs() {
                 for inline_struct in inline_structs {
-                    struct_configs.insert(
-                        to_snake_case(&inline_struct.name),
-                        inline_struct,
-                    );
+                    struct_configs.insert(to_snake_case(&inline_struct.name), inline_struct);
                 }
             }
         };
@@ -393,7 +390,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Merge inline structs from enums into objects
                 macro_rules! merge_enum_inline_structs {
                     ($enum_type:ty) => {
-                        if let Some(inline_structs) = <$enum_type as EvenframeEnum>::inline_structs() {
+                        if let Some(inline_structs) =
+                            <$enum_type as EvenframeEnum>::inline_structs()
+                        {
                             for inline_struct in inline_structs {
                                 objects.insert(inline_struct.name.clone(), inline_struct);
                             }
@@ -458,7 +457,8 @@ fn substitute_env_vars(value: &str) -> String {
     let mut result = value.to_string();
 
     // Pattern to match ${VAR_NAME} or ${VAR_NAME:-default}
-    let re = regex::Regex::new(r"\$\{([^}:]+)(?::-([^}]*))?\}").unwrap();
+    let re = regex::Regex::new(r"\$\{([^}:]+)(?::-([^}]*))?\}")
+        .expect("There were no matches for the given environment variables");
 
     for cap in re.captures_iter(value) {
         let var_name = &cap[1];
