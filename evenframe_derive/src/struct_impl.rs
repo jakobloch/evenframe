@@ -7,12 +7,13 @@ use crate::attributes::{
     parse_format_attribute, parse_mock_data_attribute, parse_relation_attribute,
     parse_table_validators,
 };
+use crate::deserialization_impl::generate_custom_deserialize;
 use crate::handlers::generate_handlers;
 use crate::type_parser::parse_data_type;
-use crate::validators::parse_field_validators;
+use crate::validator_parser::parse_field_validators;
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
-    let ident = input.ident;
+    let ident = input.ident.clone();
 
     if let Data::Struct(ref data_struct) = input.data {
         // Ensure the struct has named fields.
@@ -326,12 +327,25 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             }
         };
 
+        // Check if any field has validators
+        let has_field_validators = fields_named.named.iter().any(|field| {
+            !parse_field_validators(&field.attrs).is_empty()
+        });
+
+        // Generate custom deserialization if there are field validators
+        let deserialize_impl = if has_field_validators || !table_validators.is_empty() {
+            generate_custom_deserialize(&input)
+        } else {
+            quote! {}
+        };
+
         let output = if has_id {
             quote! {
                 // Import the trait so it's available for method calls
                 use ::helpers::evenframe::traits::EvenframePersistableStruct as _;
 
                 #evenframe_persistable_struct_impl
+                #deserialize_impl
                 impl #ident {
                     #handlers_impl
                 }
@@ -342,6 +356,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 use ::helpers::evenframe::traits::EvenframeAppStruct as _;
 
                 #evenframe_app_struct_impl
+                #deserialize_impl
             }
         };
 

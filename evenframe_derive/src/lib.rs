@@ -1,15 +1,14 @@
 mod attributes;
 mod coordinate_parsing;
+mod deserialization_impl;
 mod enum_impl;
-mod field_deserialization;
 mod handlers;
 mod struct_impl;
 mod type_parser;
-mod validators;
+mod validator_parser;
 
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+use syn::{parse_macro_input, Data, DeriveInput};
 
 /// For structs it generates both:
 /// - A `table_schema()` function returning a `helpers::TableSchema`, and

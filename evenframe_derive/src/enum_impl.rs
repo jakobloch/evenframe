@@ -4,7 +4,7 @@ use syn::{Data, DeriveInput, LitStr};
 
 use crate::attributes::parse_format_attribute;
 use crate::type_parser::parse_data_type;
-use crate::validators::parse_field_validators;
+use crate::validator_parser::parse_field_validators;
 
 pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
     let ident = input.ident;

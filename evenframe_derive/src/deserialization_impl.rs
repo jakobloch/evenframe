@@ -1,39 +1,82 @@
+use crate::validator_parser::parse_field_validators_with_logic;
 use quote::quote;
-use syn::{token::Token, Field};
+use syn::{Data, DeriveInput, Fields};
 
-pub fn generate_deserialize(fields: Vec<Field>, struct_name: String) {
-    // Generate field deserialization
+fn to_pascal_case(s: &str) -> String {
+    s.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+            }
+        })
+        .collect()
+}
+
+pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStream {
+    let struct_name = &input.ident;
+
+    // Extract fields from the struct
+    let fields = match &input.data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => &fields.named,
+            _ => return quote! {},
+        },
+        _ => return quote! {},
+    };
+
+    // Generate field deserialization with validation
     let field_deserializations = fields.iter().map(|field| {
-        let field_name = &field.ident;
+        let field_name = field.ident.as_ref().unwrap();
         let field_type = &field.ty;
+        let enum_variant = quote::format_ident!("{}", to_pascal_case(&field_name.to_string()));
+        
+        // Create a temporary variable name for validation
+        let temp_var_name = format!("__temp_{}", field_name);
 
-        // Check for custom attributes on the field
-        let has_validators = field
-            .attrs
-            .iter()
-            .any(|attr| attr.path().is_ident("evenframe_custom"));
+        // Parse validators and get both validator tokens and logic tokens
+        let (_, validation_logic_tokens) =
+            parse_field_validators_with_logic(&field.attrs, &temp_var_name);
 
-        if has_validators {
-            // Generate special handling for this field
+        if !validation_logic_tokens.is_empty() {
+            let temp_var = quote::format_ident!("{}", temp_var_name);
+            // Generate validation code
             quote! {
-                let #field_name: #field_type = map.next_value()?;
-                // Apply your custom processing here
+                Field::#enum_variant => {
+                    if #field_name.is_some() {
+                        return Err(de::Error::duplicate_field(stringify!(#field_name)));
+                    }
+                    let mut #temp_var: #field_type = map.next_value()?;
+                    // Apply validators
+                    #(#validation_logic_tokens)*
+                    #field_name = Some(#temp_var);
+                }
             }
         } else {
-            // Standard deserialization
+            // Standard deserialization without validation
             quote! {
-                let #field_name: #field_type = map.next_value()?;
+                Field::#enum_variant => {
+                    if #field_name.is_some() {
+                        return Err(de::Error::duplicate_field(stringify!(#field_name)));
+                    }
+                    #field_name = Some(map.next_value()?);
+                }
             }
         }
     });
 
     let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
+    let enum_variants: Vec<_> = fields.iter().map(|f| {
+        let name = f.ident.as_ref().unwrap();
+        quote::format_ident!("{}", to_pascal_case(&name.to_string()))
+    }).collect();
 
-    let expanded = quote! {
-        // Import the trait (adjust path as needed)
+    quote! {
+        // Import the trait
         use ::helpers::evenframe::traits::EvenframeDeserialize;
 
-        // Implement your trait with generated logic
+        // Custom deserialization implementation
         impl<'de> EvenframeDeserialize<'de> for #struct_name {
             fn evenframe_deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
@@ -43,7 +86,7 @@ pub fn generate_deserialize(fields: Vec<Field>, struct_name: String) {
                 use std::fmt;
 
                 enum Field {
-                    #(#field_names,)*
+                    #(#enum_variants,)*
                 }
 
                 impl<'de> ::serde::Deserialize<'de> for Field {
@@ -65,7 +108,7 @@ pub fn generate_deserialize(fields: Vec<Field>, struct_name: String) {
                                 E: de::Error,
                             {
                                 match value {
-                                    #(stringify!(#field_names) => Ok(Field::#field_names),)*
+                                    #(stringify!(#field_names) => Ok(Field::#enum_variants),)*
                                     _ => Err(de::Error::unknown_field(value, &[#(stringify!(#field_names)),*])),
                                 }
                             }
@@ -92,14 +135,7 @@ pub fn generate_deserialize(fields: Vec<Field>, struct_name: String) {
 
                         while let Some(key) = map.next_key()? {
                             match key {
-                                #(
-                                    Field::#field_names => {
-                                        if #field_names.is_some() {
-                                            return Err(de::Error::duplicate_field(stringify!(#field_names)));
-                                        }
-                                        #field_names = Some(map.next_value()?);
-                                    }
-                                )*
+                                #(#field_deserializations)*
                             }
                         }
 
@@ -118,7 +154,7 @@ pub fn generate_deserialize(fields: Vec<Field>, struct_name: String) {
             }
         }
 
-        // Default Deserialize implementation that delegates to your trait
+        // Default Deserialize implementation that delegates to custom trait
         impl<'de> ::serde::Deserialize<'de> for #struct_name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
@@ -127,7 +163,5 @@ pub fn generate_deserialize(fields: Vec<Field>, struct_name: String) {
                 Self::evenframe_deserialize(deserializer)
             }
         }
-
-
-    };
+    }
 }

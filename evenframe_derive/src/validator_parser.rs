@@ -5,7 +5,10 @@ use helpers::evenframe::validator::{
 use quote::quote;
 use syn::Attribute;
 
-pub fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStream> {
+pub fn parse_field_validators_with_logic(
+    attrs: &[Attribute],
+    value_ident: &str,
+) -> (Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>) {
     for attr in attrs {
         if attr.path().is_ident("validators") {
             // Parse the validator expression
@@ -18,45 +21,64 @@ pub fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStre
 
             match parse_result {
                 Ok(validators_list) => {
-                    let mut validators = Vec::new();
+                    let mut validator_tokens = Vec::new();
+                    let mut logic_tokens = Vec::new();
                     for validator_expr in validators_list {
-                        validators.extend(parse_validator_enum(&validator_expr));
+                        let (val_tokens, log_tokens) =
+                            parse_validator_enum_with_logic(&validator_expr, value_ident);
+                        validator_tokens.extend(val_tokens);
+                        logic_tokens.extend(log_tokens);
                     }
-                    return validators;
+                    return (validator_tokens, logic_tokens);
                 }
                 Err(_) => {
                     // Try parsing as a single expression for backwards compatibility
                     match attr.parse_args::<syn::Expr>() {
-                        Ok(expr) => return parse_validator_enum(&expr),
+                        Ok(expr) => return parse_validator_enum_with_logic(&expr, value_ident),
                         Err(_) => continue,
                     }
                 }
             }
         }
     }
-    vec![]
+    (vec![], vec![])
 }
 
-// Parse a validator enum expression
-pub fn parse_validator_enum(expr: &syn::Expr) -> Vec<proc_macro2::TokenStream> {
+pub fn parse_field_validators(attrs: &[Attribute]) -> Vec<proc_macro2::TokenStream> {
+    let (validator_tokens, _) = parse_field_validators_with_logic(attrs, "value");
+    validator_tokens
+}
+
+// Parse a validator enum expression and return both validator tokens and validation logic
+pub fn parse_validator_enum_with_logic(
+    expr: &syn::Expr,
+    value_ident: &str,
+) -> (Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>) {
     let mut validator_tokens = Vec::new();
+    let mut logic_tokens = Vec::new();
 
     // Handle array of validators
     if let syn::Expr::Array(array_expr) = expr {
         for elem in &array_expr.elems {
-            validator_tokens.extend(parse_validator_enum(elem));
+            let (val_tokens, log_tokens) = parse_validator_enum_with_logic(elem, value_ident);
+            validator_tokens.extend(val_tokens);
+            logic_tokens.extend(log_tokens);
         }
-        return validator_tokens;
+        return (validator_tokens, logic_tokens);
     }
 
     // Handle parenthesized expressions
     if let syn::Expr::Paren(paren) = expr {
-        return parse_validator_enum(&paren.expr);
+        return parse_validator_enum_with_logic(&paren.expr, value_ident);
     }
 
     // Try to parse the expression into a Validator enum using the SynEnum derive
     match Validator::try_from(expr) {
         Ok(validator) => {
+            // Get the validation logic tokens
+            let validation_logic = validator.get_validation_logic_tokens(value_ident);
+            logic_tokens.push(validation_logic);
+
             // Match on the actual Validator enum
             let validator_token = match validator {
                 Validator::StringValidator(string_validator) => match string_validator {
@@ -462,11 +484,9 @@ pub fn parse_validator_enum(expr: &syn::Expr) -> Vec<proc_macro2::TokenStream> {
             validator_tokens.push(validator_token);
         }
         Err(_) => {
-            // If we can't parse it as a Validator, try to handle it as raw expression
-            // This maintains backward compatibility
             panic!("Something went wrong parsing the syn::Expr as a Validator")
         }
     }
 
-    validator_tokens
+    (validator_tokens, logic_tokens)
 }
