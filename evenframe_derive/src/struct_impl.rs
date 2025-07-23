@@ -292,7 +292,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                             .route(&format!("/{}", collection_name), axum::routing::put(helpers::update!(#ident)))
                             .route(&format!("/{}", collection_name), axum::routing::delete(helpers::delete!(#ident)))
                             .route(&format!("/{}", collection_name), axum::routing::get(helpers::read!(#ident)))
-                            .route(&format!("/{}", collection_name_plural), axum::routing::get(helpers::fetch!(#ident)))
+                            .route(&format!("/{}", collection_name_plural), axum::routing::get(helpers::read_all!(#ident)))
                     }
                 }
             }
