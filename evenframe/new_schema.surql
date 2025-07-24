@@ -8,7 +8,7 @@ OPTION IMPORT;
 -- ACCESSES
 -- ------------------------------
 
-DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'MivvOYTtPiI8lp2ZOJ6BrBi9QrDDxWNR5amUSy1L6dRKtFgFKyrOAnOFEGmdCZulLFnby8MGG3DNk1uP5KrRKTyxdchzIebBKagyir1A8oyBfmSBPKEtMB2pt1JEPe0j' WITH ISSUER KEY 'MivvOYTtPiI8lp2ZOJ6BrBi9QrDDxWNR5amUSy1L6dRKtFgFKyrOAnOFEGmdCZulLFnby8MGG3DNk1uP5KrRKTyxdchzIebBKagyir1A8oyBfmSBPKEtMB2pt1JEPe0j' DURATION FOR TOKEN 15m, FOR SESSION 6h;
+DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'xMYuhL6rt7JUXcUnQ1BTHGXFcuS6QhHv1ZkJacpnVwcX4apFZZAFmtiKr2NQQ9Nlv1gHGQEi7m5Wb7aoLxFpbOVTmBg7TimeAG5BGCwU9RLWCIOVVw5Vfpw4hzAFaUKi' WITH ISSUER KEY 'xMYuhL6rt7JUXcUnQ1BTHGXFcuS6QhHv1ZkJacpnVwcX4apFZZAFmtiKr2NQQ9Nlv1gHGQEi7m5Wb7aoLxFpbOVTmBg7TimeAG5BGCwU9RLWCIOVVw5Vfpw4hzAFaUKi' DURATION FOR TOKEN 15m, FOR SESSION 6h;
 
 -- ------------------------------
 -- TABLE: account
@@ -107,8 +107,8 @@ DEFINE TABLE employee TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR selec
 
 DEFINE FIELD active ON employee TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD address ON employee TYPE string DEFAULT '' PERMISSIONS FULL;
-DEFINE FIELD attendance ON employee TYPE array<string> DEFAULT [] PERMISSIONS FULL;
-DEFINE FIELD attendance[*] ON employee TYPE string PERMISSIONS FULL;
+DEFINE FIELD attendance ON employee TYPE array<datetime> DEFAULT [] PERMISSIONS FULL;
+DEFINE FIELD attendance[*] ON employee TYPE datetime PERMISSIONS FULL;
 DEFINE FIELD description ON employee TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD email ON employee TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FULL;
 DEFINE FIELD image_url ON employee TYPE null | string DEFAULT NULL PERMISSIONS FULL;
@@ -136,14 +136,14 @@ DEFINE TABLE lead TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, c
 DEFINE FIELD `value` ON lead TYPE float DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD accepted ON lead TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD account_type ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
-DEFINE FIELD close_date ON lead TYPE null | string DEFAULT NULL PERMISSIONS FULL;
+DEFINE FIELD close_date ON lead TYPE null | datetime DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD color ON lead TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD company_name ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD custom_fields ON lead TYPE object DEFAULT {  } PERMISSIONS FULL;
 DEFINE FIELD custom_fields[*] ON lead TYPE string PERMISSIONS FULL;
-DEFINE FIELD date_added ON lead TYPE null | string DEFAULT NULL PERMISSIONS FULL;
+DEFINE FIELD date_added ON lead TYPE null | datetime DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD description ON lead TYPE null | string DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD due_date ON lead TYPE null | string DEFAULT NULL PERMISSIONS FULL;
+DEFINE FIELD due_date ON lead TYPE null | datetime DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD email ON lead TYPE { can_email: bool, email_string: string } DEFAULT { can_email: false, email_string: '' } PERMISSIONS FULL;
 DEFINE FIELD favorite ON lead TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD first_name ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
@@ -183,11 +183,11 @@ DEFINE FIELD appointment ON order TYPE record<appointment> DEFAULT NULL PERMISSI
 DEFINE FIELD balance ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD billed_items ON order TYPE array<{ item: record<product> | record<service>, quantity: int, taxed: bool, upsale: bool }> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD billed_items[*] ON order TYPE { item: record<product> | record<service>, quantity: int, taxed: bool, upsale: bool } PERMISSIONS FULL;
-DEFINE FIELD commissions ON order TYPE array<float> DEFAULT [] PERMISSIONS FULL;
+DEFINE FIELD commissions ON order TYPE null | array<float> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD commissions[*] ON order TYPE float PERMISSIONS FULL;
-DEFINE FIELD date_created ON order TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date_created ON order TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD discount ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
-DEFINE FIELD due ON order TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD due ON order TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD group ON order TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD is_posted ON order TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD last_techs ON order TYPE array<record<employee>> DEFAULT [] PERMISSIONS FULL;
@@ -242,7 +242,7 @@ DEFINE FIELD date ON package TYPE string DEFAULT '' PERMISSIONS FULL;
 
 DEFINE TABLE payment TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Payment') = true;
 
-DEFINE FIELD date ON payment TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date ON payment TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 
 
 
@@ -270,7 +270,7 @@ DEFINE FIELD unit ON product TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 
 DEFINE TABLE promotion TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Promotion') = true;
 
-DEFINE FIELD date ON promotion TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date ON promotion TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 
 
 
@@ -280,7 +280,7 @@ DEFINE FIELD date ON promotion TYPE string DEFAULT '' PERMISSIONS FULL;
 
 DEFINE TABLE represents TYPE RELATION IN employee OUT account SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Represents') = true;
 
-DEFINE FIELD date_started ON represents TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date_started ON represents TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD in ON represents TYPE record<employee> PERMISSIONS FULL;
 DEFINE FIELD out ON represents TYPE record<account> PERMISSIONS FULL;
 

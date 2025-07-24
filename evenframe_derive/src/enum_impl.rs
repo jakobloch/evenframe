@@ -38,7 +38,10 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                             
                             // Parse field attributes (format, validators, etc.)
                             let format = parse_format_attribute(&f.attrs);
-                            let validators = parse_field_validators(&f.attrs);
+                            let validators = match parse_field_validators(&f.attrs) {
+                                Ok(v) => v,
+                                Err(err) => return err.to_compile_error(),
+                            };
                             
                             let format_tokens = if let Some(ref fmt) = format {
                                 quote! { Some(#fmt) }
@@ -112,7 +115,10 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                             
                             // Parse field attributes (format, validators, etc.)
                             let format = parse_format_attribute(&f.attrs);
-                            let validators = parse_field_validators(&f.attrs);
+                            let validators = match parse_field_validators(&f.attrs) {
+                                Ok(v) => v,
+                                Err(err) => return err.to_compile_error(),
+                            };
                             
                             let format_tokens = if let Some(ref fmt) = format {
                                 quote! { Some(#fmt) }

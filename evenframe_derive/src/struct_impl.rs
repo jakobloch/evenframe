@@ -12,6 +12,12 @@ use crate::type_parser::parse_data_type;
 use crate::validator_parser::parse_field_validators;
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
+    let evenframe_config = match ::helpers::evenframe::config::EvenframeConfig::new() {
+        Ok(evenframe_config) => evenframe_config,
+        Err(e) => {
+            panic!("{:#?}", e)
+        }
+    };
     let ident = input.ident.clone();
 
     if let Data::Struct(ref data_struct) = input.data {
@@ -82,7 +88,10 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             let format = parse_format_attribute(&field.attrs);
 
             // Parse field-level validators
-            let field_validators = parse_field_validators(&field.attrs);
+            let field_validators = match parse_field_validators(&field.attrs) {
+                Ok(v) => v,
+                Err(err) => return err.to_compile_error().into(),
+            };
 
             // Parse any subquery attribute, overrides default edge subquery if found
             if let Some(subquery_value) = field
@@ -212,6 +221,11 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 quote! { vec![] }
             };
 
+            let default_preservation_mode = evenframe_config
+                .schemasync
+                .mock_gen_config
+                .default_preservation_mode;
+
             quote! {
                 Some(::helpers::evenframe::schemasync::mock::MockGenerationConfig {
                     n: #n,
@@ -221,7 +235,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                     preserve_modified: false,
                     batch_size: 1000,
                     regenerate_fields: vec!["updated_at".to_string(), "created_at".to_string()],
-                    preservation_mode: ::helpers::evenframe::schemasync::merge::PreservationMode::None,
+                    preservation_mode: #default_preservation_mode,
                 })
             }
         } else {
@@ -322,10 +336,12 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         };
 
         // Check if any field has validators
-        let has_field_validators = fields_named
-            .named
-            .iter()
-            .any(|field| !parse_field_validators(&field.attrs).is_empty());
+        let has_field_validators = fields_named.named.iter().any(|field| {
+            match parse_field_validators(&field.attrs) {
+                Ok(validators) => !validators.is_empty(),
+                Err(_) => true, // Consider it as having validators if there's an error
+            }
+        });
 
         // Generate custom deserialization if there are field validators
         let deserialize_impl = if has_field_validators || !table_validators.is_empty() {

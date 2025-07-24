@@ -1,36 +1,52 @@
 
-Successfully executed define statements for table order
-Successfully executed define statements for table service
-Successfully executed define statements for table payment
-Successfully executed define statements for table site
-Successfully executed define statements for table employee
-Successfully executed define statements for table tax_rate
-Successfully executed define statements for table lead
-Successfully executed define statements for table user
-Successfully executed define statements for table ordered
-Successfully executed define statements for table route
-Successfully executed define statements for table product
-Successfully executed define statements for table company
-Successfully executed define statements for table promotion
-Successfully executed define statements for table appointment
-Successfully executed define statements for table package
-Successfully executed define statements for table represents
-Successfully executed define statements for table account
-Successfully executed define access statements for db northern_lightning_wash
-Successfully executed upsert statements for table service
-Successfully executed upsert statements for table tax_rate
-Successfully executed upsert statements for table lead
-Successfully executed upsert statements for table site
-Successfully executed upsert statements for table company
-Successfully executed upsert statements for table product
-Successfully executed upsert statements for table represents
-Successfully executed upsert statements for table account
-Successfully executed upsert statements for table employee
-Successfully executed upsert statements for table package
-Successfully executed upsert statements for table ordered
-Successfully executed upsert statements for table order
-Successfully executed upsert statements for table user
-Successfully executed upsert statements for table route
-Successfully executed upsert statements for table payment
-Successfully executed upsert statements for table appointment
-Successfully executed upsert statements for table promotion
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table user"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table product"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table package"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table ordered"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table site"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table represents"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table route"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table employee"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table appointment"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table lead"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table tax_rate"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table account"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table service"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table order"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table payment"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table company"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1171] &format!("Successfully executed define statements for table {}", table_name) = "Successfully executed define statements for table promotion"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1245] &format!("Successfully executed define access statements for db {}",
+env::var("SURREALDB_DB").expect("SURREALDB_DB not set")) = "Successfully executed define access statements for db northern_lightning_wash"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1014] &format!("Recursion analysis - components: {:?}",
+rec.meta.keys().collect::<Vec<_>>()) = 
+"Recursion analysis - components: [0, 3, 13, 9, 10, 7, 4, 5, 6, 8, 11, 1, 2, 12]"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'represents' depends on: {\"employee\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = 
+"Table 'order' depends on: {\"appointment\", \"promotion\", \"payment\", \"employee\", \"account\", \"site\", \"package\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'ordered' depends on: {\"order\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'appointment' depends on: {\"employee\", \"site\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'company' depends on: {\"tax_rate\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = 
+"Table 'account' depends on: {\"tax_rate\", \"site\", \"ordered\", \"represents\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'employee' depends on: {\"route\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'lead' depends on: {\"represents\", \"tax_rate\", \"site\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1031] &format!("Table '{}' depends on: {:?}", table_name, deps) = "Table 'route' depends on: {\"employee\"}"
+[helpers/src/lib/evenframe/schemasync/surql.rs:1291] &format!("Sorted table order: {:?}", sorted_table_names) = 
+"Sorted table order: [\"account\", \"appointment\", \"company\", \"employee\", \"lead\", \"order\", \"ordered\", \"package\", \"payment\", \"product\", \"promotion\", \"represents\", \"route\", \"service\", \"site\", \"tax_rate\", \"user\"]"
+[helpers/src/lib/evenframe/schemasync/surql_validator.rs:137] &format!("Successfully executed {} {} statements for table {} with {} results",
+results.len(), operation_type, table_name,
+results.iter().filter(|v| !v.is_null()).count()) = "Successfully executed 13 UPSERT statements for table account with 13 results"
+[helpers/src/lib/evenframe/schemasync/surql_validator.rs:137] &format!("Successfully executed {} {} statements for table {} with {} results",
+results.len(), operation_type, table_name,
+results.iter().filter(|v| !v.is_null()).count()) = 
+"Successfully executed 13 UPSERT statements for table appointment with 13 results"
+[helpers/src/lib/evenframe/schemasync/surql_validator.rs:137] &format!("Successfully executed {} {} statements for table {} with {} results",
+results.len(), operation_type, table_name,
+results.iter().filter(|v| !v.is_null()).count()) = "Successfully executed 1 UPSERT statements for table company with 1 results"
+[helpers/src/lib/evenframe/schemasync/surql_validator.rs:137] &format!("Successfully executed {} {} statements for table {} with {} results",
+results.len(), operation_type, table_name,
+results.iter().filter(|v| !v.is_null()).count()) = "Successfully executed 36 UPSERT statements for table employee with 36 results"
+[helpers/src/lib/evenframe/schemasync/surql_validator.rs:137] &format!("Successfully executed {} {} statements for table {} with {} results",
+results.len(), operation_type, table_name,
+results.iter().filter(|v| !v.is_null()).count()) = "Successfully executed 4 UPSERT statements for table lead with 4 results"
