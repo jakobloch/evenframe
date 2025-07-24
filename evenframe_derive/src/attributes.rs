@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::{Attribute, Expr, ExprLit, Lit, Meta, spanned::Spanned};
+use syn::{spanned::Spanned, Attribute, Expr, ExprLit, Lit, Meta};
 
 pub fn parse_mock_data_attribute(
     attrs: &[Attribute],
@@ -51,7 +51,9 @@ pub fn parse_mock_data_attribute(
                                 }
                             }
                             Meta::NameValue(nv) => {
-                                let param_name = nv.path.get_ident()
+                                let param_name = nv
+                                    .path
+                                    .get_ident()
                                     .map(|i| i.to_string())
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
@@ -69,10 +71,11 @@ pub fn parse_mock_data_attribute(
                     }
 
                     // Also parse coordinates
-                    let coordinates = match crate::coordinate_parsing::parse_coordinate_attribute(attrs) {
-                        Ok(coords) => coords,
-                        Err(err) => return Err(err),
-                    };
+                    let coordinates =
+                        match crate::coordinate_parsing::parse_coordinate_attribute(attrs) {
+                            Ok(coords) => coords,
+                            Err(err) => return Err(err),
+                        };
 
                     return Ok(Some((n, overrides, coordinates)));
                 }
@@ -114,7 +117,9 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
                                 }
                             }
                             Meta::NameValue(nv) => {
-                                let param_name = nv.path.get_ident()
+                                let param_name = nv
+                                    .path
+                                    .get_ident()
                                     .map(|i| i.to_string())
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
@@ -206,8 +211,12 @@ pub fn parse_relation_attribute(
                                 }) = &nv.value
                                 {
                                     direction = match lit.value().as_str() {
-                                        "from" => Some(::helpers::evenframe::schemasync::Direction::From),
-                                        "to" => Some(::helpers::evenframe::schemasync::Direction::To),
+                                        "from" => {
+                                            Some(::helpers::evenframe::schemasync::Direction::From)
+                                        }
+                                        "to" => {
+                                            Some(::helpers::evenframe::schemasync::Direction::To)
+                                        }
                                         other => {
                                             return Err(syn::Error::new(
                                                 lit.span(),
@@ -223,7 +232,9 @@ pub fn parse_relation_attribute(
                                 }
                             }
                             Meta::NameValue(nv) => {
-                                let param_name = nv.path.get_ident()
+                                let param_name = nv
+                                    .path
+                                    .get_ident()
                                     .map(|i| i.to_string())
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
@@ -255,8 +266,12 @@ pub fn parse_relation_attribute(
                                 from.is_none().then(|| "from"),
                                 to.is_none().then(|| "to"),
                                 direction.is_none().then(|| "direction"),
-                            ].into_iter().flatten().collect::<Vec<_>>().join(", ");
-                            
+                            ]
+                            .into_iter()
+                            .flatten()
+                            .collect::<Vec<_>>()
+                            .join(", ");
+
                             return Err(syn::Error::new(
                                 attr.span(),
                                 format!("Missing required parameters in relation attribute: {}\n\nAll parameters are required:\n#[relation(\n    edge_name = \"has_user\",\n    from = \"Order\",\n    to = \"User\",\n    direction = \"from\"\n)]", missing)
@@ -276,9 +291,11 @@ pub fn parse_relation_attribute(
     Ok(None)
 }
 
-pub fn parse_format_attribute(attrs: &[Attribute]) -> Result<Option<proc_macro2::TokenStream>, syn::Error> {
+pub fn parse_format_attribute(
+    attrs: &[Attribute],
+) -> Result<Option<proc_macro2::TokenStream>, syn::Error> {
     use syn::{Expr, ExprCall, ExprPath, Path, PathSegment};
-    
+
     for attr in attrs {
         if attr.path().is_ident("format") {
             // Parse the attribute content as an expression
@@ -287,7 +304,7 @@ pub fn parse_format_attribute(attrs: &[Attribute]) -> Result<Option<proc_macro2:
                     attr.span(),
                     format!("Failed to parse format attribute: {}\n\nExamples:\n#[format(DateTime)]\n#[format(Url(\"example.com\"))]", e)
                 ))?;
-            
+
             // Transform the expression to add Format:: prefix if needed
             let format_expr = match &expr {
                 // If it's just an identifier like DateTime, convert to Format::DateTime
@@ -311,7 +328,8 @@ pub fn parse_format_attribute(attrs: &[Attribute]) -> Result<Option<proc_macro2:
                         if path_expr.path.segments.len() == 1 {
                             let variant = &path_expr.path.segments[0];
                             let mut segments = syn::punctuated::Punctuated::new();
-                            segments.push(PathSegment::from(syn::Ident::new("Format", variant.span())));
+                            segments
+                                .push(PathSegment::from(syn::Ident::new("Format", variant.span())));
                             segments.push(variant.clone());
                             Expr::Call(ExprCall {
                                 attrs: call_expr.attrs.clone(),
@@ -336,9 +354,9 @@ pub fn parse_format_attribute(attrs: &[Attribute]) -> Result<Option<proc_macro2:
                 // Otherwise keep as is
                 _ => expr.clone(),
             };
-            
+
             // Use the TryFrom implementation to parse the Format
-            match ::helpers::evenframe::schemasync::format::Format::try_from(&format_expr) {
+            match ::helpers::evenframe::schemasync::mock::format::Format::try_from(&format_expr) {
                 Ok(format) => {
                     // Since Format implements ToTokens, we can just quote it directly
                     return Ok(Some(quote! { #format }));
