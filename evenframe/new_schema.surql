@@ -8,7 +8,7 @@ OPTION IMPORT;
 -- ACCESSES
 -- ------------------------------
 
-DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'xMYuhL6rt7JUXcUnQ1BTHGXFcuS6QhHv1ZkJacpnVwcX4apFZZAFmtiKr2NQQ9Nlv1gHGQEi7m5Wb7aoLxFpbOVTmBg7TimeAG5BGCwU9RLWCIOVVw5Vfpw4hzAFaUKi' WITH ISSUER KEY 'xMYuhL6rt7JUXcUnQ1BTHGXFcuS6QhHv1ZkJacpnVwcX4apFZZAFmtiKr2NQQ9Nlv1gHGQEi7m5Wb7aoLxFpbOVTmBg7TimeAG5BGCwU9RLWCIOVVw5Vfpw4hzAFaUKi' DURATION FOR TOKEN 15m, FOR SESSION 6h;
+DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'TmyycUMTV2sEVx4CRRGPEkSaPia8k7Q1n0RA3MTlFkYqwN3fgtBajUpWgWdbUJfGkKFikkVz6ZlDrTYYnmxlfkFjBjExww1m13CPVy6nthdzuOKQJZAhwoys9tthp7Oq' WITH ISSUER KEY 'TmyycUMTV2sEVx4CRRGPEkSaPia8k7Q1n0RA3MTlFkYqwN3fgtBajUpWgWdbUJfGkKFikkVz6ZlDrTYYnmxlfkFjBjExww1m13CPVy6nthdzuOKQJZAhwoys9tthp7Oq' DURATION FOR TOKEN 15m, FOR SESSION 6h;
 
 -- ------------------------------
 -- TABLE: account
@@ -133,7 +133,7 @@ DEFINE FIELD username ON employee TYPE string DEFAULT '' PERMISSIONS FULL;
 
 DEFINE TABLE lead TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Lead') = true;
 
-DEFINE FIELD `value` ON lead TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD `value` ON lead TYPE float DEFAULT 0f PERMISSIONS FULL;
 DEFINE FIELD accepted ON lead TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD account_type ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD close_date ON lead TYPE null | datetime DEFAULT NULL PERMISSIONS FULL;
@@ -159,7 +159,7 @@ DEFINE FIELD payment_terms ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD phones ON lead TYPE array<{ can_call: bool, can_text: bool, main: bool, number: string, phone_type: string }> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD phones[*] ON lead TYPE { can_call: bool, can_text: bool, main: bool, number: string, phone_type: string } PERMISSIONS FULL;
 DEFINE FIELD priority ON lead TYPE 'High' | 'Medium' | 'Low' DEFAULT 'High' PERMISSIONS FULL;
-DEFINE FIELD probability ON lead TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD probability ON lead TYPE float DEFAULT 0f PERMISSIONS FULL;
 DEFINE FIELD sector ON lead TYPE 'Residential' | 'Commercial' DEFAULT 'Residential' PERMISSIONS FULL;
 DEFINE FIELD site ON lead TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD stage ON lead TYPE 'Open' | 'InitialContact' | 'Qualified' | 'Estimate' | 'Negotiation' DEFAULT 'Open' PERMISSIONS FULL;
@@ -180,13 +180,13 @@ DEFINE TABLE order TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, 
 DEFINE FIELD account ON order TYPE record<account> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD action_item ON order TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD appointment ON order TYPE record<appointment> DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD balance ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD balance ON order TYPE decimal DEFAULT 0.00dec PERMISSIONS FULL;
 DEFINE FIELD billed_items ON order TYPE array<{ item: record<product> | record<service>, quantity: int, taxed: bool, upsale: bool }> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD billed_items[*] ON order TYPE { item: record<product> | record<service>, quantity: int, taxed: bool, upsale: bool } PERMISSIONS FULL;
-DEFINE FIELD commissions ON order TYPE null | array<float> DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD commissions[*] ON order TYPE float PERMISSIONS FULL;
+DEFINE FIELD commissions ON order TYPE array<decimal> DEFAULT [] PERMISSIONS FULL;
+DEFINE FIELD commissions[*] ON order TYPE decimal PERMISSIONS FULL;
 DEFINE FIELD date_created ON order TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
-DEFINE FIELD discount ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD discount ON order TYPE decimal DEFAULT 0.00dec PERMISSIONS FULL;
 DEFINE FIELD due ON order TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 DEFINE FIELD group ON order TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD is_posted ON order TYPE bool DEFAULT false PERMISSIONS FULL;
@@ -208,9 +208,9 @@ DEFINE FIELD sales_rep ON order TYPE record<employee> DEFAULT NULL PERMISSIONS F
 DEFINE FIELD site ON order TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD stage ON order TYPE 'Estimate' | 'Active' | 'Invoice' DEFAULT 'Estimate' PERMISSIONS FULL;
 DEFINE FIELD subgroup ON order TYPE string DEFAULT '' PERMISSIONS FULL;
-DEFINE FIELD tip ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
-DEFINE FIELD total ON order DEFAULT 0 READONLY VALUE <future> { fn::calc_order_total(billed_items.item.defaults.price, billed_items.quantity, discount) } PERMISSIONS FULL;
-DEFINE FIELD upsale ON order TYPE float DEFAULT 0 PERMISSIONS FULL;
+DEFINE FIELD tip ON order TYPE decimal DEFAULT 0.00dec PERMISSIONS FULL;
+DEFINE FIELD total ON order DEFAULT 0.00dec READONLY VALUE <future> { fn::calc_order_total(billed_items.item.defaults.price, billed_items.quantity, discount) } PERMISSIONS FULL;
+DEFINE FIELD upsale ON order TYPE decimal DEFAULT 0.00dec PERMISSIONS FULL;
 
 
 
@@ -232,7 +232,7 @@ DEFINE FIELD out ON ordered TYPE record<order> PERMISSIONS FULL;
 
 DEFINE TABLE package TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Package') = true;
 
-DEFINE FIELD date ON package TYPE string DEFAULT '' PERMISSIONS FULL;
+DEFINE FIELD date ON package TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
 
 
 
@@ -254,7 +254,7 @@ DEFINE TABLE product TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select
 
 DEFINE FIELD active ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD commission ON product TYPE bool DEFAULT false PERMISSIONS FULL;
-DEFINE FIELD defaults ON product TYPE { description: string, price: float } DEFAULT { description: '', price: 0 } PERMISSIONS FULL;
+DEFINE FIELD defaults ON product TYPE { description: string, price: float } DEFAULT { description: '', price: 0f } PERMISSIONS FULL;
 DEFINE FIELD favorite ON product TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD group ON product TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD name ON product TYPE string DEFAULT '' PERMISSIONS FULL;
@@ -316,7 +316,7 @@ DEFINE TABLE service TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select
 DEFINE FIELD active ON service TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD average_time ON service TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD commission ON service TYPE bool DEFAULT false PERMISSIONS FULL;
-DEFINE FIELD defaults ON service TYPE { description: string, price: float } DEFAULT { description: '', price: 0 } PERMISSIONS FULL;
+DEFINE FIELD defaults ON service TYPE { description: string, price: float } DEFAULT { description: '', price: 0f } PERMISSIONS FULL;
 DEFINE FIELD favorite ON service TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD group ON service TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD name ON service TYPE string DEFAULT '' PERMISSIONS FULL;
@@ -337,7 +337,7 @@ DEFINE FIELD address_line2 ON site TYPE null | string DEFAULT NULL PERMISSIONS F
 DEFINE FIELD administrative_area_level1 ON site TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD administrative_area_level2 ON site TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD administrative_area_level3 ON site TYPE string DEFAULT '' PERMISSIONS FULL;
-DEFINE FIELD coordinates ON site TYPE { lat: float, lng: float } DEFAULT { lat: 0, lng: 0 } PERMISSIONS FULL;
+DEFINE FIELD coordinates ON site TYPE { lat: float, lng: float } DEFAULT { lat: 0f, lng: 0f } PERMISSIONS FULL;
 DEFINE FIELD country ON site TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD locality ON site TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD postal_code ON site TYPE string DEFAULT '' PERMISSIONS FULL;
