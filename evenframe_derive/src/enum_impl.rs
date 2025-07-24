@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, LitStr};
+use syn::{Data, DeriveInput, LitStr, spanned::Spanned};
 
 use crate::attributes::parse_format_attribute;
 use crate::type_parser::parse_data_type;
@@ -19,9 +19,15 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                 let data_tokens = match &variant.fields {
                     syn::Fields::Unit => quote! { None },
                     syn::Fields::Unnamed(fields) => {
-                        if fields.unnamed.len() == 1 {
-                            let ty = &fields.unnamed.first().unwrap().ty;
-                            let field_type = parse_data_type(ty);
+                        if fields.unnamed.is_empty() {
+                            return syn::Error::new(
+                                fields.span(),
+                                format!("Variant '{}' has unnamed fields but no actual fields defined.\n\nExample of valid unnamed variant:\n{}(String)\n{}(i32, String)", 
+                                    variant_name, variant_name, variant_name)
+                            ).to_compile_error();
+                        } else if fields.unnamed.len() == 1 {
+                            let field = &fields.unnamed[0];
+                            let field_type = parse_data_type(&field.ty);
                             quote! { Some(::helpers::evenframe::schemasync::VariantData::DataStructureRef(#field_type)) }
                         } else {
                             let field_types =
@@ -30,52 +36,19 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                         }
                     }
                     syn::Fields::Named(fields) => {
-                        // Create an inline struct for named fields
-                        let struct_name = variant_name.clone();
-                        let struct_fields = fields.named.iter().map(|f| {
-                            let field_name = f.ident.as_ref().unwrap().to_string();
-                            let field_type = parse_data_type(&f.ty);
-                            
-                            // Parse field attributes (format, validators, etc.)
-                            let format = parse_format_attribute(&f.attrs);
-                            let validators = match parse_field_validators(&f.attrs) {
-                                Ok(v) => v,
-                                Err(err) => return err.to_compile_error(),
-                            };
-                            
-                            let format_tokens = if let Some(ref fmt) = format {
-                                quote! { Some(#fmt) }
-                            } else {
-                                quote! { None }
-                            };
-                            
-                            let validators_tokens = if validators.is_empty() {
-                                quote! { vec![] }
-                            } else {
-                                quote! { vec![#(#validators),*] }
-                            };
-                            
-                            quote! {
-                                ::helpers::evenframe::schemasync::StructField {
-                                    field_name: #field_name.to_string(),
-                                    field_type: #field_type,
-                                    edge_config: None,
-                                    define_config: None,
-                                    format: #format_tokens,
-                                    validators: #validators_tokens,
-                                    always_regenerate: false
+                        match generate_struct_fields_tokens(&variant_name, fields) {
+                            Ok(struct_fields) => {
+                                quote! { 
+                                    Some(::helpers::evenframe::schemasync::VariantData::InlineStruct(
+                                        ::helpers::evenframe::schemasync::StructConfig {
+                                            name: #variant_name.to_string(),
+                                            fields: vec![ #(#struct_fields),* ],
+                                            validators: vec![],
+                                        }
+                                    ))
                                 }
                             }
-                        });
-                        
-                        quote! { 
-                            Some(::helpers::evenframe::schemasync::VariantData::InlineStruct(
-                                ::helpers::evenframe::schemasync::StructConfig {
-                                    name: #struct_name.to_string(),
-                                    fields: vec![ #(#struct_fields),* ],
-                                    validators: vec![],
-                                }
-                            ))
+                            Err(err) => return err.to_compile_error(),
                         }
                     }
                 };
@@ -108,50 +81,18 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                 match &variant.fields {
                     syn::Fields::Named(fields) => {
                         let variant_name = variant.ident.to_string();
-                        let struct_name = variant_name.clone();
-                        let struct_fields = fields.named.iter().map(|f| {
-                            let field_name = f.ident.as_ref().unwrap().to_string();
-                            let field_type = parse_data_type(&f.ty);
-                            
-                            // Parse field attributes (format, validators, etc.)
-                            let format = parse_format_attribute(&f.attrs);
-                            let validators = match parse_field_validators(&f.attrs) {
-                                Ok(v) => v,
-                                Err(err) => return err.to_compile_error(),
-                            };
-                            
-                            let format_tokens = if let Some(ref fmt) = format {
-                                quote! { Some(#fmt) }
-                            } else {
-                                quote! { None }
-                            };
-                            
-                            let validators_tokens = if validators.is_empty() {
-                                quote! { vec![] }
-                            } else {
-                                quote! { vec![#(#validators),*] }
-                            };
-                            
-                            quote! {
-                                ::helpers::evenframe::schemasync::StructField {
-                                    field_name: #field_name.to_string(),
-                                    field_type: #field_type,
-                                    edge_config: None,
-                                    define_config: None,
-                                    format: #format_tokens,
-                                    validators: #validators_tokens,
-                                    always_regenerate: false
-                                }
+                        match generate_struct_fields_tokens(&variant_name, fields) {
+                            Ok(struct_fields) => {
+                                Some(quote! {
+                                    ::helpers::evenframe::schemasync::StructConfig {
+                                        name: #variant_name.to_string(),
+                                        fields: vec![ #(#struct_fields),* ],
+                                        validators: vec![],
+                                    }
+                                })
                             }
-                        });
-                        
-                        Some(quote! {
-                            ::helpers::evenframe::schemasync::StructConfig {
-                                name: #struct_name.to_string(),
-                                fields: vec![ #(#struct_fields),* ],
-                                validators: vec![],
-                            }
-                        })
+                            Err(err) => Some(err.to_compile_error()),
+                        }
                     }
                     _ => None
                 }
@@ -197,9 +138,80 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
     } else {
         syn::Error::new(
             ident.span(),
-            "generate_enum_impl called on non-enum",
+            format!("The Evenframe derive macro can only be applied to enums when using generate_enum_impl.\n\nYou tried to apply it to: {}\n\nExample of correct usage:\n#[derive(Evenframe)]\nenum MyEnum {{\n    Variant1,\n    Variant2(String),\n    Variant3 {{ field: i32 }}\n}}", ident),
         )
         .to_compile_error()
         .into()
     }
+}
+
+/// Helper function to generate struct field tokens for named fields
+/// This avoids duplication between variant processing and inline struct collection
+fn generate_struct_fields_tokens(
+    variant_name: &str,
+    fields: &syn::FieldsNamed,
+) -> Result<Vec<proc_macro2::TokenStream>, syn::Error> {
+    if fields.named.is_empty() {
+        return Err(syn::Error::new(
+            fields.span(),
+            format!("Variant '{}' has named fields but no actual fields defined.\n\nExample of valid named variant:\n{} {{\n    field1: String,\n    field2: i32,\n}}", 
+                variant_name, variant_name)
+        ));
+    }
+    
+    fields.named
+        .iter()
+        .map(|f| {
+            let field_ident = f.ident.as_ref()
+                .ok_or_else(|| {
+                    syn::Error::new(
+                        f.span(),
+                        "Internal error: Named field should have an identifier"
+                    )
+                })?;
+            let field_name = field_ident.to_string();
+            let field_type = parse_data_type(&f.ty);
+            
+            // Parse field attributes (format, validators, etc.)
+            let format = parse_format_attribute(&f.attrs).map_err(|err| {
+                syn::Error::new(
+                    f.span(),
+                    format!("Failed to parse format attribute for field '{}' in variant '{}': {}",
+                        field_name, variant_name, err)
+                )
+            })?;
+            
+            let validators = parse_field_validators(&f.attrs).map_err(|err| {
+                syn::Error::new(
+                    f.span(),
+                    format!("Failed to parse validators for field '{}' in variant '{}': {}\n\nExample usage:\n#[validate(min_length = 3)]\nfield_name: String",
+                        field_name, variant_name, err)
+                )
+            })?;
+            
+            let format_tokens = if let Some(ref fmt) = format {
+                quote! { Some(#fmt) }
+            } else {
+                quote! { None }
+            };
+            
+            let validators_tokens = if validators.is_empty() {
+                quote! { vec![] }
+            } else {
+                quote! { vec![#(#validators),*] }
+            };
+            
+            Ok(quote! {
+                ::helpers::evenframe::schemasync::StructField {
+                    field_name: #field_name.to_string(),
+                    field_type: #field_type,
+                    edge_config: None,
+                    define_config: None,
+                    format: #format_tokens,
+                    validators: #validators_tokens,
+                    always_regenerate: false
+                }
+            })
+        })
+        .collect()
 }

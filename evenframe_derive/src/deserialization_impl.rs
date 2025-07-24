@@ -1,9 +1,12 @@
 use crate::validator_parser::parse_field_validators_with_logic;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields};
+use syn::{Data, DeriveInput, Fields, spanned::Spanned};
 
+/// Converts snake_case to PascalCase for enum variant names
+/// Example: "my_field" -> "MyField"
 fn to_pascal_case(s: &str) -> String {
     s.split('_')
+        .filter(|word| !word.is_empty()) // Skip empty segments from consecutive underscores
         .map(|word| {
             let mut chars = word.chars();
             match chars.next() {
@@ -14,6 +17,8 @@ fn to_pascal_case(s: &str) -> String {
         .collect()
 }
 
+/// Generates a custom Deserialize implementation that includes field validation
+/// This is used when structs have validators that need to be applied during deserialization
 pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStream {
     let struct_name = &input.ident;
 
@@ -21,17 +26,52 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => &fields.named,
-            _ => return quote! {},
+            Fields::Unnamed(_) => {
+                return syn::Error::new(
+                    input.span(),
+                    "Custom deserialization is only supported for structs with named fields.\n\nExample:\nstruct MyStruct {\n    field1: String,\n    field2: i32,\n}"
+                ).to_compile_error();
+            },
+            Fields::Unit => {
+                return syn::Error::new(
+                    input.span(),
+                    "Custom deserialization is not supported for unit structs.\n\nUnit structs have no fields to validate."
+                ).to_compile_error();
+            },
         },
-        _ => return quote! {},
+        Data::Enum(_) => {
+            return syn::Error::new(
+                input.span(),
+                "Custom deserialization is currently only implemented for structs, not enums.\n\nEnums should use the standard Serde derive."
+            ).to_compile_error();
+        },
+        Data::Union(_) => {
+            return syn::Error::new(
+                input.span(),
+                "Custom deserialization is not supported for unions.\n\nUnions are not supported by Evenframe."
+            ).to_compile_error();
+        },
     };
 
+    // Check if there are any fields to deserialize
+    if fields.is_empty() {
+        return syn::Error::new(
+            input.span(),
+            "Cannot generate custom deserialization for struct with no fields.\n\nEmpty structs should use the standard #[derive(Deserialize)]"
+        ).to_compile_error();
+    }
+    
     // Generate field deserialization with validation
     let field_deserializations = fields.iter().map(|field| {
-        let field_name = field.ident.as_ref().expect(&format!(
-            "Something went wrong getting the syn::Ident for this field: {:#?}",
-            field
-        ));
+        let field_name = match field.ident.as_ref() {
+            Some(ident) => ident,
+            None => {
+                return syn::Error::new(
+                    field.span(),
+                    "Internal error: Named field should have an identifier"
+                ).to_compile_error();
+            }
+        };
         let field_type = &field.ty;
         let enum_variant = quote::format_ident!("{}", to_pascal_case(&field_name.to_string()));
 
@@ -47,14 +87,14 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
 
         if !validation_logic_tokens.is_empty() {
             let temp_var = quote::format_ident!("{}", temp_var_name);
-            // Generate validation code
+            // Generate validation code with better error context
             quote! {
                 Field::#enum_variant => {
                     if #field_name.is_some() {
                         return Err(de::Error::duplicate_field(stringify!(#field_name)));
                     }
                     let mut #temp_var: #field_type = map.next_value()?;
-                    // Apply validators
+                    // Apply validators - any validation errors will be converted to deserialization errors
                     #(#validation_logic_tokens)*
                     #field_name = Some(#temp_var);
                 }
@@ -72,16 +112,18 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
         }
     });
 
-    let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
-    let enum_variants: Vec<_> = fields
+    let field_names: Vec<_> = fields.iter().filter_map(|f| f.ident.as_ref()).collect();
+    
+    // Validate that all fields have names (this should always be true after our earlier check)
+    if field_names.len() != fields.len() {
+        return syn::Error::new(
+            input.span(),
+            "Internal error: Some fields are missing identifiers after validation"
+        ).to_compile_error();
+    }
+    let enum_variants: Vec<_> = field_names
         .iter()
-        .map(|f| {
-            let name = f.ident.as_ref().expect(&format!(
-                "Something went wrong getting the syn::Ident for this field: {:#?}",
-                f
-            ));
-            quote::format_ident!("{}", to_pascal_case(&name.to_string()))
-        })
+        .map(|name| quote::format_ident!("{}", to_pascal_case(&name.to_string())))
         .collect();
 
     quote! {

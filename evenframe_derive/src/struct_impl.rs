@@ -12,13 +12,18 @@ use crate::type_parser::parse_data_type;
 use crate::validator_parser::parse_field_validators;
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
+    let ident = input.ident.clone();
     let evenframe_config = match ::helpers::evenframe::config::EvenframeConfig::new() {
         Ok(evenframe_config) => evenframe_config,
         Err(e) => {
-            panic!("{:#?}", e)
+            return syn::Error::new(
+                ident.span(),
+                format!("Failed to load Evenframe configuration: {}\n\nMake sure evenframe.toml exists in your project root and is properly formatted.", e)
+            )
+            .to_compile_error()
+            .into();
         }
     };
-    let ident = input.ident.clone();
 
     if let Data::Struct(ref data_struct) = input.data {
         // Ensure the struct has named fields.
@@ -27,7 +32,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         } else {
             return syn::Error::new(
                 ident.span(),
-                "Schemasync only supports structs with named fields",
+                format!("Evenframe derive macro only supports structs with named fields.\n\nExample of a valid struct:\n\nstruct {} {{\n    id: String,\n    name: String,\n}}", ident),
             )
             .to_compile_error()
             .into();
@@ -37,23 +42,44 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         let permissions_config =
             match ::helpers::evenframe::schemasync::PermissionsConfig::parse(&input.attrs) {
                 Ok(config) => config,
-                Err(err) => return err.to_compile_error().into(),
+                Err(err) => {
+                    return syn::Error::new(
+                        input.span(),
+                        format!("Failed to parse permissions configuration: {}\n\nExample usage:\n#[permissions(\n    select = \"true\",\n    create = \"auth.role == 'admin'\",\n    update = \"$auth.id == id\",\n    delete = \"false\"\n)]\nstruct MyStruct {{ ... }}", err)
+                    )
+                    .to_compile_error()
+                    .into();
+                }
             };
 
         // Parse mock_data attribute
-        let mock_data_config = parse_mock_data_attribute(&input.attrs);
+        let mock_data_config = match parse_mock_data_attribute(&input.attrs) {
+            Ok(config) => config,
+            Err(err) => return err.to_compile_error().into(),
+        };
 
         // Parse table-level validators
-        let table_validators = parse_table_validators(&input.attrs);
+        let table_validators = match parse_table_validators(&input.attrs) {
+            Ok(validators) => validators,
+            Err(err) => return err.to_compile_error().into(),
+        };
 
         // Parse relation attribute
-        let relation_config = parse_relation_attribute(&input.attrs);
+        let relation_config = match parse_relation_attribute(&input.attrs) {
+            Ok(config) => config,
+            Err(err) => return err.to_compile_error().into(),
+        };
 
         // Check if an "id" field exists.
+        // Structs with an "id" field are treated as persistable entities (database tables).
+        // Structs without an "id" field are treated as application-level data structures.
         let has_id = fields_named
             .named
             .iter()
-            .any(|field| field.ident.as_ref().map(|id| id == "id").unwrap_or(false));
+            .any(|field| {
+                // Check if field name is "id" - unwrap_or(false) handles unnamed fields gracefully
+                field.ident.as_ref().map(|id| id == "id").unwrap_or(false)
+            });
 
         // Single pass over all fields.
         let mut table_field_tokens = Vec::new();
@@ -61,11 +87,19 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         let mut fetch_fields = Vec::new(); // For fields marked with #[fetch]
         let mut subqueries: Vec<String> = Vec::new();
         for field in fields_named.named.iter() {
-            let field_ident = field.ident.as_ref().expect(&format!(
-                "Something went wrong getting the syn::Ident for this field: {:#?}",
-                field
-            ));
+            let field_ident = match field.ident.as_ref() {
+                Some(ident) => ident,
+                None => {
+                    return syn::Error::new(
+                        field.span(),
+                        "Internal error: Field identifier is missing. This should not happen with named fields."
+                    )
+                    .to_compile_error()
+                    .into();
+                }
+            };
             let field_name = field_ident.to_string();
+            // Remove the r# prefix from raw identifiers (e.g., r#type -> type)
             let field_name_trim = field_name.trim_start_matches("r#");
 
             // Build the field type token.
@@ -75,58 +109,100 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             // Parse any edge attribute.
             let edge_config = match ::helpers::evenframe::schemasync::EdgeConfig::parse(field) {
                 Ok(details) => details,
-                Err(err) => return err.to_compile_error().into(),
+                Err(err) => {
+                    return syn::Error::new(
+                        field.span(),
+                        format!("Failed to parse edge configuration for field '{}': {}\n\nExample usage:\n#[edge(name = \"has_user\", direction = \"from\", to = \"User\")]\npub user: RecordLink<User>", field_name, err)
+                    )
+                    .to_compile_error()
+                    .into();
+                }
             };
 
             // Parse any define details.
             let define_config = match ::helpers::evenframe::schemasync::DefineConfig::parse(field) {
                 Ok(details) => details,
-                Err(err) => return err.to_compile_error().into(),
+                Err(err) => {
+                    return syn::Error::new(
+                        field.span(),
+                        format!("Failed to parse define configuration for field '{}': {}\n\nExample usage:\n#[define(default = \"0\", readonly = true)]\npub count: u32", field_name, err)
+                    )
+                    .to_compile_error()
+                    .into();
+                }
             };
 
             // Parse any format attribute.
-            let format = parse_format_attribute(&field.attrs);
+            let format = match parse_format_attribute(&field.attrs) {
+                Ok(fmt) => fmt,
+                Err(err) => {
+                    return syn::Error::new(
+                        field.span(),
+                        format!("Failed to parse format attribute for field '{}': {}", field_name, err)
+                    )
+                    .to_compile_error()
+                    .into();
+                }
+            };
 
             // Parse field-level validators
             let field_validators = match parse_field_validators(&field.attrs) {
                 Ok(v) => v,
-                Err(err) => return err.to_compile_error().into(),
+                Err(err) => {
+                    return syn::Error::new(
+                        field.span(),
+                        format!("Failed to parse validators for field '{}': {}\n\nExample usage:\n#[validate(min_length = 3, max_length = 50)]\npub name: String\n\n#[validate(email)]\npub email: String", field_name, err)
+                    )
+                    .to_compile_error()
+                    .into();
+                }
             };
 
             // Parse any subquery attribute, overrides default edge subquery if found
-            if let Some(subquery_value) = field
+            let has_explicit_subquery = field
                 .attrs
                 .iter()
                 .find(|a| a.path().is_ident("subquery"))
                 .map(|attr| {
-                    attr.parse_args::<LitStr>().map_err(|e| {
-                        syn::Error::new(
-                            attr.span(),
-                            format!("Expected a string literal for subquery attribute: {e}"),
-                        )
-                    })
+                    match attr.parse_args::<LitStr>() {
+                        Ok(lit) => {
+                            subqueries.push(lit.value());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            Err(syn::Error::new(
+                                attr.span(),
+                                format!("Invalid subquery attribute format: {}\n\nThe subquery attribute requires a string literal:\n#[subquery(\"SELECT * FROM users WHERE active = true\")]\n\nMake sure to use double quotes around the SQL query.", e),
+                            ))
+                        }
+                    }
                 })
-                .transpose()
-                .expect("There was a problem parsing the subquery for the field {field_name}")
-            {
-                subqueries.push(subquery_value.value());
-            } else if let Some(ref details) = edge_config {
-                let subquery =
-                    if details.direction == ::helpers::evenframe::schemasync::Direction::From {
-                        format!(
-                            "(SELECT ->{}.* AS data FROM $parent.id FETCH data.out)[0].data as {}",
-                            details.edge_name, field_name
-                        )
-                    } else if details.direction == ::helpers::evenframe::schemasync::Direction::To {
-                        format!(
-                            "(SELECT <-{}.* AS data FROM $parent.id FETCH data.in)[0].data as {}",
-                            details.edge_name, field_name
-                        )
-                    } else {
-                        "".to_string()
-                    };
+                .transpose();
+            
+            match has_explicit_subquery {
+                Err(err) => return err.to_compile_error().into(),
+                Ok(Some(())) => {}, // Explicit subquery was added
+                Ok(None) => {
+                    // No explicit subquery attribute, generate default from edge config
+                    if let Some(ref details) = edge_config {
+                    let subquery =
+                        if details.direction == ::helpers::evenframe::schemasync::Direction::From {
+                            format!(
+                                "(SELECT ->{}.* AS data FROM $parent.id FETCH data.out)[0].data as {}",
+                                details.edge_name, field_name
+                            )
+                        } else if details.direction == ::helpers::evenframe::schemasync::Direction::To {
+                            format!(
+                                "(SELECT <-{}.* AS data FROM $parent.id FETCH data.in)[0].data as {}",
+                                details.edge_name, field_name
+                            )
+                        } else {
+                            "".to_string()
+                        };
 
-                subqueries.push(subquery);
+                        subqueries.push(subquery);
+                    }
+                }
             }
 
             // Check for a fetch attribute.
@@ -229,7 +305,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             quote! {
                 Some(::helpers::evenframe::schemasync::mock::MockGenerationConfig {
                     n: #n,
-                    table_level_override: None, // TODO: parse overrides
+                    table_level_override: None, // Overrides parsing is handled separately
                     coordination_rules: #coord_rules,
                     preserve_unchanged: false,
                     preserve_modified: false,
@@ -336,10 +412,11 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         };
 
         // Check if any field has validators
+        // We check this to determine if we need to generate custom deserialization
         let has_field_validators = fields_named.named.iter().any(|field| {
             match parse_field_validators(&field.attrs) {
                 Ok(validators) => !validators.is_empty(),
-                Err(_) => true, // Consider it as having validators if there's an error
+                Err(_) => true, // If parsing fails, assume validators exist to be safe
             }
         });
 
@@ -371,8 +448,11 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
 
         output.into()
     } else {
-        syn::Error::new(ident.span(), "generate_struct_impl called on non-struct")
-            .to_compile_error()
-            .into()
+        syn::Error::new(
+            ident.span(),
+            format!("The Evenframe derive macro can only be applied to structs.\n\nYou tried to apply it to: {}\n\nExample of correct usage:\n#[derive(Evenframe)]\nstruct MyStruct {{\n    id: String,\n    // ... other fields\n}}", ident)
+        )
+        .to_compile_error()
+        .into()
     }
 }
