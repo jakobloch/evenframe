@@ -2,6 +2,8 @@ use quote::quote;
 use syn::spanned::Spanned;
 use syn::{GenericArgument, PathArguments, Type};
 
+// Remove unused import - type_parser generates tokens that need fully qualified paths
+
 /// Generate a helpful error message for unsupported types
 fn unsupported_type_error(ty: &Type, type_str: &str, hint: &str) -> proc_macro2::TokenStream {
     syn::Error::new(

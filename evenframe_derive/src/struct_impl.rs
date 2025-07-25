@@ -3,6 +3,7 @@ use crate::attributes::{
     parse_table_validators,
 };
 use crate::deserialization_impl::generate_custom_deserialize;
+use crate::imports::generate_struct_imports;
 use crate::type_parser::parse_data_type;
 use crate::validator_parser::parse_field_validators;
 use proc_macro::TokenStream;
@@ -23,6 +24,9 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             .into();
         }
     };
+
+    // Get centralized imports for struct implementations
+    let imports = generate_struct_imports();
 
     if let Data::Struct(ref data_struct) = input.data {
         // Ensure the struct has named fields.
@@ -244,7 +248,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             };
 
             table_field_tokens.push(quote! {
-                ::helpers::evenframe::types::StructField {
+                StructField {
                     field_name: #field_name_trim.to_string(),
                     field_type: #field_type,
                     edge_config: #edge_config_tokens,
@@ -284,8 +288,8 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             let validator_strings = table_validators.iter().map(|v| quote! { #v.to_string() });
             quote! {
                 vec![
-                    #(::helpers::evenframe::validator::Validator::StringValidator(
-                        ::helpers::evenframe::validator::StringValidator::StringEmbedded(#validator_strings)
+                    #(Validator::StringValidator(
+                        StringValidator::StringEmbedded(#validator_strings)
                     )),*
                 ]
             }
@@ -306,7 +310,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 .default_preservation_mode;
 
             quote! {
-                Some(::helpers::evenframe::schemasync::mock::MockGenerationConfig {
+                Some(MockGenerationConfig {
                     n: #n,
                     table_level_override: None, // Overrides parsing is handled separately
                     coordination_rules: #coord_rules,
@@ -329,33 +333,33 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
 
         let evenframe_persistable_struct_impl = {
             quote! {
-                impl ::helpers::evenframe::traits::EvenframePersistableStruct for #ident {
+                impl EvenframePersistableStruct for #ident {
                     fn name() -> String {
                         #struct_name.to_string()
                     }
 
-                    fn validators() -> Vec<::helpers::evenframe::validator::Validator> {
+                    fn validators() -> Vec<Validator> {
                         #table_validators_tokens
                     }
 
-                    fn permissions_config() -> Option<::helpers::evenframe::schemasync::PermissionsConfig> {
+                    fn permissions_config() -> Option<PermissionsConfig> {
                         #permissions_config_tokens
                     }
 
-                    fn struct_config() -> ::helpers::evenframe::types::StructConfig {
-                        ::helpers::evenframe::types::StructConfig {
+                    fn struct_config() -> StructConfig {
+                        StructConfig {
                             name: helpers::case::to_snake_case(#struct_name),
                             fields: vec![ #(#table_field_tokens),* ],
                             validators: vec![],
                         }
                     }
 
-                    fn table_fields() -> Vec<::helpers::evenframe::types::StructField> {
+                    fn table_fields() -> Vec<StructField> {
                         vec![ #(#table_field_tokens),* ]
                     }
 
-                    fn table_config() -> Option<::helpers::evenframe::schemasync::TableConfig> {
-                        Some(::helpers::evenframe::schemasync::TableConfig {
+                    fn table_config() -> Option<TableConfig> {
+                        Some(TableConfig {
                             struct_config: ::helpers::evenframe::types::StructConfig {
                                 name: helpers::case::to_snake_case(#struct_name),
                                 fields: vec![ #(#table_field_tokens),* ],
@@ -367,12 +371,12 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         })
                     }
 
-                    fn get_table_config(&self) -> Option<::helpers::evenframe::schemasync::TableConfig> {
+                    fn get_table_config(&self) -> Option<TableConfig> {
                         Self::table_config()
                     }
 
 
-                    fn mock_generation_config() -> Option<::helpers::evenframe::schemasync::mock::MockGenerationConfig> {
+                    fn mock_generation_config() -> Option<MockGenerationConfig> {
                         #mock_data_tokens
                     }
 
@@ -394,20 +398,20 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         // Generate EvenframeAppStruct trait implementation
         let evenframe_app_struct_impl = {
             quote! {
-                impl ::helpers::evenframe::traits::EvenframeAppStruct for #ident {
+                impl EvenframeAppStruct for #ident {
                     fn name() -> String {
                         #struct_name.to_string()
                     }
 
-                    fn struct_config() -> ::helpers::evenframe::types::StructConfig {
-                        ::helpers::evenframe::types::StructConfig {
+                    fn struct_config() -> StructConfig {
+                        StructConfig {
                             name: helpers::case::to_snake_case(#struct_name),
                             fields: vec![ #(#table_field_tokens),* ],
                             validators: vec![],
                         }
                     }
 
-                    fn table_fields() -> Vec<::helpers::evenframe::types::StructField> {
+                    fn table_fields() -> Vec<StructField> {
                         vec![ #(#table_field_tokens),* ]
                     }
                 }
@@ -432,19 +436,22 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
 
         let output = if has_id {
             quote! {
-                // Import the trait so it's available for method calls
-                use ::helpers::evenframe::traits::EvenframePersistableStruct as _;
+                const _: () = {
+                    #imports
 
-                #evenframe_persistable_struct_impl
+                    #evenframe_persistable_struct_impl
+                };
+
                 #deserialize_impl
-
             }
         } else {
             quote! {
-                // Import the trait so it's available for method calls
-                use ::helpers::evenframe::traits::EvenframeAppStruct as _;
+                const _: () = {
+                    #imports
 
-                #evenframe_app_struct_impl
+                    #evenframe_app_struct_impl
+                };
+
                 #deserialize_impl
             }
         };

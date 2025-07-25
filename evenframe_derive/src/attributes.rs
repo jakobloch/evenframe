@@ -1,6 +1,8 @@
 use quote::quote;
 use syn::{spanned::Spanned, Attribute, Expr, ExprLit, Lit, Meta};
 
+// Remove unused imports - these are only used in the macro implementation, not generated code
+
 pub fn parse_mock_data_attribute(
     attrs: &[Attribute],
 ) -> Result<Option<(usize, Option<String>, Option<Vec<proc_macro2::TokenStream>>)>, syn::Error> {
@@ -359,7 +361,8 @@ pub fn parse_format_attribute(
             };
 
             // Use the TryFrom implementation to parse the Format
-            match ::helpers::evenframe::schemasync::mock::format::Format::try_from(&format_expr) {
+            match ::helpers::evenframe::schemasync::mockmake::format::Format::try_from(&format_expr)
+            {
                 Ok(format) => {
                     // Since Format implements ToTokens, we can just quote it directly
                     return Ok(Some(quote! { #format }));

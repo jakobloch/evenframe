@@ -3,11 +3,15 @@ use quote::quote;
 use syn::{Data, DeriveInput, LitStr, spanned::Spanned};
 
 use crate::attributes::parse_format_attribute;
+use crate::imports::generate_enum_imports;
 use crate::type_parser::parse_data_type;
 use crate::validator_parser::parse_field_validators;
 
 pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
     let ident = input.ident;
+    
+    // Get centralized imports for enum implementations
+    let imports = generate_enum_imports();
     
     if let Data::Enum(ref data_enum) = input.data {
         let enum_name_lit = LitStr::new(&ident.to_string(), ident.span());
@@ -28,19 +32,19 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                         } else if fields.unnamed.len() == 1 {
                             let field = &fields.unnamed[0];
                             let field_type = parse_data_type(&field.ty);
-                            quote! { Some(::helpers::evenframe::types::VariantData::DataStructureRef(#field_type)) }
+                            quote! { Some(VariantData::DataStructureRef(#field_type)) }
                         } else {
                             let field_types =
                                 fields.unnamed.iter().map(|f| parse_data_type(&f.ty));
-                            quote! { Some(::helpers::evenframe::types::VariantData::DataStructureRef(::helpers::evenframe::types::FieldType::Tuple(vec![ #(#field_types),* ]))) }
+                            quote! { Some(VariantData::DataStructureRef(FieldType::Tuple(vec![ #(#field_types),* ]))) }
                         }
                     }
                     syn::Fields::Named(fields) => {
                         match generate_struct_fields_tokens(&variant_name, fields) {
                             Ok(struct_fields) => {
                                 quote! { 
-                                    Some(::helpers::evenframe::types::VariantData::InlineStruct(
-                                        ::helpers::evenframe::types::StructConfig {
+                                    Some(VariantData::InlineStruct(
+                                        StructConfig {
                                             name: #variant_name.to_string(),
                                             fields: vec![ #(#struct_fields),* ],
                                             validators: vec![],
@@ -54,7 +58,7 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                 };
 
                 quote! {
-                    ::helpers::evenframe::types::Variant {
+                    Variant {
                         name: #variant_name.to_string(),
                         data: #data_tokens,
                     }
@@ -64,8 +68,8 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
 
         let enum_impl = quote! {
             impl #ident {
-                pub fn variants() -> ::helpers::evenframe::types::TaggedUnion {
-                    ::helpers::evenframe::types::TaggedUnion {
+                pub fn variants() -> TaggedUnion {
+                    TaggedUnion {
                         enum_name: #enum_name_lit.to_string(),
                         variants: vec![ #(#variant_tokens),* ],
                     }
@@ -84,7 +88,7 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                         match generate_struct_fields_tokens(&variant_name, fields) {
                             Ok(struct_fields) => {
                                 Some(quote! {
-                                    ::helpers::evenframe::types::StructConfig {
+                                    StructConfig {
                                         name: #variant_name.to_string(),
                                         fields: vec![ #(#struct_fields),* ],
                                         validators: vec![],
@@ -107,31 +111,32 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
 
         // Generate EvenframeEnum trait implementation
         let evenframe_enum_impl = quote! {
-            impl ::helpers::evenframe::traits::EvenframeEnum for #ident {
+            impl EvenframeEnum for #ident {
                 fn name() -> String {
                     #enum_name_lit.to_string()
                 }
 
-                fn variants() -> Vec<::helpers::evenframe::types::Variant> {
+                fn variants() -> Vec<Variant> {
                     vec![ #(#variant_tokens),* ]
                 }
 
-                fn inline_structs() -> Option<Vec<::helpers::evenframe::types::StructConfig>> {
+                fn inline_structs() -> Option<Vec<StructConfig>> {
                     #inline_structs_impl
                 }
 
-                fn tagged_union() -> ::helpers::evenframe::types::TaggedUnion {
+                fn tagged_union() -> TaggedUnion {
                     #ident::variants()
                 }
             }
         };
 
         let output = quote! {
-            // Import the trait so it's available for method calls
-            use ::helpers::evenframe::traits::EvenframeEnum as _;
+            const _: () = {
+                #imports
 
-            #enum_impl
-            #evenframe_enum_impl
+                #enum_impl
+                #evenframe_enum_impl
+            };
         };
 
         output.into()
@@ -202,7 +207,7 @@ fn generate_struct_fields_tokens(
             };
             
             Ok(quote! {
-                ::helpers::evenframe::types::StructField {
+                StructField {
                     field_name: #field_name.to_string(),
                     field_type: #field_type,
                     edge_config: None,

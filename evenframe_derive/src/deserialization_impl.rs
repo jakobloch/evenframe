@@ -1,3 +1,4 @@
+use crate::imports::generate_deserialize_imports;
 use crate::validator_parser::parse_field_validators_with_logic;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, spanned::Spanned};
@@ -126,12 +127,14 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
         .map(|name| quote::format_ident!("{}", to_pascal_case(&name.to_string())))
         .collect();
 
+    let imports = generate_deserialize_imports();
+    
     quote! {
-        // Import the trait
-        use ::helpers::evenframe::traits::EvenframeDeserialize;
-
-        // Custom deserialization implementation
-        impl<'de> EvenframeDeserialize<'de> for #struct_name {
+        const _: () = {
+            #imports
+            
+            // Custom deserialization implementation
+            impl<'de> EvenframeDeserialize<'de> for #struct_name {
             fn evenframe_deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: ::serde::Deserializer<'de>,
@@ -208,12 +211,15 @@ pub fn generate_custom_deserialize(input: &DeriveInput) -> proc_macro2::TokenStr
             }
         }
 
+        };
+        
         // Default Deserialize implementation that delegates to custom trait
         impl<'de> ::serde::Deserialize<'de> for #struct_name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: ::serde::Deserializer<'de>,
             {
+                #imports
                 Self::evenframe_deserialize(deserializer)
             }
         }
