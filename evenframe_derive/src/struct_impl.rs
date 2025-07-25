@@ -39,18 +39,19 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         };
 
         // Parse struct-level attributes
-        let permissions_config =
-            match ::helpers::evenframe::schemasync::PermissionsConfig::parse(&input.attrs) {
-                Ok(config) => config,
-                Err(err) => {
-                    return syn::Error::new(
+        let permissions_config = match ::helpers::evenframe::schemasync::PermissionsConfig::parse(
+            &input.attrs,
+        ) {
+            Ok(config) => config,
+            Err(err) => {
+                return syn::Error::new(
                         input.span(),
                         format!("Failed to parse permissions configuration: {}\n\nExample usage:\n#[permissions(\n    select = \"true\",\n    create = \"auth.role == 'admin'\",\n    update = \"$auth.id == id\",\n    delete = \"false\"\n)]\nstruct MyStruct {{ ... }}", err)
                     )
                     .to_compile_error()
                     .into();
-                }
-            };
+            }
+        };
 
         // Parse mock_data attribute
         let mock_data_config = match parse_mock_data_attribute(&input.attrs) {
@@ -73,13 +74,10 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         // Check if an "id" field exists.
         // Structs with an "id" field are treated as persistable entities (database tables).
         // Structs without an "id" field are treated as application-level data structures.
-        let has_id = fields_named
-            .named
-            .iter()
-            .any(|field| {
-                // Check if field name is "id" - unwrap_or(false) handles unnamed fields gracefully
-                field.ident.as_ref().map(|id| id == "id").unwrap_or(false)
-            });
+        let has_id = fields_named.named.iter().any(|field| {
+            // Check if field name is "id" - unwrap_or(false) handles unnamed fields gracefully
+            field.ident.as_ref().map(|id| id == "id").unwrap_or(false)
+        });
 
         // Single pass over all fields.
         let mut table_field_tokens = Vec::new();
@@ -138,7 +136,10 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 Err(err) => {
                     return syn::Error::new(
                         field.span(),
-                        format!("Failed to parse format attribute for field '{}': {}", field_name, err)
+                        format!(
+                            "Failed to parse format attribute for field '{}': {}",
+                            field_name, err
+                        ),
                     )
                     .to_compile_error()
                     .into();
@@ -178,20 +179,23 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                     }
                 })
                 .transpose();
-            
+
             match has_explicit_subquery {
                 Err(err) => return err.to_compile_error().into(),
-                Ok(Some(())) => {}, // Explicit subquery was added
+                Ok(Some(())) => {} // Explicit subquery was added
                 Ok(None) => {
                     // No explicit subquery attribute, generate default from edge config
                     if let Some(ref details) = edge_config {
-                    let subquery =
-                        if details.direction == ::helpers::evenframe::schemasync::Direction::From {
+                        let subquery = if details.direction
+                            == ::helpers::evenframe::schemasync::Direction::From
+                        {
                             format!(
                                 "(SELECT ->{}.* AS data FROM $parent.id FETCH data.out)[0].data as {}",
                                 details.edge_name, field_name
                             )
-                        } else if details.direction == ::helpers::evenframe::schemasync::Direction::To {
+                        } else if details.direction
+                            == ::helpers::evenframe::schemasync::Direction::To
+                        {
                             format!(
                                 "(SELECT <-{}.* AS data FROM $parent.id FETCH data.in)[0].data as {}",
                                 details.edge_name, field_name
@@ -241,7 +245,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             };
 
             table_field_tokens.push(quote! {
-                ::helpers::evenframe::schemasync::StructField {
+                ::helpers::evenframe::types::StructField {
                     field_name: #field_name_trim.to_string(),
                     field_type: #field_type,
                     edge_config: #edge_config_tokens,
@@ -339,21 +343,21 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         #permissions_config_tokens
                     }
 
-                    fn struct_config() -> ::helpers::evenframe::schemasync::StructConfig {
-                        ::helpers::evenframe::schemasync::StructConfig {
+                    fn struct_config() -> ::helpers::evenframe::types::StructConfig {
+                        ::helpers::evenframe::types::StructConfig {
                             name: helpers::case::to_snake_case(#struct_name),
                             fields: vec![ #(#table_field_tokens),* ],
                             validators: vec![],
                         }
                     }
 
-                    fn table_fields() -> Vec<::helpers::evenframe::schemasync::StructField> {
+                    fn table_fields() -> Vec<::helpers::evenframe::types::StructField> {
                         vec![ #(#table_field_tokens),* ]
                     }
 
                     fn table_config() -> Option<::helpers::evenframe::schemasync::TableConfig> {
                         Some(::helpers::evenframe::schemasync::TableConfig {
-                            struct_config: ::helpers::evenframe::schemasync::StructConfig {
+                            struct_config: ::helpers::evenframe::types::StructConfig {
                                 name: helpers::case::to_snake_case(#struct_name),
                                 fields: vec![ #(#table_field_tokens),* ],
                                 validators: vec![],
@@ -396,15 +400,15 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         #struct_name.to_string()
                     }
 
-                    fn struct_config() -> ::helpers::evenframe::schemasync::StructConfig {
-                        ::helpers::evenframe::schemasync::StructConfig {
+                    fn struct_config() -> ::helpers::evenframe::types::StructConfig {
+                        ::helpers::evenframe::types::StructConfig {
                             name: helpers::case::to_snake_case(#struct_name),
                             fields: vec![ #(#table_field_tokens),* ],
                             validators: vec![],
                         }
                     }
 
-                    fn table_fields() -> Vec<::helpers::evenframe::schemasync::StructField> {
+                    fn table_fields() -> Vec<::helpers::evenframe::types::StructField> {
                         vec![ #(#table_field_tokens),* ]
                     }
                 }

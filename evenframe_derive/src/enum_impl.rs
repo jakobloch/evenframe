@@ -28,19 +28,19 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                         } else if fields.unnamed.len() == 1 {
                             let field = &fields.unnamed[0];
                             let field_type = parse_data_type(&field.ty);
-                            quote! { Some(::helpers::evenframe::schemasync::VariantData::DataStructureRef(#field_type)) }
+                            quote! { Some(::helpers::evenframe::types::VariantData::DataStructureRef(#field_type)) }
                         } else {
                             let field_types =
                                 fields.unnamed.iter().map(|f| parse_data_type(&f.ty));
-                            quote! { Some(::helpers::evenframe::schemasync::VariantData::DataStructureRef(::helpers::evenframe::schemasync::FieldType::Tuple(vec![ #(#field_types),* ]))) }
+                            quote! { Some(::helpers::evenframe::types::VariantData::DataStructureRef(::helpers::evenframe::types::FieldType::Tuple(vec![ #(#field_types),* ]))) }
                         }
                     }
                     syn::Fields::Named(fields) => {
                         match generate_struct_fields_tokens(&variant_name, fields) {
                             Ok(struct_fields) => {
                                 quote! { 
-                                    Some(::helpers::evenframe::schemasync::VariantData::InlineStruct(
-                                        ::helpers::evenframe::schemasync::StructConfig {
+                                    Some(::helpers::evenframe::types::VariantData::InlineStruct(
+                                        ::helpers::evenframe::types::StructConfig {
                                             name: #variant_name.to_string(),
                                             fields: vec![ #(#struct_fields),* ],
                                             validators: vec![],
@@ -54,7 +54,7 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                 };
 
                 quote! {
-                    ::helpers::evenframe::schemasync::Variant {
+                    ::helpers::evenframe::types::Variant {
                         name: #variant_name.to_string(),
                         data: #data_tokens,
                     }
@@ -64,8 +64,8 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
 
         let enum_impl = quote! {
             impl #ident {
-                pub fn variants() -> ::helpers::evenframe::schemasync::TaggedUnion {
-                    ::helpers::evenframe::schemasync::TaggedUnion {
+                pub fn variants() -> ::helpers::evenframe::types::TaggedUnion {
+                    ::helpers::evenframe::types::TaggedUnion {
                         enum_name: #enum_name_lit.to_string(),
                         variants: vec![ #(#variant_tokens),* ],
                     }
@@ -84,7 +84,7 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                         match generate_struct_fields_tokens(&variant_name, fields) {
                             Ok(struct_fields) => {
                                 Some(quote! {
-                                    ::helpers::evenframe::schemasync::StructConfig {
+                                    ::helpers::evenframe::types::StructConfig {
                                         name: #variant_name.to_string(),
                                         fields: vec![ #(#struct_fields),* ],
                                         validators: vec![],
@@ -112,15 +112,15 @@ pub fn generate_enum_impl(input: DeriveInput) -> TokenStream {
                     #enum_name_lit.to_string()
                 }
 
-                fn variants() -> Vec<::helpers::evenframe::schemasync::Variant> {
+                fn variants() -> Vec<::helpers::evenframe::types::Variant> {
                     vec![ #(#variant_tokens),* ]
                 }
 
-                fn inline_structs() -> Option<Vec<::helpers::evenframe::schemasync::StructConfig>> {
+                fn inline_structs() -> Option<Vec<::helpers::evenframe::types::StructConfig>> {
                     #inline_structs_impl
                 }
 
-                fn tagged_union() -> ::helpers::evenframe::schemasync::TaggedUnion {
+                fn tagged_union() -> ::helpers::evenframe::types::TaggedUnion {
                     #ident::variants()
                 }
             }
@@ -202,7 +202,7 @@ fn generate_struct_fields_tokens(
             };
             
             Ok(quote! {
-                ::helpers::evenframe::schemasync::StructField {
+                ::helpers::evenframe::types::StructField {
                     field_name: #field_name.to_string(),
                     field_type: #field_type,
                     edge_config: None,
