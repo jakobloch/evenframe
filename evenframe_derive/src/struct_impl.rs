@@ -1,8 +1,3 @@
-use proc_macro::TokenStream;
-use quote::quote;
-use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Fields, LitStr};
-
 use crate::attributes::{
     parse_format_attribute, parse_mock_data_attribute, parse_relation_attribute,
     parse_table_validators,
@@ -10,6 +5,10 @@ use crate::attributes::{
 use crate::deserialization_impl::generate_custom_deserialize;
 use crate::type_parser::parse_data_type;
 use crate::validator_parser::parse_field_validators;
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::spanned::Spanned;
+use syn::{Data, DeriveInput, Fields, LitStr};
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
     let ident = input.ident.clone();
