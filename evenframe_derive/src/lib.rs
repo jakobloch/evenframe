@@ -1,5 +1,5 @@
 mod attributes;
-mod coordinate_parsing;
+mod coordinate_parser;
 mod deserialization_impl;
 mod enum_impl;
 mod struct_impl;

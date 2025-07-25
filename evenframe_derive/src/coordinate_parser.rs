@@ -97,7 +97,7 @@ fn parse_initialize_equal(call: &syn::ExprCall) -> Result<TokenStream, syn::Erro
             ));
         }
         Ok(quote! {
-            helpers::schemasync::coordinate::Coordination::InitializeEqual(vec![#(#fields.to_string()),*])
+            helpers::evenframe::coordinate::Coordination::InitializeEqual(vec![#(#fields.to_string()),*])
         })
     } else {
         Err(syn::Error::new(
@@ -142,7 +142,7 @@ fn parse_initialize_sequential(call: &syn::ExprCall) -> Result<TokenStream, syn:
         let increment_tokens = parse_increment(increment)?;
 
         Ok(quote! {
-            helpers::schemasync::coordinate::Coordination::InitializeSequential {
+            helpers::evenframe::coordinate::Coordination::InitializeSequential {
                 fields: vec![#(#field_names.to_string()),*],
                 increment: #increment_tokens,
             }
@@ -207,7 +207,7 @@ fn parse_initialize_sum(call: &syn::ExprCall) -> Result<TokenStream, syn::Error>
         };
 
         Ok(quote! {
-            helpers::schemasync::coordinate::Coordination::InitializeSum {
+            helpers::evenframe::coordinate::Coordination::InitializeSum {
                 fields: vec![#(#field_names.to_string()),*],
                 total: #total,
             }
@@ -255,7 +255,7 @@ fn parse_initialize_coherent(call: &syn::ExprCall) -> Result<TokenStream, syn::E
         let dataset_tokens = parse_coherent_dataset(dataset)?;
 
         Ok(quote! {
-            helpers::schemasync::coordinate::Coordination::InitializeCoherent {
+            helpers::evenframe::coordinate::Coordination::InitializeCoherent {
                 fields: vec![#(#field_names.to_string()),*],
                 dataset: #dataset_tokens,
             }

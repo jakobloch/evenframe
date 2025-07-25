@@ -50,6 +50,9 @@ pub fn parse_mock_data_attribute(
                                     ));
                                 }
                             }
+                            Meta::NameValue(nv) if nv.path.is_ident("coordinate") => {
+                                // Skip here - coordinate is parsed separately by coordinate_parser
+                            }
                             Meta::NameValue(nv) => {
                                 let param_name = nv
                                     .path
@@ -58,7 +61,7 @@ pub fn parse_mock_data_attribute(
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
                                     nv.path.span(),
-                                    format!("Unknown parameter '{}' in mock_data attribute.\n\nValid parameters are: n, overrides\n\nExample: #[mock_data(n = 1000, overrides = \"config\")]", param_name)
+                                    format!("Unknown parameter '{}' in mock_data attribute.\n\nValid parameters are: n, overrides, coordinate\n\nExample: #[mock_data(n = 1000, overrides = \"config\", coordinate = [InitializeEqual([\"field1\", \"field2\"])])]", param_name)
                                 ));
                             }
                             _ => {
@@ -72,7 +75,7 @@ pub fn parse_mock_data_attribute(
 
                     // Also parse coordinates
                     let coordinates =
-                        match crate::coordinate_parsing::parse_coordinate_attribute(attrs) {
+                        match crate::coordinate_parser::parse_coordinate_attribute(attrs) {
                             Ok(coords) => coords,
                             Err(err) => return Err(err),
                         };
