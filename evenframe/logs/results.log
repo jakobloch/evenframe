@@ -1,47 +1,47 @@
 
-Successfully executed define statements for table package
-Successfully executed define statements for table appointment
-Successfully executed define statements for table account
-Successfully executed define statements for table route
-Successfully executed define statements for table service
-Successfully executed define statements for table employee
+Successfully executed define statements for table site
 Successfully executed define statements for table product
 Successfully executed define statements for table order
-Successfully executed define statements for table promotion
-Successfully executed define statements for table user
-Successfully executed define statements for table represents
-Successfully executed define statements for table payment
 Successfully executed define statements for table lead
-Successfully executed define statements for table tax_rate
-Successfully executed define statements for table site
-Successfully executed define statements for table ordered
+Successfully executed define statements for table employee
 Successfully executed define statements for table company
+Successfully executed define statements for table payment
+Successfully executed define statements for table ordered
+Successfully executed define statements for table route
+Successfully executed define statements for table service
+Successfully executed define statements for table tax_rate
+Successfully executed define statements for table appointment
+Successfully executed define statements for table user
+Successfully executed define statements for table package
+Successfully executed define statements for table promotion
+Successfully executed define statements for table account
+Successfully executed define statements for table represents
 Successfully executed define access statements for db northern_lightning_wash
-Table 'appointment' depends on: {"appointment", "employee", "site"}
-Table 'account' depends on: {"site", "represents", "tax_rate", "ordered"}
-Table 'route' depends on: {"employee"}
+Table 'order' depends on: {"appointment", "account", "promotion", "service", "product", "employee", "site", "package", "payment"}
+Table 'lead' depends on: {"tax_rate", "site", "represents"}
 Table 'employee' depends on: {"route"}
-Table 'order' depends on: {"payment", "product", "promotion", "account", "appointment", "site", "package", "service", "employee"}
-Table 'represents' depends on: {"account", "employee"}
-Table 'lead' depends on: {"tax_rate", "represents", "site"}
-Table 'ordered' depends on: {"account", "order"}
 Table 'company' depends on: {"tax_rate"}
+Table 'ordered' depends on: {"order", "account"}
+Table 'route' depends on: {"employee"}
+Table 'appointment' depends on: {"employee", "site", "appointment"}
+Table 'account' depends on: {"tax_rate", "ordered", "site", "represents"}
+Table 'represents' depends on: {"employee", "account"}
 Circular dependency detected among tables: ["employee", "route"]
 Circular dependency detected among tables: ["account", "order", "ordered", "represents"]
 Tables with no dependencies (adding at beginning): ["user"]
-Final sorted table order: ["user", "service", "package", "site", "employee", "route", "appointment", "promotion", "product", "payment", "tax_rate", "account", "order", "ordered", "represents", "lead", "company"]
-Sorted table order: ["user", "service", "package", "site", "employee", "route", "appointment", "promotion", "product", "payment", "tax_rate", "account", "order", "ordered", "represents", "lead", "company"]
+Final sorted table order: ["user", "site", "employee", "route", "appointment", "tax_rate", "payment", "package", "product", "service", "promotion", "account", "order", "ordered", "represents", "lead", "company"]
+Sorted table order: ["user", "site", "employee", "route", "appointment", "tax_rate", "payment", "package", "product", "service", "promotion", "account", "order", "ordered", "represents", "lead", "company"]
 Successfully executed 15 UPSERT statements for table user with 15 results
-Successfully executed 12 UPSERT statements for table service with 12 results
-Successfully executed 2 UPSERT statements for table package with 2 results
 Successfully executed 50 UPSERT statements for table site with 50 results
-Successfully executed 34 UPSERT statements for table employee with 34 results
+Successfully executed 33 UPSERT statements for table employee with 33 results
 Successfully executed 10 UPSERT statements for table route with 10 results
 Successfully executed 13 UPSERT statements for table appointment with 13 results
-Successfully executed 4 UPSERT statements for table promotion with 4 results
-Successfully executed 4 UPSERT statements for table product with 4 results
-Successfully executed 4 UPSERT statements for table payment with 4 results
 Successfully executed 3 UPSERT statements for table tax_rate with 3 results
+Successfully executed 4 UPSERT statements for table payment with 4 results
+Successfully executed 2 UPSERT statements for table package with 2 results
+Successfully executed 4 UPSERT statements for table product with 4 results
+Successfully executed 12 UPSERT statements for table service with 12 results
+Successfully executed 4 UPSERT statements for table promotion with 4 results
 Successfully executed 13 UPSERT statements for table account with 13 results
 Successfully executed 20 UPSERT statements for table order with 20 results
 Successfully executed 13 UPSERT statements for table ordered with 13 results
