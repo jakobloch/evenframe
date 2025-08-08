@@ -1,12 +1,4 @@
-mod attributes;
-mod coordinate_parser;
-mod deserialization_impl;
-mod enum_impl;
-mod imports;
-mod struct_impl;
-mod type_parser;
-mod validator_parser;
-
+use helpers::evenframe::derive::{enum_impl, struct_impl};
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, Data, DeriveInput};
 
@@ -36,8 +28,8 @@ pub fn evenframe_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     match input.data {
-        Data::Struct(_) => struct_impl::generate_struct_impl(input),
-        Data::Enum(_) => enum_impl::generate_enum_impl(input),
+        Data::Struct(_) => struct_impl::generate_struct_impl(input).into(),
+        Data::Enum(_) => enum_impl::generate_enum_impl(input).into(),
         _ => syn::Error::new(
             input.ident.span(),
             "Evenframe can only be used on structs and enums",

@@ -1,4 +1,6 @@
 mod config_builders;
+mod config_generator;
+mod workspace_scanner;
 
 use helpers::evenframe::schemasync::Schemasync; // Import your new struct
 use helpers::evenframe::{
@@ -16,8 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let generate_effect_schemas = config.typesync.should_generate_effect_types;
 
     // Get the config builder closure
-    let build_configs = config_builders::build_all_configs();
-    let (enums, tables, objects) = build_configs();
+    let (enums, tables, objects) = config_builders::build_all_configs();
 
     if generate_arktype_types {
         let structs = config_builders::merge_tables_and_objects(&tables, &objects);
