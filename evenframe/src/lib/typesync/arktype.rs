@@ -3,12 +3,14 @@ use crate::types::StructConfig;
 use crate::types::{FieldType, TaggedUnion, VariantData};
 use convert_case::{Case, Casing};
 use std::collections::HashMap;
+use tracing;
 
 pub fn field_type_to_arktype(
     field_type: &FieldType,
     structs: &HashMap<String, StructConfig>,
     enums: &HashMap<String, TaggedUnion>,
 ) -> String {
+    tracing::trace!(field_type = ?field_type, "Converting field type to Arktype");
     match field_type {
         FieldType::String => "'string'".to_string(),
         FieldType::Char => "'string'".to_string(),
@@ -139,6 +141,12 @@ pub fn generate_arktype_type_string(
     enums: &HashMap<String, TaggedUnion>,
     print_types: bool,
 ) -> String {
+    tracing::info!(
+        struct_count = structs.len(),
+        enum_count = enums.len(),
+        print_types = print_types,
+        "Generating Arktype type string"
+    );
     let mut output = String::new();
     let mut scope_output = String::new();
     let mut types_output = String::new();
@@ -190,7 +198,9 @@ pub fn generate_arktype_type_string(
     }
 
     // Then, process all structs
+    tracing::debug!("Processing structs for Arktype");
     for struct_config in structs.values() {
+        tracing::trace!(struct_name = %struct_config.name, "Processing struct");
         let type_name = struct_config.name.to_case(Case::Pascal);
         scope_output.push_str(&format!("{}: {{\n", type_name));
         defaults_output.push_str(&format!(
@@ -237,5 +247,6 @@ pub fn generate_arktype_type_string(
         output.push_str(&format!("{scope_output}\n{defaults_output}"));
     }
 
+    tracing::info!(output_length = output.len(), "Arktype type string generation complete");
     output
 }

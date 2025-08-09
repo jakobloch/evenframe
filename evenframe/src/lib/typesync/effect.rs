@@ -13,29 +13,43 @@ use crate::{
 use convert_case::{Case, Casing};
 use petgraph::{algo::toposort, graphmap::DiGraphMap};
 use std::collections::{HashMap, HashSet};
+use tracing;
 
 pub fn generate_effect_schema_string(
     structs: &HashMap<String, StructConfig>,
     enums: &HashMap<String, TaggedUnion>,
     print_types: bool,
 ) -> String {
+    tracing::info!(
+        struct_count = structs.len(),
+        enum_count = enums.len(),
+        print_types = print_types,
+        "Generating Effect Schema string"
+    );
+    
     // 1.  analyse once
+    tracing::debug!("Analyzing recursion in types");
     let rec = analyse_recursion(structs, enums);
 
     let mut out_encoded = String::new();
     /* every struct gets an interface */
+    tracing::debug!("Generating encoded interfaces for structs");
     for sc in structs.values() {
+        tracing::trace!(struct_name = %sc.name, "Generating encoded interface");
         out_encoded.push_str(&encoded_interface_for_struct(sc, structs, enums));
     }
 
     /* every union/enum gets a type alias */
+    tracing::debug!("Generating encoded aliases for enums");
     for e in enums.values() {
+        tracing::trace!(enum_name = %e.enum_name, "Generating encoded alias");
         out_encoded.push_str(&encoded_alias_for_enum(e, structs, enums));
     }
 
     // 2.  topologically sort components so all **non-recursive**
     //     dependencies appear first; this removes the need for
     //     `Schema.suspend` outside recursive SCCs.
+    tracing::debug!("Performing topological sort of components");
     let mut condensation = DiGraphMap::<usize, ()>::new();
     for (t1, _tos) in rec
         .meta
@@ -57,6 +71,7 @@ pub fn generate_effect_schema_string(
     ordered_comps.reverse();
 
     // 3.  generate ------------------------------------------------------------
+    tracing::debug!("Generating schema classes");
     let mut out_classes = String::new();
     let mut out_types = String::new();
     let mut processed = HashSet::<String>::new();
@@ -139,11 +154,14 @@ pub fn generate_effect_schema_string(
         }
     }
 
-    if print_types {
+    let result = if print_types {
         format!("{out_classes}\n{out_encoded}\n{out_types}")
     } else {
         format!("{out_classes}\n{out_encoded}")
-    }
+    };
+    
+    tracing::info!(output_length = result.len(), "Effect Schema generation complete");
+    result
 }
 
 // ----- for classes ---------------------------------------------------------
@@ -175,6 +193,7 @@ fn encoded_alias_for_enum(
     structs: &HashMap<String, StructConfig>,
     enums: &HashMap<String, TaggedUnion>,
 ) -> String {
+    tracing::trace!(enum_name = %en.enum_name, "Creating encoded alias for enum");
     let name = en.enum_name.to_case(Case::Pascal);
     let union = en
         .variants

@@ -15,6 +15,7 @@
 use rand::Rng;
 use std::error::Error;
 use std::fmt;
+use tracing;
 
 // Character class constants
 const HEX_CHARS: &str = "0123456789abcdefABCDEF";
@@ -109,6 +110,7 @@ pub struct Maker {
 impl Maker {
     /// Creates a new Maker instance
     pub fn new() -> Self {
+        tracing::trace!("Creating new Maker instance");
         Self { rng: rand::rng() }
     }
 
@@ -127,13 +129,22 @@ impl Maker {
     /// * Groups: `(abc)`, `(a|b|c)`
     /// * Literals: `abc`, `\+`, `\.`
     pub fn generate(&mut self, pattern: &str) -> Result<String> {
+        tracing::trace!(pattern = %pattern, "Generating string from regex pattern");
         let components = self.parse_pattern(pattern)?;
         #[cfg(test)]
         println!("Parsed components: {:?}", components);
-        Ok(self.generate_from_components(&components))
+        tracing::trace!(component_count = components.len(), "Pattern parsed successfully");
+        let result = self.generate_from_components(&components);
+        tracing::trace!(
+            pattern = %pattern,
+            result_length = result.len(),
+            "Generated string from pattern"
+        );
+        Ok(result)
     }
 
     fn parse_pattern(&self, pattern: &str) -> Result<Vec<RegexComponent>> {
+        tracing::trace!(pattern = %pattern, "Parsing regex pattern");
         // Remove anchors ^ and $
         let pattern = pattern.trim_start_matches('^').trim_end_matches('$');
         
@@ -295,6 +306,7 @@ impl Maker {
         &self,
         chars: &mut std::iter::Peekable<std::str::Chars>,
     ) -> Result<RegexComponent> {
+        tracing::trace!("Parsing character class");
         let mut class_content = String::new();
         let mut bracket_count = 1;
 
@@ -594,6 +606,7 @@ impl Maker {
     }
 
     fn parse_alternation(&self, content: &str) -> Result<RegexComponent> {
+        tracing::trace!(content = %content, "Parsing alternation");
         // Split by '|' but respect nested parentheses
         let mut alternatives = Vec::new();
         let mut current = String::new();
@@ -642,16 +655,19 @@ impl Maker {
     }
 
     fn generate_from_components(&mut self, components: &[RegexComponent]) -> String {
+        tracing::trace!(component_count = components.len(), "Generating from components");
         let mut result = String::new();
 
         for component in components {
             result.push_str(&self.generate_component(component));
         }
 
+        tracing::trace!(result_length = result.len(), "Components generated");
         result
     }
 
     fn generate_component(&mut self, component: &RegexComponent) -> String {
+        tracing::trace!(component = ?component, "Generating component");
         match component {
             RegexComponent::Literal(s) => s.clone(),
 

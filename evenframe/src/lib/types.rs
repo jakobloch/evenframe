@@ -665,7 +665,11 @@ impl StructField {
                     match inner.as_ref() {
                         FieldType::Other(type_name) => {
                             // Convert type name to snake_case for table name
-                            (format!("record<{}>", type_name.to_case(Case::Snake)), false, None)
+                            (
+                                format!("record<{}>", type_name.to_case(Case::Snake)),
+                                false,
+                                None,
+                            )
                         }
                         _ => {
                             // For other inner types, treat as before
@@ -706,7 +710,7 @@ impl StructField {
                                     );
                                     variant_type
                                 } else {
-                                    format!("\"{}\"", variant.name)
+                                    format!("{}", variant.name)
                                 }
                             })
                             .collect();
@@ -729,8 +733,15 @@ impl StructField {
                             .collect();
 
                         (format!("{{ {} }}", field_defs.join(", ")), false, None)
-                    } else if persistable_structs.get(&name.to_case(Case::Snake)).is_some() {
-                        (format!("record<{}>", name.to_case(Case::Snake)), false, None)
+                    } else if persistable_structs
+                        .get(&name.to_case(Case::Snake))
+                        .is_some()
+                    {
+                        (
+                            format!("record<{}>", name.to_case(Case::Snake)),
+                            false,
+                            None,
+                        )
                     } else {
                         (name.clone(), false, None)
                     }

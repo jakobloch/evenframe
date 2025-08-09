@@ -1,3 +1,4 @@
+use tracing::{debug, trace, warn};
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{GenericArgument, PathArguments, Type};
@@ -26,9 +27,11 @@ fn parse_generic_args(
     type_name: &str,
     args: &syn::punctuated::Punctuated<GenericArgument, syn::token::Comma>,
 ) -> proc_macro2::TokenStream {
+    debug!("Parsing generic arguments for type '{}' with {} arguments", type_name, args.len());
     match (type_name, args.len()) {
         ("Option" | "Vec" | "RecordLink" | "OrderedFloat", 1) => {
             if let Some(GenericArgument::Type(inner_ty)) = args.first() {
+                trace!("Processing inner type for {}", type_name);
                 let inner_parsed = parse_data_type(inner_ty);
                 match type_name {
                     "Option" => {
@@ -113,6 +116,7 @@ fn parse_generic_args(
 
 /// Parse simple type by name
 fn parse_simple_type(name: &str) -> Option<proc_macro2::TokenStream> {
+    trace!("Checking if '{}' is a simple type", name);
     match name {
         "String" => Some(quote! { ::evenframe::types::FieldType::String }),
         "char" => Some(quote! { ::evenframe::types::FieldType::Char }),
@@ -139,7 +143,10 @@ fn parse_simple_type(name: &str) -> Option<proc_macro2::TokenStream> {
         "Duration" => Some(quote! { ::evenframe::types::FieldType::Duration }),
         "Tz" => Some(quote! { ::evenframe::types::FieldType::Timezone }),
         "()" => Some(quote! { ::evenframe::types::FieldType::Unit }),
-        _ => None,
+        _ => {
+            trace!("'{}' is not a simple type", name);
+            None
+        },
     }
 }
 
@@ -160,48 +167,70 @@ fn check_common_mistakes(ident: &syn::Ident) -> Option<proc_macro2::TokenStream>
 
 /// Parse a Rust type into its corresponding FieldType representation
 pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
+    let type_str = quote! { #ty }.to_string();
+    trace!("Parsing data type: {}", type_str);
     match ty {
         // Handle reference types
-        Type::Reference(type_ref) => syn::Error::new(
-            type_ref.span(),
-            "Reference types (&T or &mut T) are not supported. \
-            Use owned types instead (e.g., String instead of &str)",
-        )
-        .to_compile_error(),
+        Type::Reference(type_ref) => {
+            warn!("Unsupported reference type: {}", type_str);
+            syn::Error::new(
+                type_ref.span(),
+                "Reference types (&T or &mut T) are not supported. \
+                Use owned types instead (e.g., String instead of &str)",
+            )
+            .to_compile_error()
+        },
 
         // Handle pointer types
-        Type::Ptr(_) => syn::Error::new(
-            ty.span(),
-            "Raw pointer types are not supported in Evenframe schemas",
-        )
-        .to_compile_error(),
+        Type::Ptr(_) => {
+            warn!("Unsupported pointer type: {}", type_str);
+            syn::Error::new(
+                ty.span(),
+                "Raw pointer types are not supported in Evenframe schemas",
+            )
+            .to_compile_error()
+        },
 
         // Handle array types
-        Type::Array(arr) => syn::Error::new(
-            arr.span(),
-            "Fixed-size arrays are not supported. Use Vec<T> for dynamic arrays instead",
-        )
-        .to_compile_error(),
+        Type::Array(arr) => {
+            warn!("Unsupported array type: {}", type_str);
+            syn::Error::new(
+                arr.span(),
+                "Fixed-size arrays are not supported. Use Vec<T> for dynamic arrays instead",
+            )
+            .to_compile_error()
+        },
 
         // Handle slice types
-        Type::Slice(slice) => syn::Error::new(
-            slice.span(),
-            "Slice types are not supported. Use Vec<T> instead",
-        )
-        .to_compile_error(),
+        Type::Slice(slice) => {
+            warn!("Unsupported slice type: {}", type_str);
+            syn::Error::new(
+                slice.span(),
+                "Slice types are not supported. Use Vec<T> instead",
+            )
+            .to_compile_error()
+        },
 
         // Handle tuple types
         Type::Tuple(tuple) => {
-            let elems = tuple.elems.iter().map(|elem| parse_data_type(elem));
+            debug!("Parsing tuple type with {} elements", tuple.elems.len());
+            let elems = tuple.elems.iter().enumerate().map(|(index, elem)| {
+                trace!("Processing tuple element {} of {}", index + 1, tuple.elems.len());
+                parse_data_type(elem)
+            });
+            debug!("Successfully parsed tuple type");
             quote! { ::evenframe::types::FieldType::Tuple(vec![ #(#elems),* ]) }
         }
 
         // Handle path types (the most common case)
-        Type::Path(type_path) => parse_path_type(ty, type_path),
+        Type::Path(type_path) => {
+            trace!("Processing path type: {}", type_str);
+            parse_path_type(ty, type_path)
+        },
 
         // Fallback for any other type
         _ => {
-            let type_str = quote! { #ty }.to_string();
+            warn!("Unknown/unsupported type pattern: {}", type_str);
             unsupported_type_error(ty, &type_str, "This type pattern is not supported")
         }
     }
@@ -210,24 +239,29 @@ pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
 /// Parse path types (e.g., String, Vec<T>, std::collections::HashMap<K, V>)
 fn parse_path_type(ty: &Type, type_path: &syn::TypePath) -> proc_macro2::TokenStream {
     let type_str = quote! { #ty }.to_string();
+    debug!("Parsing path type: {}", type_str);
 
     // Get the last segment of the path (the actual type name)
     if let Some(last_segment) = type_path.path.segments.last() {
         let ident = &last_segment.ident;
         let ident_str = ident.to_string();
+        trace!("Extracted type identifier: {}", ident_str);
 
         // Check for common mistakes
         if let Some(error) = check_common_mistakes(ident) {
+            warn!("Common type mistake detected: {}", ident_str);
             return error;
         }
 
         // Check if it's a known simple type
         if let Some(field_type) = parse_simple_type(&ident_str) {
+            debug!("Found simple type: {}", ident_str);
             return field_type;
         }
 
         // Check if it has generic arguments
         if let PathArguments::AngleBracketed(angle_args) = &last_segment.arguments {
+            debug!("Type has generic arguments: {}<...>", ident_str);
             return parse_generic_args(ty, &ident_str, &angle_args.args);
         }
 
@@ -263,6 +297,7 @@ fn parse_path_type(ty: &Type, type_path: &syn::TypePath) -> proc_macro2::TokenSt
     }
 
     // If we get here, it's a custom type (struct/enum)
+    debug!("Treating as custom type: {}", type_str);
     let lit = syn::LitStr::new(&type_str, ty.span());
     quote! { ::evenframe::types::FieldType::Other(#lit.to_string()) }
 }

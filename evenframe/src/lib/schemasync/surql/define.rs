@@ -13,6 +13,7 @@ use surrealdb::{
     Surreal,
 };
 use syn::{parenthesized, LitStr};
+use tracing::{debug, info, trace};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DefineConfig {
@@ -309,13 +310,15 @@ pub fn generate_define_statements(
     enums: &HashMap<String, TaggedUnion>,
     full_refresh_mode: bool,
 ) -> String {
+    info!(table_name = %table_name, full_refresh_mode = %full_refresh_mode, "Generating define statements for table");
+    debug!(query_details_count = query_details.len(), server_only_count = server_only.len(), enum_count = enums.len(), "Context sizes");
+    trace!("Table config: {:?}", ds);
     let table_type = if ds.relation.is_some() {
-        &format!(
-            "RELATION FROM {} TO {}",
-            ds.relation.as_ref().unwrap().from,
-            ds.relation.as_ref().unwrap().to
-        )
+        let relation = ds.relation.as_ref().unwrap();
+        debug!(table_name = %table_name, from = %relation.from, to = %relation.to, "Table is a relation");
+        &format!("RELATION FROM {} TO {}", relation.from, relation.to)
     } else {
+        debug!(table_name = %table_name, "Table is normal type");
         "NORMAL"
     };
     let select_permissions = ds
@@ -340,6 +343,7 @@ pub fn generate_define_statements(
         .unwrap_or("FULL");
 
     let mut output = "".to_owned();
+    debug!(table_name = %table_name, "Starting statement generation");
 
     if let Some(mock_config) = &ds.mock_generation_config {
         if mock_config.preservation_mode == PreservationMode::None || full_refresh_mode {
@@ -354,6 +358,7 @@ pub fn generate_define_statements(
         "DEFINE TABLE OVERWRITE {table_name} SCHEMAFULL TYPE {table_type} CHANGEFEED 3d PERMISSIONS FOR select {select_permissions} FOR update {update_permissions} FOR create {create_permissions} FOR delete {delete_permissions};\n"
     ));
 
+    debug!(table_name = %table_name, field_count = ds.struct_config.fields.len(), "Processing table fields");
     for table_field in &ds.struct_config.fields {
         // if struct field is an edge it should not be defined in the table itself
         if table_field.edge_config.is_none()
@@ -377,5 +382,7 @@ pub fn generate_define_statements(
         }
     }
 
+    info!(table_name = %table_name, output_length = output.len(), "Completed define statements generation");
+    trace!(table_name = %table_name, "Generated output: {}", output);
     output
 }

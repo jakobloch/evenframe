@@ -2,6 +2,7 @@ use crate::validator::Validator;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Attribute, Error, Result};
+use tracing;
 
 /// Helper function to suggest validator corrections based on common mistakes
 fn suggest_validator_correction(expr_str: &str) -> String {
@@ -50,6 +51,7 @@ pub fn parse_field_validators_with_logic(
     attrs: &[Attribute],
     value_ident: &str,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
+    tracing::debug!(attr_count = attrs.len(), value_ident = %value_ident, "Parsing field validators with logic");
     // Check for common attribute mistakes
     for attr in attrs {
         if attr.path().is_ident("validator") {
@@ -124,6 +126,7 @@ pub fn parse_field_validators_with_logic(
 }
 
 pub fn parse_field_validators(attrs: &[Attribute]) -> Result<Vec<TokenStream>> {
+    tracing::debug!(attr_count = attrs.len(), "Parsing field validators");
     let (validator_tokens, _) = parse_field_validators_with_logic(attrs, "value")?;
     Ok(validator_tokens)
 }
@@ -133,6 +136,7 @@ pub fn parse_validator_enum_with_logic(
     expr: &syn::Expr,
     value_ident: &str,
 ) -> Result<(Vec<TokenStream>, Vec<TokenStream>)> {
+    tracing::trace!(value_ident = %value_ident, "Parsing validator enum with logic");
     let mut validator_tokens = Vec::new();
     let mut logic_tokens = Vec::new();
 

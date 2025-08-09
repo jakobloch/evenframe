@@ -4,6 +4,7 @@ use crate::types::FieldType;
 use crate::{coordinate::TableInsertsState, schemasync::table::TableConfig};
 use convert_case::{Case, Casing};
 use std::collections::HashSet;
+use tracing::{debug, info};
 
 impl Mockmaker {
     pub fn generate_insert_statements(
@@ -11,6 +12,8 @@ impl Mockmaker {
         table_name: &str,
         table_config: &TableConfig,
     ) -> String {
+        info!(table_name = %table_name, "Generating insert statements for table");
+        debug!("Table config: {:?}", table_config);
         let log_name = format!("insert_logs/{}.log", table_name);
         evenframe_log!("", log_name);
 

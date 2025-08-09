@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use syn::{parse_file, Attribute, Item, Meta};
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 #[allow(unused)]
 #[derive(Debug, Clone)]
@@ -39,8 +39,18 @@ impl WorkspaceScanner {
     pub fn scan_for_evenframe_types(
         &self,
     ) -> Result<Vec<EvenframeType>, Box<dyn std::error::Error>> {
+        info!("Starting workspace scan for Evenframe types");
+        debug!("Scanning path: {:?}", self.handlers_path);
+        
         let mut types = Vec::new();
         self.scan_directory(&self.handlers_path, &mut types, "handlers", 0)?;
+        
+        info!("Workspace scan complete. Found {} Evenframe types", types.len());
+        debug!("Type breakdown: {} structs, {} enums", 
+            types.iter().filter(|t| t.kind == TypeKind::Struct).count(),
+            types.iter().filter(|t| t.kind == TypeKind::Enum).count()
+        );
+        
         Ok(types)
     }
 
@@ -101,38 +111,76 @@ impl WorkspaceScanner {
         module_path: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         trace!("Scanning file: {:?}", path);
-        let content = fs::read_to_string(path)?;
+        
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Failed to read file {:?}: {}", path, e);
+                return Err(e.into());
+            }
+        };
+        
         trace!("Parsing file: {:?}, size: {} bytes", path, content.len());
-        let syntax_tree = parse_file(&content)?;
+        
+        let syntax_tree = match parse_file(&content) {
+            Ok(tree) => tree,
+            Err(e) => {
+                error!("Failed to parse file {:?}: {}", path, e);
+                return Err(e.into());
+            }
+        };
+        
         trace!("Successfully parsed file: {:?}", path);
+        
+        let mut file_types = 0;
 
         for item in syntax_tree.items {
             match item {
                 Item::Struct(item_struct) => {
                     if has_evenframe_derive(&item_struct.attrs) {
                         let has_id = has_id_field(&item_struct.fields);
+                        let struct_name = item_struct.ident.to_string();
+                        
+                        debug!(
+                            "Found Evenframe struct '{}' in module '{}' (has_id: {})",
+                            struct_name, module_path, has_id
+                        );
+                        
                         types.push(EvenframeType {
-                            name: item_struct.ident.to_string(),
+                            name: struct_name,
                             module_path: module_path.to_string(),
                             file_path: path.to_string_lossy().to_string(),
                             kind: TypeKind::Struct,
                             has_id_field: has_id,
                         });
+                        file_types += 1;
                     }
                 }
                 Item::Enum(item_enum) => {
                     if has_evenframe_derive(&item_enum.attrs) {
+                        let enum_name = item_enum.ident.to_string();
+                        
+                        debug!(
+                            "Found Evenframe enum '{}' in module '{}'",
+                            enum_name, module_path
+                        );
+                        
                         types.push(EvenframeType {
-                            name: item_enum.ident.to_string(),
+                            name: enum_name,
                             module_path: module_path.to_string(),
                             file_path: path.to_string_lossy().to_string(),
                             kind: TypeKind::Enum,
                             has_id_field: false,
                         });
+                        file_types += 1;
                     }
                 }
                 _ => {}
             }
+        }
+        
+        if file_types > 0 {
+            debug!("Found {} Evenframe types in {:?}", file_types, path);
         }
 
         Ok(())
@@ -168,5 +216,10 @@ pub fn get_unique_modules(types: &[EvenframeType]) -> Vec<String> {
     for t in types {
         modules.insert(t.module_path.clone());
     }
-    modules.into_iter().collect()
+    let unique_modules: Vec<String> = modules.into_iter().collect();
+    
+    debug!("Found {} unique modules from {} types", unique_modules.len(), types.len());
+    trace!("Unique modules: {:?}", unique_modules);
+    
+    unique_modules
 }

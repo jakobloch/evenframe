@@ -1,3 +1,4 @@
+use tracing::{debug, error, info, trace};
 use quote::quote;
 use syn::{spanned::Spanned, Attribute, Expr, ExprLit, Lit, Meta};
 
@@ -12,26 +13,39 @@ use crate::{
 pub fn parse_mock_data_attribute(
     attrs: &[Attribute],
 ) -> Result<Option<(usize, Option<String>, Option<Vec<proc_macro2::TokenStream>>)>, syn::Error> {
-    for attr in attrs {
+    info!("Starting mock_data attribute parsing for {} attributes", attrs.len());
+    trace!("Processing attributes: {:?}", attrs.iter().map(|a| a.path().get_ident().map(|i| i.to_string()).unwrap_or_else(|| "unknown".to_string())).collect::<Vec<_>>());
+    
+    for (index, attr) in attrs.iter().enumerate() {
+        trace!("Processing attribute {} of {}", index + 1, attrs.len());
         if attr.path().is_ident("mock_data") {
+            debug!("Found mock_data attribute, parsing arguments");
             let result: Result<syn::punctuated::Punctuated<Meta, syn::Token![,]>, _> =
                 attr.parse_args_with(syn::punctuated::Punctuated::parse_terminated);
 
             match result {
                 Ok(metas) => {
+                    debug!("Successfully parsed {} meta arguments", metas.len());
                     let mut n = 100; // default
                     let mut overrides = None;
+                    trace!("Initialized defaults: n={}, overrides={:?}", n, overrides);
 
-                    for meta in metas {
+                    for (meta_index, meta) in metas.iter().enumerate() {
+                        trace!("Processing meta {} of {}", meta_index + 1, metas.len());
                         match meta {
                             Meta::NameValue(nv) if nv.path.is_ident("n") => {
+                                debug!("Processing 'n' parameter");
                                 if let Expr::Lit(ExprLit {
                                     lit: Lit::Int(lit), ..
                                 }) = &nv.value
                                 {
                                     match lit.base10_parse::<usize>() {
-                                        Ok(value) => n = value,
+                                        Ok(value) => {
+                                            debug!("Successfully parsed n value: {}", value);
+                                            n = value;
+                                        },
                                         Err(_) => {
+                                            error!("Failed to parse 'n' value: {}", lit.base10_digits());
                                             return Err(syn::Error::new(
                                                 lit.span(),
                                                 format!("Invalid value for 'n': '{}'. Expected a positive integer.\n\nExample: #[mock_data(n = 1000)]", lit.base10_digits())
@@ -87,9 +101,11 @@ pub fn parse_mock_data_attribute(
                         Err(err) => return Err(err),
                     };
 
+                    info!("Successfully parsed mock_data attribute: n={}, overrides={:?}, coordinates_count={}", n, overrides, coordinates.as_ref().map_or(0, |c| c.len()));
                     return Ok(Some((n, overrides, coordinates)));
                 }
                 Err(err) => {
+                    error!("Failed to parse mock_data attribute arguments: {}", err);
                     return Err(syn::Error::new(
                         attr.span(),
                         format!("Failed to parse mock_data attribute: {}\n\nExample usage:\n#[mock_data(n = 1000)]\n#[mock_data(n = 500, overrides = \"custom_config\")]", err)
@@ -98,14 +114,17 @@ pub fn parse_mock_data_attribute(
             }
         }
     }
+    debug!("No mock_data attribute found");
     Ok(None)
 }
 
 pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::Error> {
+    info!("Starting table validators parsing for {} attributes", attrs.len());
     let mut validators = Vec::new();
 
     for attr in attrs {
         if attr.path().is_ident("validators") {
+            debug!("Found validators attribute");
             let result: Result<syn::punctuated::Punctuated<Meta, syn::Token![,]>, _> =
                 attr.parse_args_with(syn::punctuated::Punctuated::parse_terminated);
 
@@ -118,7 +137,9 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
                                     lit: Lit::Str(lit), ..
                                 }) = &nv.value
                                 {
-                                    validators.push(lit.value());
+                                    let validator_value = lit.value();
+                                    debug!("Adding custom validator: {}", validator_value);
+                                    validators.push(validator_value);
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
@@ -156,12 +177,15 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
         }
     }
 
+    info!("Successfully parsed {} table validators", validators.len());
     Ok(validators)
 }
 
 pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig>, syn::Error> {
+    info!("Starting relation attribute parsing for {} attributes", attrs.len());
     for attr in attrs {
         if attr.path().is_ident("relation") {
+            debug!("Found relation attribute");
             let result: Result<syn::punctuated::Punctuated<Meta, syn::Token![,]>, _> =
                 attr.parse_args_with(syn::punctuated::Punctuated::parse_terminated);
 
@@ -257,6 +281,7 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
 
                     match (&edge_name, &from, &to, &direction) {
                         (Some(edge_name), Some(from), Some(to), Some(direction)) => {
+                            info!("Successfully parsed relation attribute: edge_name={}, from={}, to={}, direction={:?}", edge_name, from, to, direction);
                             return Ok(Some(EdgeConfig {
                                 edge_name: edge_name.to_owned(),
                                 from: from.to_owned(),
@@ -292,6 +317,7 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
             }
         }
     }
+    debug!("No relation attribute found");
     Ok(None)
 }
 
@@ -300,8 +326,10 @@ pub fn parse_format_attribute(
 ) -> Result<Option<proc_macro2::TokenStream>, syn::Error> {
     use syn::{Expr, ExprCall, ExprPath, Path, PathSegment};
 
+    info!("Starting format attribute parsing for {} attributes", attrs.len());
     for attr in attrs {
         if attr.path().is_ident("format") {
+            debug!("Found format attribute");
             // Parse the attribute content as an expression
             let expr: syn::Expr = attr.parse_args()
                 .map_err(|e| syn::Error::new(
@@ -362,10 +390,12 @@ pub fn parse_format_attribute(
             // Use the TryFrom implementation to parse the Format
             match Format::try_from(&format_expr) {
                 Ok(format) => {
+                    debug!("Successfully parsed format: {:?}", format);
                     // Since Format implements ToTokens, we can just quote it directly
                     return Ok(Some(quote! { #format }));
                 }
                 Err(e) => {
+                    error!("Failed to parse format expression: {}", e);
                     return Err(syn::Error::new(
                         expr.span(),
                         format!("{}\n\nValid formats:\n- Simple: DateTime, Date, Time, Currency, Percentage, Phone, Email, FirstName, LastName, CompanyName, PhoneNumber, ColorHex, JwtToken, Oklch, PostalCode\n- With parameter: Url(\"domain.com\")", e)
@@ -374,5 +404,6 @@ pub fn parse_format_attribute(
             }
         }
     }
+    debug!("No format attribute found");
     Ok(None)
 }

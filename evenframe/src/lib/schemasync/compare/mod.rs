@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use surrealdb::engine::local::{Db, Mem};
 use surrealdb::{engine::remote::http::Client, Surreal};
+use tracing;
 
 use import::{AccessDefinition, FieldDefinition, ObjectType, SchemaDefinition, TableDefinition};
 
@@ -55,36 +56,58 @@ impl Comparator {
     }
 
     pub async fn run(mut self) -> Result<Self, Box<dyn std::error::Error>> {
+        tracing::info!("Starting Comparator pipeline");
+        
+        tracing::debug!("Setting up schemas");
         self.setup_schemas().await?;
+        
+        tracing::debug!("Setting up access definitions");
         self.setup_access().await?;
+        
+        tracing::debug!("Exporting schemas for comparison");
         self.export_schemas().await?;
+        
+        tracing::debug!("Comparing schemas");
         self.compare_schemas().await?;
+        
+        tracing::info!("Comparator pipeline completed successfully");
         Ok(self)
     }
 
     /// Setup backup and create in-memory schemas
     async fn setup_schemas(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Creating backup and in-memory schemas");
         let (remote_schema, new_schema) = setup_backup_and_schemas(&self.db).await?;
         self.remote_schema = Some(remote_schema);
         self.new_schema = Some(new_schema);
+        tracing::trace!("Schemas setup complete");
         Ok(())
     }
 
     /// Setup access definitions
     async fn setup_access(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Setting up access definitions");
         let new_schema = self.new_schema.as_ref().unwrap();
         self.access_query = setup_access_definitions(new_schema, &self.schemasync_config).await?;
+        tracing::trace!(access_query_length = self.access_query.len(), "Access query generated");
         Ok(())
     }
 
     /// Export schemas for comparison
     async fn export_schemas(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Exporting schemas");
         let remote_schema = self.remote_schema.as_ref().unwrap();
         let new_schema = self.new_schema.as_ref().unwrap();
 
         let (remote_schema_string, new_schema_string) =
             export_schemas(remote_schema, new_schema).await?;
 
+        tracing::trace!(
+            remote_schema_size = remote_schema_string.len(),
+            new_schema_size = new_schema_string.len(),
+            "Schemas exported"
+        );
+        
         self.remote_schema_string = remote_schema_string;
         self.new_schema_string = new_schema_string;
         Ok(())
@@ -92,14 +115,22 @@ impl Comparator {
 
     /// Compare schemas to find changes
     async fn compare_schemas(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.schema_changes = Some(
-            compare_schemas(
-                &self.db,
-                &self.remote_schema_string,
-                &self.new_schema_string,
-            )
-            .await?,
+        tracing::trace!("Starting schema comparison");
+        let changes = compare_schemas(
+            &self.db,
+            &self.remote_schema_string,
+            &self.new_schema_string,
+        )
+        .await?;
+        
+        tracing::info!(
+            new_tables = changes.new_tables.len(),
+            removed_tables = changes.removed_tables.len(),
+            modified_tables = changes.modified_tables.len(),
+            "Schema changes detected"
         );
+        
+        self.schema_changes = Some(changes);
         Ok(())
     }
 
@@ -173,8 +204,16 @@ impl<'a> Merger<'a> {
 
     /// Import schema from production database
     pub async fn import_schema_from_db(&self) -> Result<import::SchemaDefinition, String> {
+        tracing::debug!("Importing schema from production database");
         let importer = SchemaImporter::new(&self.client);
-        importer.import_schema_only().await
+        let schema = importer.import_schema_only().await?;
+        tracing::debug!(
+            tables = schema.tables.len(),
+            edges = schema.edges.len(),
+            accesses = schema.accesses.len(),
+            "Schema imported"
+        );
+        Ok(schema)
     }
 
     /// Generate schema from Rust structs
@@ -182,7 +221,14 @@ impl<'a> Merger<'a> {
         &self,
         tables: &HashMap<String, TableConfig>,
     ) -> Result<import::SchemaDefinition, String> {
-        import::SchemaDefinition::from_table_configs(tables)
+        tracing::debug!(table_count = tables.len(), "Generating schema from Rust structs");
+        let schema = import::SchemaDefinition::from_table_configs(tables)?;
+        tracing::debug!(
+            tables = schema.tables.len(),
+            edges = schema.edges.len(),
+            "Schema generated from structs"
+        );
+        Ok(schema)
     }
 
     /// Compare two schemas using the new dual-export approach
@@ -193,6 +239,7 @@ impl<'a> Merger<'a> {
         old: &import::SchemaDefinition,
         new: &import::SchemaDefinition,
     ) -> Result<SchemaChanges, String> {
+        tracing::debug!("Comparing schemas using legacy method");
         Comparator::compare(old, new)
     }
 
@@ -718,6 +765,8 @@ impl Comparator {
         old: &SchemaDefinition,
         new: &SchemaDefinition,
     ) -> Result<SchemaChanges, String> {
+        tracing::debug!("Starting detailed schema comparison");
+        
         let mut changes = SchemaChanges {
             new_tables: Vec::new(),
             removed_tables: Vec::new(),
@@ -730,24 +779,40 @@ impl Comparator {
         // Get all table names from both schemas
         let old_tables: HashSet<String> = old.tables.keys().cloned().collect();
         let new_tables: HashSet<String> = new.tables.keys().cloned().collect();
+        
+        tracing::trace!(
+            old_table_count = old_tables.len(),
+            new_table_count = new_tables.len(),
+            "Comparing table sets"
+        );
 
         // Find new tables
         for table in new_tables.difference(&old_tables) {
+            tracing::trace!(table = %table, "Found new table");
             changes.new_tables.push(table.clone());
         }
 
         // Find removed tables
         for table in old_tables.difference(&new_tables) {
+            tracing::trace!(table = %table, "Found removed table");
             changes.removed_tables.push(table.clone());
         }
 
         // Find modified tables
         for table in old_tables.intersection(&new_tables) {
+            tracing::trace!(table = %table, "Comparing table");
             if let Some(table_changes) = Self::compare_tables(
                 table,
                 old.tables.get(table).unwrap(),
                 new.tables.get(table).unwrap(),
             )? {
+                tracing::trace!(
+                    table = %table,
+                    new_fields = table_changes.new_fields.len(),
+                    removed_fields = table_changes.removed_fields.len(),
+                    modified_fields = table_changes.modified_fields.len(),
+                    "Table has changes"
+                );
                 changes.modified_tables.push(table_changes);
             }
         }
@@ -808,6 +873,16 @@ impl Comparator {
             }
         }
 
+        tracing::debug!(
+            new_tables = changes.new_tables.len(),
+            removed_tables = changes.removed_tables.len(),
+            modified_tables = changes.modified_tables.len(),
+            new_accesses = changes.new_accesses.len(),
+            removed_accesses = changes.removed_accesses.len(),
+            modified_accesses = changes.modified_accesses.len(),
+            "Schema comparison complete"
+        );
+        
         Ok(changes)
     }
 
@@ -1186,12 +1261,15 @@ pub fn filter_changed_tables_and_objects(
     enums: &HashMap<String, TaggedUnion>,
     record_diffs: &HashMap<String, i32>,
 ) -> (HashMap<String, TableConfig>, HashMap<String, StructConfig>) {
+    tracing::debug!("Filtering changed tables and objects");
+    
     let mut filtered_tables = HashMap::new();
     let mut filtered_objects = HashMap::new();
 
     // Process new tables - these need full regeneration
     for table_name in &schema_changes.new_tables {
         if let Some(table_config) = tables.get(table_name) {
+            tracing::trace!(table = %table_name, "Adding new table for full regeneration");
             filtered_tables.insert(table_name.clone(), table_config.clone());
         }
     }
@@ -1199,6 +1277,11 @@ pub fn filter_changed_tables_and_objects(
     // Process tables that need more records (positive diffs)
     for (table_name, diff) in record_diffs {
         if *diff > 0 {
+            tracing::trace!(
+                table = %table_name,
+                record_diff = diff,
+                "Table needs additional records"
+            );
             // This table needs additional records, so include it for regeneration
             if let Some(table_config) = tables.get(table_name) {
                 // Only add if not already included from new_tables
@@ -1529,6 +1612,12 @@ pub fn filter_changed_tables_and_objects(
         }
     }
 
+    tracing::debug!(
+        filtered_table_count = filtered_tables.len(),
+        filtered_object_count = filtered_objects.len(),
+        "Filtering complete"
+    );
+    
     (filtered_tables, filtered_objects)
 }
 
@@ -1589,6 +1678,7 @@ pub async fn compare_schemas(
     remote_schema_string: &str,
     new_schema_string: &str,
 ) -> Result<SchemaChanges, Box<dyn std::error::Error>> {
+    tracing::debug!("Parsing and comparing schema exports");
     let importer = SchemaImporter::new(db);
 
     let schema_changes = Comparator::compare(
@@ -1608,6 +1698,7 @@ pub async fn export_schemas(
     remote_schema: &Surreal<Db>,
     new_schema: &Surreal<Db>,
 ) -> Result<(String, String), Box<dyn std::error::Error>> {
+    tracing::trace!("Exporting remote schema");
     remote_schema
         .export("remote_schema.surql")
         .with_config()
@@ -1626,6 +1717,7 @@ pub async fn export_schemas(
     )
     .expect("Something went wrong reading the file to string");
 
+    tracing::trace!("Exporting new schema");
     new_schema
         .export("new_schema.surql")
         .with_config()
@@ -1644,12 +1736,14 @@ pub async fn export_schemas(
     )
     .expect("Something went wrong reading the file to string");
 
+    tracing::trace!("Schema export complete");
     Ok((remote_schema_string, new_schema_string))
 }
 
 pub async fn setup_backup_and_schemas(
     db: &Surreal<Client>,
 ) -> Result<(Surreal<Db>, Surreal<Db>), Box<dyn std::error::Error>> {
+    tracing::trace!("Creating database backup");
     db.export("backup.surql").await?;
     let remote_schema = Surreal::new::<Mem>(())
         .await
@@ -1659,6 +1753,7 @@ pub async fn setup_backup_and_schemas(
     std::io::Read::read_to_string(&mut std::fs::File::open("backup.surql")?, &mut backup)
         .expect("Something went wrong reading the file to string");
 
+    tracing::trace!("Importing backup to remote in-memory schema");
     remote_schema.use_ns("remote").use_db("backup").await?;
     remote_schema
         .query(&backup)
@@ -1668,7 +1763,9 @@ pub async fn setup_backup_and_schemas(
     let new_schema = Surreal::new::<Mem>(())
         .await
         .expect("Something went wrong starting the new_schema in-memory db");
+    tracing::trace!("Setting up new in-memory schema");
     new_schema.use_ns("new").use_db("memory").await?;
 
+    tracing::trace!("In-memory schemas ready");
     Ok((remote_schema, new_schema))
 }

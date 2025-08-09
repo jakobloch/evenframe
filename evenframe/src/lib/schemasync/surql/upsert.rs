@@ -1,6 +1,7 @@
 use crate::{coordinate::TableInsertsState, mockmake::Mockmaker, schemasync::table::TableConfig};
 use convert_case::{Case, Casing};
 use std::collections::{HashMap, HashSet};
+use tracing::{debug, info};
 
 impl Mockmaker {
     pub fn generate_upsert_statements(
@@ -8,6 +9,8 @@ impl Mockmaker {
         table_name: &str,
         table_config: &TableConfig,
     ) -> String {
+        info!(table_name = %table_name, "Generating upsert statements for table");
+        debug!("Table config: {:?}", table_config);
         let mut output = String::new();
         let config = self
             .tables

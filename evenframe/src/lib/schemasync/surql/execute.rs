@@ -1,6 +1,7 @@
 use crate::evenframe_log;
 use serde_json::Value;
 use surrealdb::Response;
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
 pub struct QueryValidationError {
@@ -33,8 +34,11 @@ pub async fn validate_surql_response(
     statements: &str,
     expected_operation: &str,
 ) -> Result<Vec<Value>, Vec<QueryValidationError>> {
+    info!(expected_operation = %expected_operation, statement_length = statements.len(), "Validating SurrealQL response");
+    trace!("Statements to validate: {}", statements);
     let mut errors = Vec::new();
     let mut results = Vec::new();
+    debug!("Initialized validation state");
 
     // Split statements for error reporting
     let statement_lines: Vec<&str> = statements
@@ -129,7 +133,13 @@ pub async fn execute_and_validate<C>(
 where
     C: surrealdb::Connection,
 {
-    let response = db.query(statements).await?;
+    info!(operation_type = %operation_type, table_name = %table_name, statement_length = statements.len(), "Executing and validating statements");
+    trace!("Statements: {}", statements);
+    debug!("Sending query to database");
+    let response = db.query(statements).await.map_err(|e| {
+        error!(operation_type = %operation_type, table_name = %table_name, error = %e, "Database query failed");
+        e
+    })?;
 
     match validate_surql_response(response, statements, operation_type).await {
         Ok(results) => {

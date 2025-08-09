@@ -1,3 +1,4 @@
+use tracing::{debug, error, info, trace, warn};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{spanned::Spanned, Attribute, Expr, ExprArray, ExprLit, Lit, Meta};
@@ -7,40 +8,59 @@ use syn::{spanned::Spanned, Attribute, Expr, ExprArray, ExprLit, Lit, Meta};
 pub fn parse_coordinate_attribute(
     attrs: &[Attribute],
 ) -> Result<Option<Vec<TokenStream>>, syn::Error> {
-    for attr in attrs {
+    info!("Starting coordinate attribute parsing for {} attributes", attrs.len());
+    for (index, attr) in attrs.iter().enumerate() {
+        trace!("Processing attribute {} of {}", index + 1, attrs.len());
         if attr.path().is_ident("mock_data") {
+            debug!("Found mock_data attribute, parsing for coordinate parameter");
             let result: Result<syn::punctuated::Punctuated<Meta, syn::Token![,]>, _> =
                 attr.parse_args_with(syn::punctuated::Punctuated::parse_terminated);
 
             match result {
                 Ok(metas) => {
-                    for meta in metas {
+                    debug!("Successfully parsed {} meta arguments, searching for coordinate", metas.len());
+                    for (meta_index, meta) in metas.iter().enumerate() {
+                        trace!("Processing meta {} of {}: coordinate parameter", meta_index + 1, metas.len());
                         match meta {
                             Meta::NameValue(nv) if nv.path.is_ident("coordinate") => {
+                                debug!("Found coordinate parameter");
                                 // coordinate = [...]
                                 if let Expr::Array(ExprArray { elems, .. }) = &nv.value {
+                                    debug!("Coordinate parameter is an array with {} elements", elems.len());
                                     let mut coordinates = Vec::new();
 
-                                    for elem in elems {
+                                    for (elem_index, elem) in elems.iter().enumerate() {
+                                        trace!("Processing coordinate element {} of {}", elem_index + 1, elems.len());
                                         match parse_coordinate_expr(elem) {
-                                            Ok(coord_tokens) => coordinates.push(coord_tokens),
-                                            Err(err) => return Err(err),
+                                            Ok(coord_tokens) => {
+                                                debug!("Successfully parsed coordinate element {}", elem_index + 1);
+                                                coordinates.push(coord_tokens);
+                                            },
+                                            Err(err) => {
+                                                error!("Failed to parse coordinate element {}: {}", elem_index + 1, err);
+                                                return Err(err);
+                                            }
                                         }
                                     }
 
+                                    info!("Successfully parsed {} coordinate rules", coordinates.len());
                                     return Ok(Some(coordinates));
-                                } else {
+                                                } else {
+                                    warn!("Coordinate parameter is not an array");
                                     return Err(syn::Error::new(
                                         nv.value.span(),
                                         "The 'coordinate' parameter must be an array of coordination rules.\n\nExample:\n#[mock_data(coordinate = [\n    InitializeEqual([\"field1\", \"field2\"]),\n    InitializeSum { fields: [\"price\", \"tax\"], total: 100.0 }\n])]"
                                     ));
                                 }
                             }
-                            _ => {}
+                            _ => {
+                                trace!("Skipping non-coordinate meta");
+                            }
                         }
                     }
                 }
                 Err(err) => {
+                    error!("Failed to parse mock_data attribute arguments: {}", err);
                     return Err(syn::Error::new(
                         attr.span(),
                         format!("Failed to parse mock_data attribute: {}", err),
@@ -49,36 +69,58 @@ pub fn parse_coordinate_attribute(
             }
         }
     }
+    debug!("No coordinate attribute found");
     Ok(None)
 }
 
 /// Parse individual coordinate expression
 fn parse_coordinate_expr(expr: &Expr) -> Result<TokenStream, syn::Error> {
+    trace!("Parsing coordinate expression");
     match expr {
         Expr::Call(call) => {
             let func_name = if let Expr::Path(path) = &*call.func {
                 path.path.segments.last()
-                    .ok_or_else(|| syn::Error::new(
-                        call.func.span(),
-                        "Invalid coordination function path"
-                    ))?
+                    .ok_or_else(|| {
+                        error!("Invalid coordination function path");
+                        syn::Error::new(
+                            call.func.span(),
+                            "Invalid coordination function path"
+                        )
+                    })?
                     .ident.to_string()
             } else {
+                warn!("Coordination rule is not a function call");
                 return Err(syn::Error::new(
                     call.func.span(),
                     "Coordination rule must be a function call like InitializeEqual(...)"
                 ));
             };
+            debug!("Found coordination function: {}", func_name);
 
             match func_name.as_str() {
-                "InitializeEqual" => parse_initialize_equal(call),
-                "InitializeSequential" => parse_initialize_sequential(call),
-                "InitializeSum" => parse_initialize_sum(call),
-                "InitializeCoherent" => parse_initialize_coherent(call),
-                _ => Err(syn::Error::new(
-                    call.func.span(),
-                    format!("Unknown coordination rule '{}'. Valid rules are:\n- InitializeEqual\n- InitializeSequential\n- InitializeSum\n- InitializeCoherent", func_name)
-                ))
+                "InitializeEqual" => {
+                    debug!("Processing InitializeEqual coordination rule");
+                    parse_initialize_equal(call)
+                },
+                "InitializeSequential" => {
+                    debug!("Processing InitializeSequential coordination rule");
+                    parse_initialize_sequential(call)
+                },
+                "InitializeSum" => {
+                    debug!("Processing InitializeSum coordination rule");
+                    parse_initialize_sum(call)
+                },
+                "InitializeCoherent" => {
+                    debug!("Processing InitializeCoherent coordination rule");
+                    parse_initialize_coherent(call)
+                },
+                _ => {
+                    warn!("Unknown coordination rule: {}", func_name);
+                    Err(syn::Error::new(
+                        call.func.span(),
+                        format!("Unknown coordination rule '{}'. Valid rules are:\n- InitializeEqual\n- InitializeSequential\n- InitializeSum\n- InitializeCoherent", func_name)
+                    ))
+                }
             }
         }
         _ => Err(syn::Error::new(
@@ -90,14 +132,18 @@ fn parse_coordinate_expr(expr: &Expr) -> Result<TokenStream, syn::Error> {
 
 /// Parse InitializeEqual coordination rule
 fn parse_initialize_equal(call: &syn::ExprCall) -> Result<TokenStream, syn::Error> {
+    trace!("Parsing InitializeEqual arguments");
     if let Some(Expr::Array(arr)) = call.args.first() {
+        debug!("Found array argument with {} elements", arr.elems.len());
         let fields = parse_string_array(arr)?;
         if fields.is_empty() {
+            error!("InitializeEqual requires at least one field");
             return Err(syn::Error::new(
                 arr.span(),
                 "InitializeEqual requires at least one field",
             ));
         }
+        debug!("Successfully parsed {} fields for InitializeEqual: {:?}", fields.len(), fields);
         Ok(quote! {
             evenframe::coordinate::Coordination::InitializeEqual(vec![#(#fields.to_string()),*])
         })
@@ -277,20 +323,26 @@ fn parse_initialize_coherent(call: &syn::ExprCall) -> Result<TokenStream, syn::E
 
 /// Parse an array of string literals
 fn parse_string_array(arr: &ExprArray) -> Result<Vec<String>, syn::Error> {
+    trace!("Parsing string array with {} elements", arr.elems.len());
     let mut strings = Vec::new();
-    for elem in &arr.elems {
+    for (index, elem) in arr.elems.iter().enumerate() {
+        trace!("Processing array element {} of {}", index + 1, arr.elems.len());
         if let Expr::Lit(ExprLit {
             lit: Lit::Str(s), ..
         }) = elem
         {
-            strings.push(s.value());
+            let string_value = s.value();
+            trace!("Found string literal: {}", string_value);
+            strings.push(string_value);
         } else {
+            error!("Array element {} is not a string literal", index + 1);
             return Err(syn::Error::new(
                 elem.span(),
                 "Array elements must be string literals.\n\nExample: [\"field1\", \"field2\"]",
             ));
         }
     }
+    debug!("Successfully parsed {} string literals", strings.len());
     Ok(strings)
 }
 

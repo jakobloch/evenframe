@@ -21,6 +21,7 @@ use std::collections::HashMap;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::remote::http::Client;
 use surrealdb::Surreal;
+use tracing;
 
 pub struct Mockmaker {
     db: Surreal<Client>,
@@ -60,30 +61,44 @@ impl Mockmaker {
     }
 
     pub async fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::info!("Starting Mockmaker pipeline");
+        
         // Step 1: Generate IDs
+        tracing::debug!("Step 1: Generating IDs for mock data");
         self.generate_ids().await?;
 
         // Step 2: Run comparator pipeline
+        tracing::debug!("Step 2: Running comparator pipeline");
         let comparator = self.comparator.take().unwrap();
         self.comparator = Some(comparator.run().await?);
 
         // Step 3: Run remaining mockmaker steps
+        tracing::debug!("Step 3: Removing old data based on schema changes");
         self.remove_old_data().await?;
+        
+        tracing::debug!("Step 4: Executing access queries");
         self.execute_access().await?;
+        
+        tracing::debug!("Step 5: Filtering changed tables and objects");
         self.filter_changes().await?;
+        
+        tracing::debug!("Step 6: Generating mock data");
         self.generate_mock_data().await?;
 
+        tracing::info!("Mockmaker pipeline completed successfully");
         Ok(())
     }
 
     /// Generate IDs for tables
     pub async fn generate_ids(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Starting ID generation for all tables");
         let mut map = HashMap::new();
         let mut record_diffs = HashMap::new();
 
         // Process tables sequentially to avoid reference issues
         // Since these are just SELECT queries, they should be fast enough
         for (table_name, table_config) in &self.tables {
+            tracing::trace!(table = %table_name, "Generating IDs for table");
             let snake_case_table_name = table_name.to_case(Case::Snake);
 
             // Determine desired count from config or default
@@ -96,6 +111,7 @@ impl Mockmaker {
 
             // Query existing IDs
             let query = format!("SELECT id FROM {};", snake_case_table_name);
+            tracing::trace!(query = %query, "Querying existing IDs");
             let mut response = self.db.query(query).await.expect(
                 "Something went wrong getting the ids from the db for mock data generation",
             );
@@ -108,6 +124,14 @@ impl Mockmaker {
 
             // Calculate the difference between existing and desired counts
             let record_diff = desired_count as i32 - existing_count as i32;
+            
+            tracing::trace!(
+                table = %table_name,
+                existing_count = existing_count,
+                desired_count = desired_count,
+                record_diff = record_diff,
+                "Calculated record difference"
+            );
 
             // Store the difference in the record_diffs map
             record_diffs.insert(table_name.clone(), record_diff);
@@ -148,6 +172,11 @@ impl Mockmaker {
         self.id_map = map;
         self.record_diffs = record_diffs;
 
+        tracing::debug!(
+            table_count = self.id_map.len(),
+            "ID generation complete"
+        );
+        
         evenframe_log!(
             format!("Record count differences: {:#?}", self.record_diffs),
             "record_diffs.log"
@@ -158,31 +187,54 @@ impl Mockmaker {
 
     /// Remove old data based on schema changes
     pub async fn remove_old_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Removing old data based on schema changes");
         let comparator = self.comparator.as_ref().unwrap();
         let schema_changes = comparator.get_schema_changes().unwrap();
 
         let remove_statements = self.generate_remove_statements(schema_changes);
+        
+        tracing::debug!(
+            statement_length = remove_statements.len(),
+            "Generated remove statements"
+        );
 
         evenframe_log!(&remove_statements, "remove_statements.surql");
-        self.db.query(remove_statements).await?;
+        
+        if !remove_statements.is_empty() {
+            tracing::trace!("Executing remove statements");
+            self.db.query(remove_statements).await?;
+        }
+        
+        tracing::trace!("Old data removal complete");
         Ok(())
     }
 
     /// Execute access query on main database
     pub async fn execute_access(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Executing access definitions");
         let comparator = self.comparator.as_ref().unwrap();
-        execute_access_query(&self.db, comparator.get_access_query()).await
+        let access_query = comparator.get_access_query();
+        
+        tracing::debug!(
+            query_length = access_query.len(),
+            "Executing access query"
+        );
+        
+        execute_access_query(&self.db, access_query).await
     }
 
     /// Filter changed tables and objects
     pub async fn filter_changes(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Filtering changes based on schema comparison");
         let comparator = self.comparator.as_ref().unwrap();
         let schema_changes = comparator.get_schema_changes().unwrap();
 
         let (filtered_tables, filtered_objects) =
             if self.schemasync_config.mock_gen_config.full_refresh_mode {
+                tracing::debug!("Full refresh mode enabled - using all tables and objects");
                 (self.tables.clone(), self.objects.clone())
             } else {
+                tracing::debug!("Incremental mode - filtering changed items only");
                 filter_changed_tables_and_objects(
                     schema_changes,
                     &self.tables,
@@ -195,6 +247,12 @@ impl Mockmaker {
         self.filtered_tables = filtered_tables;
         self.filtered_objects = filtered_objects;
 
+        tracing::info!(
+            filtered_tables = self.filtered_tables.len(),
+            filtered_objects = self.filtered_objects.len(),
+            "Filtering complete"
+        );
+        
         evenframe_log!(
             format!("{:#?}{:#?}", self.filtered_objects, self.filtered_tables),
             "filtered.log"
@@ -204,9 +262,17 @@ impl Mockmaker {
     }
 
     pub(super) async fn generate_mock_data(&self) -> Result<(), Box<dyn std::error::Error>> {
+        tracing::trace!("Starting mock data generation");
+        
         // Sort tables by dependencies to ensure proper insertion order
         let sorted_table_names =
             sort_tables_by_dependencies(&self.filtered_tables, &self.filtered_objects, &self.enums);
+        
+        tracing::debug!(
+            table_count = sorted_table_names.len(),
+            "Tables sorted by dependencies"
+        );
+        
         evenframe_log!(
             &format!("Sorted table order: {:?}", sorted_table_names),
             "results.log",
@@ -216,12 +282,28 @@ impl Mockmaker {
         for table_name in sorted_table_names {
             if let Some(table) = &self.filtered_tables.get(&table_name) {
                 let snake_table_name = &table_name.to_case(Case::Snake);
+                
+                tracing::trace!(
+                    table = %table_name,
+                    is_relation = table.relation.is_some(),
+                    "Processing table for mock data"
+                );
+                
                 if self.schemasync_config.should_generate_mocks {
                     let stmts = if table.relation.is_some() {
+                        tracing::trace!(table = %table_name, "Generating INSERT statements for relation");
                         self.generate_insert_statements(snake_table_name, table)
                     } else {
+                        tracing::trace!(table = %table_name, "Generating UPSERT statements for table");
                         self.generate_upsert_statements(snake_table_name, table)
                     };
+                    
+                    tracing::debug!(
+                        table = %table_name,
+                        statement_count = stmts.lines().count(),
+                        "Generated mock data statements"
+                    );
+                    
                     evenframe_log!(&stmts, "all_statements.surql", true);
 
                     // Execute and validate upsert statements
@@ -229,9 +311,14 @@ impl Mockmaker {
 
                     match execute_and_validate(&self.db, &stmts, "UPSERT", &table_name).await {
                         Ok(_results) => {
-                            // Success is already logged by execute_and_validate
+                            tracing::debug!(table = %table_name, "Mock data inserted successfully");
                         }
                         Err(e) => {
+                            tracing::error!(
+                                table = %table_name,
+                                error = %e,
+                                "Failed to execute statements"
+                            );
                             let error_msg = format!(
                                 "Failed to execute upsert statements for table {}: {}",
                                 table_name, e
@@ -243,6 +330,7 @@ impl Mockmaker {
                 }
             }
         }
+        tracing::info!("Mock data generation complete");
         Ok(())
     }
 
@@ -257,6 +345,7 @@ impl Mockmaker {
         _index: usize,
         increment: &CoordinateIncrement,
     ) -> HashMap<String, String> {
+        tracing::trace!(field_count = fields.len(), "Generating sequential values");
         let mut values = HashMap::new();
 
         // Generate base value
@@ -350,6 +439,7 @@ impl Mockmaker {
         _index: usize,
         total: f64,
     ) -> HashMap<String, String> {
+        tracing::trace!(field_count = fields.len(), total = total, "Generating sum values");
         let mut values = HashMap::new();
         let mut rng = rand::rng();
 
@@ -420,6 +510,7 @@ impl Mockmaker {
         derivation: &DerivationType,
         source_values: &HashMap<String, String>,
     ) -> HashMap<String, String> {
+        tracing::trace!(target_field = %target_field, "Generating derived values");
         let mut values = HashMap::new();
 
         match derivation {
@@ -509,6 +600,7 @@ impl Mockmaker {
         dataset: &crate::coordinate::CoherentDataset,
         index: usize,
     ) -> HashMap<String, String> {
+        tracing::trace!(index = index, "Generating coherent values");
         use crate::coordinate::*;
 
         /// Coherent address data
@@ -616,6 +708,11 @@ impl Mockmaker {
         id_index: Option<usize>,
         coordinated_values: &HashMap<String, String>,
     ) -> String {
+        tracing::trace!(
+            field_name = %field_name,
+            field_type = ?field_ty,
+            "Generating field value with coordination"
+        );
         let mut rng = rand::rng();
 
         match field_ty {

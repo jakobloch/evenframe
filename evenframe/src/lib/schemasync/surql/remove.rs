@@ -1,5 +1,6 @@
 use crate::{compare::SchemaChanges, mockmake::Mockmaker};
 use convert_case::{Case, Casing};
+use tracing::{debug, info};
 
 impl Mockmaker {
     /// Generate REMOVE statements based on schema changes and record differences
@@ -16,6 +17,8 @@ impl Mockmaker {
     /// # Returns
     /// A string containing all REMOVE and DELETE statements to be executed
     pub fn generate_remove_statements(&self, schema_changes: &SchemaChanges) -> String {
+        info!("Generating remove statements based on schema changes");
+        debug!("Schema changes: {:?}", schema_changes);
         let mut output = String::new();
 
         // Process removed accesses first

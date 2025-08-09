@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use surrealdb::engine::remote::http::Client;
 use surrealdb::Surreal;
+use tracing;
 
 use crate::schemasync::config::AccessType;
 
@@ -120,6 +121,7 @@ pub struct SchemaDefinition {
 impl SchemaDefinition {
     /// Create from TableConfig HashMap (for code-based schema generation)
     pub fn from_table_configs(tables: &HashMap<String, TableConfig>) -> Result<Self, String> {
+        tracing::debug!(table_count = tables.len(), "Creating SchemaDefinition from TableConfigs");
         let mut schema_tables = HashMap::new();
         let mut schema_edges = HashMap::new();
 
@@ -140,11 +142,19 @@ impl SchemaDefinition {
             }
         }
 
-        Ok(Self {
-            tables: schema_tables,
-            edges: schema_edges,
+        let definition = Self {
+            tables: schema_tables.clone(),
+            edges: schema_edges.clone(),
             accesses: Vec::new(), // TODO: Extract accesses from config if available
-        })
+        };
+        
+        tracing::debug!(
+            tables = definition.tables.len(),
+            edges = definition.edges.len(),
+            "SchemaDefinition created from configs"
+        );
+        
+        Ok(definition)
     }
 
     fn extract_fields_from_config(
@@ -187,6 +197,7 @@ impl SchemaDefinition {
     }
 
     fn extract_permissions_from_config(config: &TableConfig) -> Option<PermissionSet> {
+        tracing::trace!("Extracting permissions from table config");
         config.permissions.as_ref().map(|perms| PermissionSet {
             select: perms
                 .all_permissions

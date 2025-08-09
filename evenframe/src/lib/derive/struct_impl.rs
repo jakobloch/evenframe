@@ -1,3 +1,4 @@
+use tracing::{debug, error, info, trace};
 use crate::{
     config::EvenframeConfig,
     derive::{
@@ -19,9 +20,16 @@ use syn::{Data, DeriveInput, Fields, LitStr};
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
     let ident = input.ident.clone();
+    info!("Generating struct implementation for: {}", ident);
+    
+    debug!("Loading Evenframe configuration");
     let evenframe_config = match EvenframeConfig::new() {
-        Ok(evenframe_config) => evenframe_config,
+        Ok(evenframe_config) => {
+            debug!("Successfully loaded Evenframe configuration");
+            evenframe_config
+        },
         Err(e) => {
+            error!("Failed to load Evenframe configuration: {}", e);
             return syn::Error::new(
                 ident.span(),
                 format!("Failed to load Evenframe configuration: {}\n\nMake sure evenframe.toml exists in your project root and is properly formatted.", e)
@@ -32,13 +40,17 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
     };
 
     // Get centralized imports for struct implementations
+    debug!("Generating struct imports");
     let imports = generate_struct_imports();
 
     if let Data::Struct(ref data_struct) = input.data {
+        debug!("Processing struct data");
         // Ensure the struct has named fields.
         let fields_named = if let Fields::Named(ref fields_named) = data_struct.fields {
+            debug!("Found {} named fields", fields_named.named.len());
             fields_named
         } else {
+            error!("Struct does not have named fields");
             return syn::Error::new(
                 ident.span(),
                 format!("Evenframe derive macro only supports structs with named fields.\n\nExample of a valid struct:\n\nstruct {} {{\n    id: String,\n    name: String,\n}}", ident),
@@ -48,6 +60,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         };
 
         // Parse struct-level attributes
+        debug!("Parsing struct-level attributes");
         let permissions_config = match PermissionsConfig::parse(&input.attrs) {
             Ok(config) => config,
             Err(err) => {
@@ -81,17 +94,25 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         // Check if an "id" field exists.
         // Structs with an "id" field are treated as persistable entities (database tables).
         // Structs without an "id" field are treated as application-level data structures.
+        debug!("Checking for 'id' field to determine struct type");
         let has_id = fields_named.named.iter().any(|field| {
             // Check if field name is "id" - unwrap_or(false) handles unnamed fields gracefully
             field.ident.as_ref().map(|id| id == "id").unwrap_or(false)
         });
+        if has_id {
+            debug!("Found 'id' field - treating as persistable entity");
+        } else {
+            debug!("No 'id' field found - treating as application-level data structure");
+        }
 
         // Single pass over all fields.
+        debug!("Processing {} fields", fields_named.named.len());
         let mut table_field_tokens = Vec::new();
         let mut json_assignments = Vec::new();
         let mut fetch_fields = Vec::new(); // For fields marked with #[fetch]
         let mut subqueries: Vec<String> = Vec::new();
-        for field in fields_named.named.iter() {
+        for (field_index, field) in fields_named.named.iter().enumerate() {
+            trace!("Processing field {} of {}", field_index + 1, fields_named.named.len());
             let field_ident = match field.ident.as_ref() {
                 Some(ident) => ident,
                 None => {
@@ -369,6 +390,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         };
 
         let output = if has_id {
+            info!("Successfully generated persistable struct implementation for: {}", ident);
             quote! {
                 const _: () = {
                     #imports
@@ -382,14 +404,17 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             // For app structs, we only generate deserialization if needed
             // The derive macro itself serves as the marker
             if has_field_validators {
+                info!("Successfully generated app struct implementation with validation for: {}", ident);
                 deserialize_impl
             } else {
+                info!("Successfully generated app struct implementation (no validation) for: {}", ident);
                 quote! {}
             }
         };
 
         output.into()
     } else {
+        error!("Attempted to use derive macro on non-struct type: {}", ident);
         syn::Error::new(
             ident.span(),
             format!("The Evenframe derive macro can only be applied to structs.\n\nYou tried to apply it to: {}\n\nExample of correct usage:\n#[derive(Evenframe)]\nstruct MyStruct {{\n    id: String,\n    // ... other fields\n}}", ident)

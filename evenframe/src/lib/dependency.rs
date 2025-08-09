@@ -5,6 +5,7 @@ use convert_case::{Case, Casing};
 use petgraph::algo::toposort;
 use petgraph::{algo::kosaraju_scc, graphmap::DiGraphMap};
 use std::collections::{HashMap, HashSet};
+use tracing;
 
 /// A helper struct to track recursion information for types
 #[derive(Debug)]
@@ -48,8 +49,10 @@ pub fn analyse_recursion(
             collect_refs(&f.field_type, &known, entry);
         }
     }
+    tracing::debug!("Collecting dependencies from enums");
     for e in enums.values() {
         let from = e.enum_name.to_case(Case::Pascal);
+        tracing::trace!(enum_name = %from, "Processing enum dependencies");
         let entry = deps.entry(from.clone()).or_default();
         for v in &e.variants {
             if let Some(variant_data) = &v.data {
@@ -65,6 +68,7 @@ pub fn analyse_recursion(
     }
 
     // Build graph
+    tracing::debug!("Building dependency graph");
     let mut g: DiGraphMap<&str, ()> = DiGraphMap::new();
     for (from, tos) in &deps {
         // ensure node exists even if it has no outgoing edges
@@ -73,9 +77,12 @@ pub fn analyse_recursion(
             g.add_edge(from.as_str(), to.as_str(), ());
         }
     }
+    tracing::trace!(node_count = g.node_count(), edge_count = g.edge_count(), "Graph built");
 
     // Strongly connected components
+    tracing::debug!("Finding strongly connected components");
     let sccs = kosaraju_scc(&g); // Vec<Vec<&str>>
+    tracing::debug!(scc_count = sccs.len(), "SCCs found");
 
     let mut comp_of = HashMap::<String, usize>::new();
     let mut meta = HashMap::<usize, (bool, Vec<String>)>::new();
@@ -100,6 +107,7 @@ pub fn deps_of(
     structs: &HashMap<String, StructConfig>,
     enums: &HashMap<String, TaggedUnion>,
 ) -> HashSet<String> {
+    tracing::trace!(name = %name, "Getting direct dependencies of type");
     // Build a quick "known-types" set so we don't count primitives.
     let known: HashSet<_> = structs
         .values()
@@ -111,6 +119,7 @@ pub fn deps_of(
 
     // If `name` is a struct, walk its fields
     if let Some(sc) = structs.values().find(|sc| sc.name.to_case(Case::Pascal) == name) {
+        tracing::trace!(struct_name = %sc.name, field_count = sc.fields.len(), "Walking struct fields for dependencies");
         for f in &sc.fields {
             collect_refs(&f.field_type, &known, &mut acc);
         }
@@ -121,6 +130,7 @@ pub fn deps_of(
         .values()
         .find(|e| e.enum_name.to_case(Case::Pascal) == name)
     {
+        tracing::trace!(enum_name = %e.enum_name, variant_count = e.variants.len(), "Walking enum variants for dependencies");
         for v in &e.variants {
             if let Some(variant_data) = &v.data {
                 let variant_data_field_type = match variant_data {
@@ -134,11 +144,13 @@ pub fn deps_of(
         }
     }
 
+    tracing::trace!(dependency_count = acc.len(), "Dependencies collected");
     acc
 }
 
 /// Collect references to other types from a FieldType
 pub fn collect_refs(ft: &FieldType, known: &HashSet<String>, acc: &mut HashSet<String>) {
+    tracing::trace!(field_type = ?ft, "Collecting references from field type");
     use FieldType::*;
     match ft {
         Tuple(v) => v.iter().for_each(|f| collect_refs(f, known, acc)),
@@ -160,16 +172,19 @@ pub fn collect_refs(ft: &FieldType, known: &HashSet<String>, acc: &mut HashSet<S
 pub fn analyse_recursion_tables(
     tables: &HashMap<String, crate::schemasync::TableConfig>,
 ) -> RecursionInfo {
+    tracing::info!(table_count = tables.len(), "Analyzing recursion in table dependencies");
     // Convert tables to structs for analysis
     let structs: HashMap<String, StructConfig> = tables
         .iter()
         .map(|(name, table)| (name.clone(), table.struct_config.clone()))
         .collect();
+    tracing::debug!("Converted tables to structs for analysis");
 
     // Tables don't have enums, so pass empty map
     let enums = HashMap::new();
 
     // Use the regular analyse_recursion with converted data
+    tracing::debug!("Delegating to main recursion analyzer");
     analyse_recursion(&structs, &enums)
 }
 
@@ -178,8 +193,10 @@ pub fn deps_of_table(
     table_name: &str,
     tables: &HashMap<String, crate::schemasync::TableConfig>,
 ) -> HashSet<String> {
+    tracing::debug!(table_name = %table_name, "Getting dependencies of table");
     // Build set of known table names in PascalCase
     let known: HashSet<_> = tables.keys().map(|s| s.to_case(Case::Pascal)).collect();
+    tracing::trace!(known_table_count = known.len(), "Built set of known table names");
 
     // Build a map from PascalCase to original table names
     let pascal_to_original: HashMap<String, String> = tables
@@ -191,15 +208,24 @@ pub fn deps_of_table(
 
     // Find the table and analyze its fields
     if let Some(table) = tables.get(table_name) {
+        tracing::trace!(
+            table = %table_name,
+            field_count = table.struct_config.fields.len(),
+            "Analyzing table fields for dependencies"
+        );
         for field in &table.struct_config.fields {
             collect_refs(&field.field_type, &known, &mut acc);
         }
+    } else {
+        tracing::warn!(table_name = %table_name, "Table not found");
     }
 
     // Convert PascalCase dependencies back to original table names
-    acc.into_iter()
+    let result: HashSet<String> = acc.into_iter()
         .filter_map(|pascal_name| pascal_to_original.get(&pascal_name).cloned())
-        .collect()
+        .collect();
+    tracing::debug!(dependency_count = result.len(), "Table dependencies collected");
+    result
 }
 
 /// Collect all dependencies of a table including nested objects and enums
@@ -210,12 +236,22 @@ fn collect_table_dependencies(
     enums: &HashMap<String, TaggedUnion>,
     visited_types: &mut HashSet<String>,
 ) -> HashSet<String> {
+    tracing::trace!(
+        table_name = %table_name,
+        "Collecting all dependencies of table including nested objects"
+    );
     let mut dependencies = HashSet::new();
 
     // Get the table configuration
     if let Some(table) = tables.get(table_name) {
         // If this is a relation table, it depends on both the 'from' and 'to' tables
         if let Some(relation) = &table.relation {
+            tracing::trace!(
+                table = %table_name,
+                from = %relation.from,
+                to = %relation.to,
+                "Processing relation table dependencies"
+            );
             // Add dependency on the 'from' table
             let from_snake = relation.from.to_case(Case::Snake);
             if tables.contains_key(&relation.from) {
@@ -234,6 +270,7 @@ fn collect_table_dependencies(
         }
 
         // Analyze each field in the table
+        tracing::trace!(field_count = table.struct_config.fields.len(), "Analyzing table fields");
         for field in &table.struct_config.fields {
             collect_field_type_dependencies(
                 &field.field_type,
@@ -246,6 +283,11 @@ fn collect_table_dependencies(
         }
     }
 
+    tracing::trace!(
+        table = %table_name,
+        dependency_count = dependencies.len(),
+        "Table dependencies collection complete"
+    );
     dependencies
 }
 
@@ -258,20 +300,25 @@ pub fn collect_field_type_dependencies(
     dependencies: &mut HashSet<String>,
     visited_types: &mut HashSet<String>,
 ) {
+    tracing::trace!(field_type = ?field_type, "Collecting field type dependencies");
     match field_type {
         FieldType::Other(type_name) => {
             // Avoid infinite recursion
             if visited_types.contains(type_name) {
+                tracing::trace!(type_name = %type_name, "Type already visited, skipping to avoid recursion");
                 return;
             }
             visited_types.insert(type_name.clone());
+            tracing::trace!(type_name = %type_name, "Processing Other type");
 
             let snake_case_name = type_name.to_case(Case::Snake);
 
             // Check if it's a table reference
             if tables.contains_key(type_name) {
+                tracing::trace!(type_name = %type_name, "Found table reference");
                 dependencies.insert(type_name.clone());
             } else if tables.contains_key(&snake_case_name) {
+                tracing::trace!(type_name = %snake_case_name, "Found table reference (snake case)");
                 dependencies.insert(snake_case_name.clone());
             }
 
@@ -280,6 +327,11 @@ pub fn collect_field_type_dependencies(
                 .get(type_name)
                 .or_else(|| objects.get(&snake_case_name))
             {
+                tracing::trace!(
+                    type_name = %type_name,
+                    field_count = obj.fields.len(),
+                    "Found object/struct, analyzing fields"
+                );
                 for field in &obj.fields {
                     collect_field_type_dependencies(
                         &field.field_type,
@@ -294,6 +346,11 @@ pub fn collect_field_type_dependencies(
 
             // Check if it's an enum and analyze its variants
             if let Some(enum_def) = enums.get(type_name).or_else(|| enums.get(&snake_case_name)) {
+                tracing::trace!(
+                    type_name = %type_name,
+                    variant_count = enum_def.variants.len(),
+                    "Found enum, analyzing variants"
+                );
                 for variant in &enum_def.variants {
                     if let Some(variant_data) = &variant.data {
                         match variant_data {
@@ -389,9 +446,16 @@ pub fn sort_tables_by_dependencies(
     objects: &HashMap<String, StructConfig>,
     enums: &HashMap<String, TaggedUnion>,
 ) -> Vec<String> {
+    tracing::info!(
+        table_count = tables.len(),
+        object_count = objects.len(),
+        enum_count = enums.len(),
+        "Sorting tables by dependencies"
+    );
     // Build complete dependency graph including nested objects and enums
     let mut dependency_graph: HashMap<String, HashSet<String>> = HashMap::new();
 
+    tracing::debug!("Building dependency graph for all tables");
     for table_name in tables.keys() {
         let mut visited_types = HashSet::new();
         let dependencies =
@@ -409,6 +473,7 @@ pub fn sort_tables_by_dependencies(
     }
 
     // Build petgraph for topological sorting
+    tracing::debug!("Building petgraph for topological sorting");
     let mut graph = DiGraphMap::<&str, ()>::new();
 
     // Add all nodes first
@@ -426,9 +491,12 @@ pub fn sort_tables_by_dependencies(
     }
 
     // Detect strongly connected components for circular dependencies
+    tracing::debug!("Detecting strongly connected components");
     let sccs = petgraph::algo::kosaraju_scc(&graph);
+    tracing::info!(scc_count = sccs.len(), "Found strongly connected components");
 
     // Build condensation graph (DAG of SCCs)
+    tracing::debug!("Building condensation graph");
     let mut scc_map: HashMap<&str, usize> = HashMap::new();
     for (idx, scc) in sccs.iter().enumerate() {
         for node in scc {
@@ -450,10 +518,15 @@ pub fn sort_tables_by_dependencies(
     }
 
     // Topological sort of SCCs
+    tracing::debug!("Performing topological sort of SCCs");
     let sorted_sccs = match toposort(&condensation, None) {
-        Ok(order) => order,
+        Ok(order) => {
+            tracing::debug!("Topological sort successful");
+            order
+        },
         Err(_) => {
             // If there's still a cycle (shouldn't happen with SCC), fall back to arbitrary order
+            tracing::warn!("Cycle detected in SCC condensation graph, using arbitrary order");
             evenframe_log!(
                 "Warning: Cycle detected in SCC condensation graph",
                 "results.log",
@@ -464,11 +537,13 @@ pub fn sort_tables_by_dependencies(
     };
 
     // Build final sorted list
+    tracing::debug!("Building final sorted table list");
     let mut result = Vec::new();
     let mut processed_tables = HashSet::new();
 
     // Process SCCs in reverse topological order (dependencies first)
     for scc_idx in sorted_sccs.into_iter().rev() {
+        tracing::trace!(scc_idx = scc_idx, "Processing SCC");
         // Find all tables in this SCC
         let mut scc_tables: Vec<String> = tables
             .keys()
@@ -481,6 +556,10 @@ pub fn sort_tables_by_dependencies(
 
         // Log SCC info if it contains multiple tables
         if scc_tables.len() > 1 {
+            tracing::warn!(
+                tables = ?scc_tables,
+                "Circular dependency detected among tables"
+            );
             evenframe_log!(
                 &format!(
                     "Circular dependency detected among tables: {:?}",
@@ -506,6 +585,10 @@ pub fn sort_tables_by_dependencies(
     missing_tables.sort();
 
     if !missing_tables.is_empty() {
+        tracing::debug!(
+            table_count = missing_tables.len(),
+            "Found tables with no dependencies"
+        );
         evenframe_log!(
             &format!(
                 "Tables with no dependencies (adding at beginning): {:?}",
@@ -521,6 +604,10 @@ pub fn sort_tables_by_dependencies(
             .collect();
     }
 
+    tracing::info!(
+        table_count = result.len(),
+        "Table dependency sorting complete"
+    );
     evenframe_log!(
         &format!("Final sorted table order: {:?}", result),
         "results.log",

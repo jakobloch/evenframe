@@ -333,7 +333,7 @@ fn to_surreal_string(field_type: &FieldType, value: &Value) -> String {
                 // Check for "Id" => string
                 if let Some(id_value) = obj.get("Id") {
                     if let Some(id_str) = id_value.as_str() {
-                        format!("r\"{}\"", id_str.to_string())
+                        format!("r{}", id_str.to_string())
                     } else {
                         "null".to_string()
                     }

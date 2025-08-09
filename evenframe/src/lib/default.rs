@@ -382,7 +382,7 @@ pub fn field_type_to_surreal_type(
                             );
                             variant_type
                         } else {
-                            format!("\"{}\"", v.name)
+                            format!("{}", v.name)
                         }
                     })
                     .collect();
@@ -406,7 +406,11 @@ pub fn field_type_to_surreal_type(
 
                 (format!("{{ {} }}", field_defs.join(", ")), false, None)
             } else if persistable_structs.get(name).is_some() {
-                (format!("record<{}>", name.to_case(Case::Snake)), false, None)
+                (
+                    format!("record<{}>", name.to_case(Case::Snake)),
+                    false,
+                    None,
+                )
             } else {
                 (name.clone(), false, None)
             }

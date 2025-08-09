@@ -3,9 +3,11 @@ use chrono::{Datelike, Duration, Utc};
 use quote::{quote, ToTokens};
 use regex::Regex;
 use syn_enum_derive::EnumTypeParse;
+use tracing;
 
 /// Generate a regex pattern for dates within a specified number of days from now
 fn generate_date_range_pattern(days: i64) -> String {
+    tracing::trace!(days = days, "Generating date range pattern");
     let now = Utc::now();
 
     // Collect all valid dates in the range
@@ -21,7 +23,9 @@ fn generate_date_range_pattern(days: i64) -> String {
     }
 
     // Return the joined pattern
-    format!("({})", date_patterns.join("|"))
+    let pattern = format!("({})", date_patterns.join("|"));
+    tracing::trace!(pattern_count = date_patterns.len(), "Date range pattern generated");
+    pattern
 }
 
 #[derive(
@@ -123,28 +127,35 @@ pub enum Format {
 impl Format {
     /// Helper function to generate a value from regex pattern
     fn generate_from_regex(&self) -> String {
+        tracing::trace!(format = ?self, "Generating value from regex pattern");
         let regex: Regex = self.clone().into();
         let pattern = regex.as_str();
 
         let mut maker = Maker::new();
 
-        maker
+        let result = maker
             .generate(pattern)
-            .unwrap_or_else(|e| panic!("Failed to generate value for {:?}: {}", self, e))
+            .unwrap_or_else(|e| panic!("Failed to generate value for {:?}: {}", self, e));
+        
+        tracing::trace!(value_length = result.len(), "Generated value from regex");
+        result
     }
 
     pub fn generate_formatted_value(&self) -> String {
+        tracing::debug!(format = ?self, "Generating formatted value");
         self.generate_from_regex()
     }
 
     /// Convert this Format into a Regex
     pub fn into_regex(self) -> Regex {
+        tracing::trace!(format = ?self, "Converting format to regex");
         self.into()
     }
 }
 
 impl From<Format> for Regex {
     fn from(format: Format) -> Self {
+        tracing::trace!(format = ?format, "Creating regex from format");
         let pattern = match format {
             Format::Uuid => {
                 r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -253,7 +264,9 @@ impl From<Format> for Regex {
             }
         };
 
-        Regex::new(pattern).expect("Failed to create regex from Format")
+        let regex = Regex::new(pattern).expect("Failed to create regex from Format");
+        tracing::trace!(pattern_length = pattern.len(), "Regex created successfully");
+        regex
     }
 }
 

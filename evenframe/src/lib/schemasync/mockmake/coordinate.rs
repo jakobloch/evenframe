@@ -7,16 +7,20 @@ use convert_case::{Case, Casing};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
+use tracing;
 
 type FieldName = String;
 
 /// Parse a field path like "recurrence_rule.recurrence_begins" into (parent, child)
 fn parse_field_path(field_path: &str) -> (Option<String>, String) {
+    tracing::trace!(field_path = %field_path, "Parsing field path");
     if let Some(dot_pos) = field_path.find('.') {
         let parent = field_path[..dot_pos].to_string();
         let child = field_path[dot_pos + 1..].to_string();
+        tracing::trace!(parent = %parent, child = %child, "Field path has parent");
         (Some(parent), child)
     } else {
+        tracing::trace!("Field path has no parent");
         (None, field_path.to_string())
     }
 }
@@ -39,13 +43,10 @@ impl Mockmaker {
     ) -> Vec<HashMap<String, String>> {
         let mut all_values = Vec::new();
 
-        eprintln!(
-            "DEBUG: Generating coordinated values for table: {}",
-            table_name
-        );
-        eprintln!(
-            "DEBUG: Number of coordination pairs: {}",
-            coordination_group.field_coordination_pairs.len()
+        tracing::debug!(
+            table = %table_name,
+            coordination_pairs = coordination_group.field_coordination_pairs.len(),
+            "Generating coordinated values for table"
         );
 
         let n = self

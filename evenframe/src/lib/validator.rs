@@ -5,6 +5,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Serialize};
 use syn_enum_derive::{EnumTypeParse, SynEnum};
+use tracing::{debug, trace};
 
 #[derive(Debug, Clone, PartialEq, From, Eq, Hash, SynEnum, Serialize, Deserialize)]
 pub enum Validator {
@@ -389,6 +390,8 @@ impl Validator {
     /// Generates validation logic tokens for each validator variant
     /// Returns TokenStream that can be used in proc macros to generate validation code
     pub fn get_validation_logic_tokens(&self, value_ident: &str) -> TokenStream {
+        debug!(validator_type = ?self, value_ident = %value_ident, "Generating validation logic tokens");
+        trace!("Validator details: {:?}", self);
         let value = syn::Ident::new(value_ident, proc_macro2::Span::call_site());
 
         match self {

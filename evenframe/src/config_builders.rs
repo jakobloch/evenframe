@@ -82,12 +82,14 @@ pub fn build_all_configs() -> (
                         .iter()
                         .find(|t| t.name == item_struct.ident.to_string())
                     {
+                        debug!("Found Evenframe struct: {}", item_struct.ident);
                         if let Some(config) = parse_struct_config(&item_struct) {
                             struct_configs.insert(config.name.clone(), config.clone());
 
                             if evenframe_type.has_id_field {
                                 // Build table config immediately (like before)
                                 let name = config.name.to_case(Case::Snake);
+                                debug!("Building table config for: {} (snake_case: {})", config.name, name);
 
                                 // We don't have all struct_configs yet, so we can't parse coordination rules properly
                                 // But that's okay - we'll just parse them without full resolution for now
@@ -121,6 +123,7 @@ pub fn build_all_configs() -> (
                         .iter()
                         .any(|t| t.name == item_enum.ident.to_string())
                     {
+                        debug!("Found Evenframe enum: {}", item_enum.ident);
                         if let Some(tagged_union) = parse_enum_config(&item_enum) {
                             enum_configs
                                 .insert(tagged_union.enum_name.clone(), tagged_union.clone());
@@ -154,9 +157,11 @@ pub fn build_all_configs() -> (
 
 fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
     let name = item_struct.ident.to_string();
+    trace!("Parsing struct config for: {}", name);
     let mut fields = Vec::new();
 
     if let Fields::Named(ref fields_named) = item_struct.fields {
+        debug!("Processing {} fields for struct {}", fields_named.named.len(), name);
         for field in &fields_named.named {
             let field_name = field.ident.as_ref()?.to_string();
             let field_name = field_name.trim_start_matches("r#").to_string();
@@ -204,10 +209,12 @@ fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
 
 fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
     let enum_name = item_enum.ident.to_string();
+    trace!("Parsing enum config for: {}", enum_name);
     let mut variants = Vec::new();
 
     for variant in &item_enum.variants {
         let variant_name = variant.ident.to_string();
+        trace!("Processing variant: {} in enum {}", variant_name, enum_name);
 
         let data = match &variant.fields {
             Fields::Unit => None,
@@ -304,10 +311,12 @@ fn parse_coordination_expr(
     expr: &Expr,
     struct_configs: &HashMap<String, StructConfig>,
 ) -> Option<Coordination> {
+    trace!("Parsing coordination expression");
     if let Expr::Call(call) = expr {
         if let Expr::Path(path) = &*call.func {
             if let Some(segment) = path.path.segments.last() {
                 let func_name = segment.ident.to_string();
+                trace!("Found coordination function: {}", func_name);
 
                 match func_name.as_str() {
                     "InitializeEqual" => {
@@ -324,12 +333,15 @@ fn parse_coordination_expr(
                                 }
                             }
                             if !field_names.is_empty() {
+                                debug!("Created InitializeEqual coordination with {} fields", field_names.len());
                                 return Some(Coordination::InitializeEqual(field_names));
                             }
                         }
                     }
                     // Add other coordination types as needed
-                    _ => {}
+                    _ => {
+                        trace!("Unknown coordination function: {}", func_name);
+                    }
                 }
             }
         }
@@ -366,12 +378,15 @@ pub fn merge_tables_and_objects(
     tables: &HashMap<String, TableConfig>,
     objects: &HashMap<String, StructConfig>,
 ) -> HashMap<String, StructConfig> {
+    debug!("Merging {} tables and {} objects", tables.len(), objects.len());
     let mut struct_configs = objects.clone();
 
     // Extract StructConfig from each TableConfig and merge into struct_configs
     for (name, table_config) in tables {
+        trace!("Merging table config for: {}", name);
         struct_configs.insert(name.clone(), table_config.struct_config.clone());
     }
-
+    
+    debug!("Merge complete. Total struct configs: {}", struct_configs.len());
     struct_configs
 }
