@@ -3,6 +3,9 @@ name = "evenframe"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/lib/mod.rs"
+
 
 [dependencies]
 helpers = { path = "../helpers" }
@@ -23,3 +26,13 @@ chrono-tz = { workspace = true }
 derive_more = { workspace = true }
 petgraph = { workspace = true }
 toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+futures = { workspace = true }
+bon = { workspace = true }
+convert_case = { workspace = true }
+uuid = { workspace = true }
+axum = { workspace = true }
+ordered-float = { version = "5.0.0", features = ["serde"] }
+syn_enum_derive = { path = "../syn_enum_derive" }
+serde-value = { workspace = true }

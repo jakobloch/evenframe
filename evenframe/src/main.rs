@@ -1,14 +1,18 @@
 mod config_builders;
 mod workspace_scanner;
 
-use helpers::evenframe::schemasync::Schemasync; // Import your new struct
-use helpers::evenframe::{
+use evenframe::schemasync::Schemasync; // Import your new struct
+use evenframe::{
     config::EvenframeConfig,
     typesync::{arktype::generate_arktype_type_string, effect::generate_effect_schema_string},
 };
+use tracing::{debug, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize tracing with environment variable control
+    // Set RUST_LOG=debug for debug output, RUST_LOG=info for info only
+    tracing_subscriber::fmt::init();
     // Load configuration
     let config = EvenframeConfig::new()?;
 
@@ -17,10 +21,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let generate_effect_schemas = config.typesync.should_generate_effect_types;
 
     // Get the config builder closure
+    info!("Building all configs...");
     let (enums, tables, objects) = config_builders::build_all_configs();
+    info!(
+        "Config building complete. Found {} enums, {} tables, {} objects",
+        enums.len(),
+        tables.len(),
+        objects.len()
+    );
 
     if generate_arktype_types {
+        debug!("Generating arktype types...");
         let structs = config_builders::merge_tables_and_objects(&tables, &objects);
+        debug!("Merged {} structs", structs.len());
         std::fs::write(
             "../../frontend/src/lib/core/types/arktype.ts",
             format!(
@@ -44,13 +57,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if generate_dummy_values {
+        info!("Starting Schemasync for mock data generation");
         // Much simpler now!
-        Schemasync::new()
+        let schemasync = Schemasync::new()
             .with_tables(&tables)
             .with_objects(&objects)
-            .with_enums(&enums)
-            .run()
-            .await?;
+            .with_enums(&enums);
+
+        debug!("Running Schemasync...");
+        schemasync.run().await?;
+        info!("Schemasync completed successfully");
     }
 
     Ok(())

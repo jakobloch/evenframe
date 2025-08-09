@@ -8,9 +8,9 @@ proc-macro = true # Enables procedural macro functionality
 
 [dependencies]
 proc-macro2 = { workspace = true }
-quote = { workspace = true }       # For generating Rust code
-syn = { workspace = true }         # For parsing Rust code
-helpers = { path = "../helpers" }
+quote = { workspace = true }          # For generating Rust code
+syn = { workspace = true }            # For parsing Rust code
+evenframe = { path = "../evenframe" }
 serde_json.workspace = true
 regex = { workspace = true }
 

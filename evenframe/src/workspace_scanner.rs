@@ -2,7 +2,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use syn::{parse_file, Attribute, Item, Meta};
+use tracing::{debug, trace, warn};
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct EvenframeType {
     pub name: String,
@@ -38,7 +40,7 @@ impl WorkspaceScanner {
         &self,
     ) -> Result<Vec<EvenframeType>, Box<dyn std::error::Error>> {
         let mut types = Vec::new();
-        self.scan_directory(&self.handlers_path, &mut types, "handlers")?;
+        self.scan_directory(&self.handlers_path, &mut types, "handlers", 0)?;
         Ok(types)
     }
 
@@ -47,17 +49,32 @@ impl WorkspaceScanner {
         dir: &Path,
         types: &mut Vec<EvenframeType>,
         base_module: &str,
+        depth: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        trace!("Scanning directory: {:?}, module: {}, depth: {}", dir, base_module, depth);
+        
+        // Prevent excessive recursion
+        if depth > 10 {
+            warn!("Maximum recursion depth reached at {:?}", dir);
+            return Ok(());
+        }
+        
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
+            
+            // Skip symbolic links to avoid infinite recursion
+            if path.symlink_metadata()?.file_type().is_symlink() {
+                debug!("Skipping symlink: {:?}", path);
+                continue;
+            }
 
             if path.is_dir() {
                 let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
                 if dir_name != "tests" && dir_name != "benches" {
                     let module_path = format!("{}::{}", base_module, dir_name);
-                    self.scan_directory(&path, types, &module_path)?;
+                    self.scan_directory(&path, types, &module_path, depth + 1)?;
                 }
             } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
                 if let Some(file_name) = path.file_stem().and_then(|n| n.to_str()) {
@@ -83,8 +100,11 @@ impl WorkspaceScanner {
         types: &mut Vec<EvenframeType>,
         module_path: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        trace!("Scanning file: {:?}", path);
         let content = fs::read_to_string(path)?;
+        trace!("Parsing file: {:?}, size: {} bytes", path, content.len());
         let syntax_tree = parse_file(&content)?;
+        trace!("Successfully parsed file: {:?}", path);
 
         for item in syntax_tree.items {
             match item {
