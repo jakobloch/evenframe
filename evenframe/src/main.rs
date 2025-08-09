@@ -1,5 +1,4 @@
 mod config_builders;
-mod config_generator;
 mod workspace_scanner;
 
 use helpers::evenframe::schemasync::Schemasync; // Import your new struct
