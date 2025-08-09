@@ -300,7 +300,7 @@ fn _parse_coordination_rules(
 }
 
 /// Parse a single coordination expression
-fn _parse_coordination_expr(
+fn parse_coordination_expr(
     expr: &Expr,
     struct_configs: &HashMap<String, StructConfig>,
 ) -> Option<Coordination> {
@@ -340,7 +340,7 @@ fn _parse_coordination_expr(
 /// Resolve a field path that may contain dot notation
 /// e.g., "recurrence_rule.recurrence_begins" validates that recurrence_rule is an Option<RecurrenceRule>
 /// and that RecurrenceRule has a field recurrence_begins
-fn _resolve_field_path(path: &str, _struct_configs: &HashMap<String, StructConfig>) -> String {
+fn resolve_field_path(path: &str, _struct_configs: &HashMap<String, StructConfig>) -> String {
     // For simple fields without dots, just return as-is
     if !path.contains('.') {
         return path.to_string();
