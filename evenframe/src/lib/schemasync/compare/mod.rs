@@ -57,19 +57,19 @@ impl Comparator {
 
     pub async fn run(mut self) -> Result<Self, Box<dyn std::error::Error>> {
         tracing::info!("Starting Comparator pipeline");
-        
+
         tracing::debug!("Setting up schemas");
         self.setup_schemas().await?;
-        
+
         tracing::debug!("Setting up access definitions");
         self.setup_access().await?;
-        
+
         tracing::debug!("Exporting schemas for comparison");
         self.export_schemas().await?;
-        
+
         tracing::debug!("Comparing schemas");
         self.compare_schemas().await?;
-        
+
         tracing::info!("Comparator pipeline completed successfully");
         Ok(self)
     }
@@ -89,7 +89,10 @@ impl Comparator {
         tracing::trace!("Setting up access definitions");
         let new_schema = self.new_schema.as_ref().unwrap();
         self.access_query = setup_access_definitions(new_schema, &self.schemasync_config).await?;
-        tracing::trace!(access_query_length = self.access_query.len(), "Access query generated");
+        tracing::trace!(
+            access_query_length = self.access_query.len(),
+            "Access query generated"
+        );
         Ok(())
     }
 
@@ -107,7 +110,7 @@ impl Comparator {
             new_schema_size = new_schema_string.len(),
             "Schemas exported"
         );
-        
+
         self.remote_schema_string = remote_schema_string;
         self.new_schema_string = new_schema_string;
         Ok(())
@@ -122,14 +125,14 @@ impl Comparator {
             &self.new_schema_string,
         )
         .await?;
-        
+
         tracing::info!(
             new_tables = changes.new_tables.len(),
             removed_tables = changes.removed_tables.len(),
             modified_tables = changes.modified_tables.len(),
             "Schema changes detected"
         );
-        
+
         self.schema_changes = Some(changes);
         Ok(())
     }
@@ -221,7 +224,10 @@ impl<'a> Merger<'a> {
         &self,
         tables: &HashMap<String, TableConfig>,
     ) -> Result<import::SchemaDefinition, String> {
-        tracing::debug!(table_count = tables.len(), "Generating schema from Rust structs");
+        tracing::debug!(
+            table_count = tables.len(),
+            "Generating schema from Rust structs"
+        );
         let schema = import::SchemaDefinition::from_table_configs(tables)?;
         tracing::debug!(
             tables = schema.tables.len(),
@@ -273,7 +279,7 @@ impl<'a> Merger<'a> {
             }
             PreservationMode::Smart => {
                 // Smart preservation - keep unchanged fields, regenerate specified fields
-                if existing_count > 0 && mock_config.preserve_unchanged {
+                if existing_count > 0 {
                     // Preserve existing records up to target count
                     let preserve_count = existing_count.min(target_count);
 
@@ -350,10 +356,7 @@ impl<'a> Merger<'a> {
             }
             PreservationMode::Full => {
                 // Full preservation - keep all data, only add new fields
-                if existing_count > 0
-                    && mock_config.preserve_unchanged
-                    && mock_config.preserve_modified
-                {
+                if existing_count > 0 {
                     // Check if target count is less than existing count
                     if target_count < existing_count {
                         eprintln!(
@@ -766,7 +769,7 @@ impl Comparator {
         new: &SchemaDefinition,
     ) -> Result<SchemaChanges, String> {
         tracing::debug!("Starting detailed schema comparison");
-        
+
         let mut changes = SchemaChanges {
             new_tables: Vec::new(),
             removed_tables: Vec::new(),
@@ -779,7 +782,7 @@ impl Comparator {
         // Get all table names from both schemas
         let old_tables: HashSet<String> = old.tables.keys().cloned().collect();
         let new_tables: HashSet<String> = new.tables.keys().cloned().collect();
-        
+
         tracing::trace!(
             old_table_count = old_tables.len(),
             new_table_count = new_tables.len(),
@@ -882,7 +885,7 @@ impl Comparator {
             modified_accesses = changes.modified_accesses.len(),
             "Schema comparison complete"
         );
-        
+
         Ok(changes)
     }
 
@@ -1262,7 +1265,7 @@ pub fn filter_changed_tables_and_objects(
     record_diffs: &HashMap<String, i32>,
 ) -> (HashMap<String, TableConfig>, HashMap<String, StructConfig>) {
     tracing::debug!("Filtering changed tables and objects");
-    
+
     let mut filtered_tables = HashMap::new();
     let mut filtered_objects = HashMap::new();
 
@@ -1617,7 +1620,7 @@ pub fn filter_changed_tables_and_objects(
         filtered_object_count = filtered_objects.len(),
         "Filtering complete"
     );
-    
+
     (filtered_tables, filtered_objects)
 }
 

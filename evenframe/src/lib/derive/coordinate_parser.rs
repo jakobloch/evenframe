@@ -1,14 +1,17 @@
-use tracing::{debug, error, info, trace, warn};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{spanned::Spanned, Attribute, Expr, ExprArray, ExprLit, Lit, Meta};
+use tracing::{debug, error, info, trace, warn};
 
 /// Parse coordinate attributes from mock_data attribute
 /// Returns Ok(None) if no coordinate attribute found, Ok(Some(vec)) if found, or Err on parse errors
 pub fn parse_coordinate_attribute(
     attrs: &[Attribute],
 ) -> Result<Option<Vec<TokenStream>>, syn::Error> {
-    info!("Starting coordinate attribute parsing for {} attributes", attrs.len());
+    info!(
+        "Starting coordinate attribute parsing for {} attributes",
+        attrs.len()
+    );
     for (index, attr) in attrs.iter().enumerate() {
         trace!("Processing attribute {} of {}", index + 1, attrs.len());
         if attr.path().is_ident("mock_data") {
@@ -18,34 +21,58 @@ pub fn parse_coordinate_attribute(
 
             match result {
                 Ok(metas) => {
-                    debug!("Successfully parsed {} meta arguments, searching for coordinate", metas.len());
+                    debug!(
+                        "Successfully parsed {} meta arguments, searching for coordinate",
+                        metas.len()
+                    );
                     for (meta_index, meta) in metas.iter().enumerate() {
-                        trace!("Processing meta {} of {}: coordinate parameter", meta_index + 1, metas.len());
+                        trace!(
+                            "Processing meta {} of {}: coordinate parameter",
+                            meta_index + 1,
+                            metas.len()
+                        );
                         match meta {
                             Meta::NameValue(nv) if nv.path.is_ident("coordinate") => {
                                 debug!("Found coordinate parameter");
                                 // coordinate = [...]
                                 if let Expr::Array(ExprArray { elems, .. }) = &nv.value {
-                                    debug!("Coordinate parameter is an array with {} elements", elems.len());
+                                    debug!(
+                                        "Coordinate parameter is an array with {} elements",
+                                        elems.len()
+                                    );
                                     let mut coordinates = Vec::new();
 
                                     for (elem_index, elem) in elems.iter().enumerate() {
-                                        trace!("Processing coordinate element {} of {}", elem_index + 1, elems.len());
+                                        trace!(
+                                            "Processing coordinate element {} of {}",
+                                            elem_index + 1,
+                                            elems.len()
+                                        );
                                         match parse_coordinate_expr(elem) {
                                             Ok(coord_tokens) => {
-                                                debug!("Successfully parsed coordinate element {}", elem_index + 1);
+                                                debug!(
+                                                    "Successfully parsed coordinate element {}",
+                                                    elem_index + 1
+                                                );
                                                 coordinates.push(coord_tokens);
-                                            },
+                                            }
                                             Err(err) => {
-                                                error!("Failed to parse coordinate element {}: {}", elem_index + 1, err);
+                                                error!(
+                                                    "Failed to parse coordinate element {}: {}",
+                                                    elem_index + 1,
+                                                    err
+                                                );
                                                 return Err(err);
                                             }
                                         }
                                     }
 
-                                    info!("Successfully parsed {} coordinate rules", coordinates.len());
+                                    info!(
+                                        "Successfully parsed {} coordinate rules",
+                                        coordinates.len()
+                                    );
                                     return Ok(Some(coordinates));
-                                                } else {
+                                } else {
                                     warn!("Coordinate parameter is not an array");
                                     return Err(syn::Error::new(
                                         nv.value.span(),
@@ -143,7 +170,11 @@ fn parse_initialize_equal(call: &syn::ExprCall) -> Result<TokenStream, syn::Erro
                 "InitializeEqual requires at least one field",
             ));
         }
-        debug!("Successfully parsed {} fields for InitializeEqual: {:?}", fields.len(), fields);
+        debug!(
+            "Successfully parsed {} fields for InitializeEqual: {:?}",
+            fields.len(),
+            fields
+        );
         Ok(quote! {
             evenframe::coordinate::Coordination::InitializeEqual(vec![#(#fields.to_string()),*])
         })
@@ -326,7 +357,11 @@ fn parse_string_array(arr: &ExprArray) -> Result<Vec<String>, syn::Error> {
     trace!("Parsing string array with {} elements", arr.elems.len());
     let mut strings = Vec::new();
     for (index, elem) in arr.elems.iter().enumerate() {
-        trace!("Processing array element {} of {}", index + 1, arr.elems.len());
+        trace!(
+            "Processing array element {} of {}",
+            index + 1,
+            arr.elems.len()
+        );
         if let Expr::Lit(ExprLit {
             lit: Lit::Str(s), ..
         }) = elem

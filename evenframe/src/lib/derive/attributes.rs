@@ -1,21 +1,36 @@
-use tracing::{debug, error, info, trace};
 use quote::quote;
-use syn::{spanned::Spanned, Attribute, Expr, ExprLit, Lit, Meta};
+use syn::{spanned::Spanned, Attribute, Expr, ExprArray, ExprLit, Lit, Meta};
+use tracing::{debug, error, info, trace};
 
 use crate::{
-    derive::coordinate_parser::parse_coordinate_attribute,
     format::Format,
+    mockmake::{coordinate::Coordination, MockGenerationConfig},
     schemasync::{Direction, EdgeConfig},
+    types::StructField,
 };
+use std::{collections::HashMap, convert::TryFrom};
 
 // Remove unused imports - these are only used in the macro implementation, not generated code
 
 pub fn parse_mock_data_attribute(
     attrs: &[Attribute],
-) -> Result<Option<(usize, Option<String>, Option<Vec<proc_macro2::TokenStream>>)>, syn::Error> {
-    info!("Starting mock_data attribute parsing for {} attributes", attrs.len());
-    trace!("Processing attributes: {:?}", attrs.iter().map(|a| a.path().get_ident().map(|i| i.to_string()).unwrap_or_else(|| "unknown".to_string())).collect::<Vec<_>>());
-    
+) -> Result<Option<MockGenerationConfig>, syn::Error> {
+    info!(
+        "Starting mock_data attribute parsing for {} attributes",
+        attrs.len()
+    );
+    trace!(
+        "Processing attributes: {:?}",
+        attrs
+            .iter()
+            .map(|a| a
+                .path()
+                .get_ident()
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| "unknown".to_string()))
+            .collect::<Vec<_>>()
+    );
+
     for (index, attr) in attrs.iter().enumerate() {
         trace!("Processing attribute {} of {}", index + 1, attrs.len());
         if attr.path().is_ident("mock_data") {
@@ -26,9 +41,9 @@ pub fn parse_mock_data_attribute(
             match result {
                 Ok(metas) => {
                     debug!("Successfully parsed {} meta arguments", metas.len());
-                    let mut n = 100; // default
-                    let mut overrides = None;
-                    trace!("Initialized defaults: n={}, overrides={:?}", n, overrides);
+                    // Start with defaults from MockGenerationConfig::default()
+                    let mut base_config = MockGenerationConfig::default();
+                    let mut overrides_name = None;
 
                     for (meta_index, meta) in metas.iter().enumerate() {
                         trace!("Processing meta {} of {}", meta_index + 1, metas.len());
@@ -42,10 +57,13 @@ pub fn parse_mock_data_attribute(
                                     match lit.base10_parse::<usize>() {
                                         Ok(value) => {
                                             debug!("Successfully parsed n value: {}", value);
-                                            n = value;
-                                        },
+                                            base_config.n = value;
+                                        }
                                         Err(_) => {
-                                            error!("Failed to parse 'n' value: {}", lit.base10_digits());
+                                            error!(
+                                                "Failed to parse 'n' value: {}",
+                                                lit.base10_digits()
+                                            );
                                             return Err(syn::Error::new(
                                                 lit.span(),
                                                 format!("Invalid value for 'n': '{}'. Expected a positive integer.\n\nExample: #[mock_data(n = 1000)]", lit.base10_digits())
@@ -64,7 +82,7 @@ pub fn parse_mock_data_attribute(
                                     lit: Lit::Str(lit), ..
                                 }) = &nv.value
                                 {
-                                    overrides = Some(lit.value());
+                                    overrides_name = Some(lit.value());
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
@@ -95,14 +113,63 @@ pub fn parse_mock_data_attribute(
                         }
                     }
 
-                    // Also parse coordinates
-                    let coordinates = match parse_coordinate_attribute(attrs) {
-                        Ok(coords) => coords,
-                        Err(err) => return Err(err),
-                    };
+                    // Parse coordination rules directly from the attributes
+                    let mut coordination_rules = Vec::new();
 
-                    info!("Successfully parsed mock_data attribute: n={}, overrides={:?}, coordinates_count={}", n, overrides, coordinates.as_ref().map_or(0, |c| c.len()));
-                    return Ok(Some((n, overrides, coordinates)));
+                    // Look for coordinate parameter in the metas we already have
+                    for meta in metas.iter() {
+                        if let Meta::NameValue(nv) = meta {
+                            if nv.path.is_ident("coordinate") {
+                                // coordinate = [...]
+                                if let Expr::Array(ExprArray { elems, .. }) = &nv.value {
+                                    // Convert each expression to Coordination using TryFrom
+                                    for elem in elems {
+                                        match Coordination::try_from(elem) {
+                                            Ok(coord) => {
+                                                debug!(
+                                                    "Successfully parsed coordination rule: {:?}",
+                                                    coord
+                                                );
+                                                coordination_rules.push(coord);
+                                            }
+                                            Err(e) => {
+                                                error!("Failed to parse coordination rule: {}", e);
+                                                return Err(syn::Error::new(
+                                                    elem.span(),
+                                                    format!(
+                                                        "Failed to parse coordination rule: {}",
+                                                        e
+                                                    ),
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    info!("Successfully parsed mock_data attribute: n={}, overrides={:?}, coordination_rules_count={}", base_config.n, overrides_name, coordination_rules.len());
+
+                    // Parse overrides from config if specified
+                    let table_level_override: Option<HashMap<StructField, Format>> =
+                        if let Some(override_name) = overrides_name {
+                            // TODO: Load format overrides from configuration based on override_name
+                            // For now, return None - this would be loaded from a config file
+                            debug!(
+                                "Override '{}' specified but override loading not yet implemented",
+                                override_name
+                            );
+                            None
+                        } else {
+                            None
+                        };
+
+                    // Apply parsed values to the base config
+                    base_config.table_level_override = table_level_override;
+                    base_config.coordination_rules = coordination_rules;
+
+                    return Ok(Some(base_config));
                 }
                 Err(err) => {
                     error!("Failed to parse mock_data attribute arguments: {}", err);
@@ -119,7 +186,10 @@ pub fn parse_mock_data_attribute(
 }
 
 pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::Error> {
-    info!("Starting table validators parsing for {} attributes", attrs.len());
+    info!(
+        "Starting table validators parsing for {} attributes",
+        attrs.len()
+    );
     let mut validators = Vec::new();
 
     for attr in attrs {
@@ -182,7 +252,10 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
 }
 
 pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig>, syn::Error> {
-    info!("Starting relation attribute parsing for {} attributes", attrs.len());
+    info!(
+        "Starting relation attribute parsing for {} attributes",
+        attrs.len()
+    );
     for attr in attrs {
         if attr.path().is_ident("relation") {
             debug!("Found relation attribute");
@@ -326,7 +399,10 @@ pub fn parse_format_attribute(
 ) -> Result<Option<proc_macro2::TokenStream>, syn::Error> {
     use syn::{Expr, ExprCall, ExprPath, Path, PathSegment};
 
-    info!("Starting format attribute parsing for {} attributes", attrs.len());
+    info!(
+        "Starting format attribute parsing for {} attributes",
+        attrs.len()
+    );
     for attr in attrs {
         if attr.path().is_ident("format") {
             debug!("Found format attribute");

@@ -62,7 +62,7 @@ impl Mockmaker {
 
     pub async fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("Starting Mockmaker pipeline");
-        
+
         // Step 1: Generate IDs
         tracing::debug!("Step 1: Generating IDs for mock data");
         self.generate_ids().await?;
@@ -75,13 +75,13 @@ impl Mockmaker {
         // Step 3: Run remaining mockmaker steps
         tracing::debug!("Step 3: Removing old data based on schema changes");
         self.remove_old_data().await?;
-        
+
         tracing::debug!("Step 4: Executing access queries");
         self.execute_access().await?;
-        
+
         tracing::debug!("Step 5: Filtering changed tables and objects");
         self.filter_changes().await?;
-        
+
         tracing::debug!("Step 6: Generating mock data");
         self.generate_mock_data().await?;
 
@@ -124,7 +124,7 @@ impl Mockmaker {
 
             // Calculate the difference between existing and desired counts
             let record_diff = desired_count as i32 - existing_count as i32;
-            
+
             tracing::trace!(
                 table = %table_name,
                 existing_count = existing_count,
@@ -172,11 +172,8 @@ impl Mockmaker {
         self.id_map = map;
         self.record_diffs = record_diffs;
 
-        tracing::debug!(
-            table_count = self.id_map.len(),
-            "ID generation complete"
-        );
-        
+        tracing::debug!(table_count = self.id_map.len(), "ID generation complete");
+
         evenframe_log!(
             format!("Record count differences: {:#?}", self.record_diffs),
             "record_diffs.log"
@@ -192,19 +189,19 @@ impl Mockmaker {
         let schema_changes = comparator.get_schema_changes().unwrap();
 
         let remove_statements = self.generate_remove_statements(schema_changes);
-        
+
         tracing::debug!(
             statement_length = remove_statements.len(),
             "Generated remove statements"
         );
 
         evenframe_log!(&remove_statements, "remove_statements.surql");
-        
+
         if !remove_statements.is_empty() {
             tracing::trace!("Executing remove statements");
             self.db.query(remove_statements).await?;
         }
-        
+
         tracing::trace!("Old data removal complete");
         Ok(())
     }
@@ -214,12 +211,9 @@ impl Mockmaker {
         tracing::trace!("Executing access definitions");
         let comparator = self.comparator.as_ref().unwrap();
         let access_query = comparator.get_access_query();
-        
-        tracing::debug!(
-            query_length = access_query.len(),
-            "Executing access query"
-        );
-        
+
+        tracing::debug!(query_length = access_query.len(), "Executing access query");
+
         execute_access_query(&self.db, access_query).await
     }
 
@@ -252,7 +246,7 @@ impl Mockmaker {
             filtered_objects = self.filtered_objects.len(),
             "Filtering complete"
         );
-        
+
         evenframe_log!(
             format!("{:#?}{:#?}", self.filtered_objects, self.filtered_tables),
             "filtered.log"
@@ -263,16 +257,16 @@ impl Mockmaker {
 
     pub(super) async fn generate_mock_data(&self) -> Result<(), Box<dyn std::error::Error>> {
         tracing::trace!("Starting mock data generation");
-        
+
         // Sort tables by dependencies to ensure proper insertion order
         let sorted_table_names =
             sort_tables_by_dependencies(&self.filtered_tables, &self.filtered_objects, &self.enums);
-        
+
         tracing::debug!(
             table_count = sorted_table_names.len(),
             "Tables sorted by dependencies"
         );
-        
+
         evenframe_log!(
             &format!("Sorted table order: {:?}", sorted_table_names),
             "results.log",
@@ -282,13 +276,13 @@ impl Mockmaker {
         for table_name in sorted_table_names {
             if let Some(table) = &self.filtered_tables.get(&table_name) {
                 let snake_table_name = &table_name.to_case(Case::Snake);
-                
+
                 tracing::trace!(
                     table = %table_name,
                     is_relation = table.relation.is_some(),
                     "Processing table for mock data"
                 );
-                
+
                 if self.schemasync_config.should_generate_mocks {
                     let stmts = if table.relation.is_some() {
                         tracing::trace!(table = %table_name, "Generating INSERT statements for relation");
@@ -297,13 +291,13 @@ impl Mockmaker {
                         tracing::trace!(table = %table_name, "Generating UPSERT statements for table");
                         self.generate_upsert_statements(snake_table_name, table)
                     };
-                    
+
                     tracing::debug!(
                         table = %table_name,
                         statement_count = stmts.lines().count(),
                         "Generated mock data statements"
                     );
-                    
+
                     evenframe_log!(&stmts, "all_statements.surql", true);
 
                     // Execute and validate upsert statements
@@ -439,7 +433,11 @@ impl Mockmaker {
         _index: usize,
         total: f64,
     ) -> HashMap<String, String> {
-        tracing::trace!(field_count = fields.len(), total = total, "Generating sum values");
+        tracing::trace!(
+            field_count = fields.len(),
+            total = total,
+            "Generating sum values"
+        );
         let mut values = HashMap::new();
         let mut rng = rand::rng();
 
@@ -1147,8 +1145,6 @@ pub struct MockGenerationConfig {
     pub n: usize,
     pub table_level_override: Option<HashMap<StructField, Format>>,
     pub coordination_rules: Vec<crate::schemasync::mockmake::coordinate::Coordination>,
-    pub preserve_unchanged: bool,
-    pub preserve_modified: bool,
     pub batch_size: usize,
     pub regenerate_fields: Vec<String>,
     pub preservation_mode: PreservationMode,
@@ -1156,39 +1152,72 @@ pub struct MockGenerationConfig {
 
 impl Default for MockGenerationConfig {
     fn default() -> Self {
+        // Try to load config, fall back to hardcoded defaults if unavailable
+        let (n, batch_size, preservation_mode) = match crate::config::EvenframeConfig::new() {
+            Ok(config) => (
+                config.schemasync.mock_gen_config.default_record_count,
+                config.schemasync.mock_gen_config.default_batch_size,
+                config.schemasync.mock_gen_config.default_preservation_mode,
+            ),
+            Err(_) => {
+                // Fall back to reasonable defaults if config can't be loaded
+                (10, 1000, PreservationMode::Smart)
+            }
+        };
+
         Self {
-            n: 10,
+            n,
             table_level_override: None,
             coordination_rules: Vec::new(),
-            preserve_unchanged: true,
-            preserve_modified: false,
-            batch_size: 1000,
-            regenerate_fields: vec!["updated_at".to_string(), "created_at".to_string()],
-            preservation_mode: PreservationMode::Smart,
+            batch_size,
+            regenerate_fields: vec![],
+            preservation_mode,
         }
     }
 }
 
-impl MockGenerationConfig {
-    /// Create a config for smart preservation mode
-    pub fn with_smart_preservation(n: usize) -> Self {
-        Self {
-            n,
-            preservation_mode: PreservationMode::Smart,
-            preserve_unchanged: true,
-            preserve_modified: false,
-            ..Default::default()
-        }
-    }
+impl quote::ToTokens for MockGenerationConfig {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let n = self.n;
+        let batch_size = self.batch_size;
 
-    /// Create a config for full preservation mode
-    pub fn with_full_preservation(n: usize) -> Self {
-        Self {
-            n,
-            preservation_mode: PreservationMode::Full,
-            preserve_unchanged: true,
-            preserve_modified: true,
-            ..Default::default()
-        }
+        // Convert coordination rules to tokens
+        let coordination_rules_tokens = if self.coordination_rules.is_empty() {
+            quote::quote! { vec![] }
+        } else {
+            // We need to serialize coordination rules properly
+            // For now, just create an empty vec as coordination rules need their own ToTokens impl
+            quote::quote! { vec![] }
+        };
+
+        // Convert regenerate fields to tokens
+        let regenerate_fields = &self.regenerate_fields;
+
+        // Convert preservation mode to tokens
+        let preservation_mode_tokens = match &self.preservation_mode {
+            PreservationMode::Smart => {
+                quote::quote! { ::evenframe::schemasync::compare::PreservationMode::Smart }
+            }
+            PreservationMode::Full => {
+                quote::quote! { ::evenframe::schemasync::compare::PreservationMode::Full }
+            }
+            PreservationMode::None => {
+                quote::quote! { ::evenframe::schemasync::compare::PreservationMode::None }
+            }
+        };
+
+        // Generate the full config token stream
+        let config_tokens = quote::quote! {
+            MockGenerationConfig {
+                n: #n,
+                table_level_override: None,
+                coordination_rules: #coordination_rules_tokens,
+                batch_size: #batch_size,
+                regenerate_fields: vec![#(#regenerate_fields.to_string()),*],
+                preservation_mode: #preservation_mode_tokens,
+            }
+        };
+
+        tokens.extend(config_tokens);
     }
 }

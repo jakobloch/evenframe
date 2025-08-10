@@ -6,10 +6,9 @@ use bon::Builder;
 use convert_case::{Case, Casing};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use uuid::Uuid;
 use tracing;
-
-type FieldName = String;
+use try_from_expr::TryFromExpr;
+use uuid::Uuid;
 
 /// Parse a field path like "recurrence_rule.recurrence_begins" into (parent, child)
 fn parse_field_path(field_path: &str) -> (Option<String>, String) {
@@ -32,7 +31,7 @@ pub struct CoordinationGroup {
     #[builder(default)]
     pub tables: HashSet<TableName>,
     #[builder(default)]
-    pub field_coordination_pairs: Vec<(HashSet<(TableName, FieldName)>, Coordination)>,
+    pub field_coordination_pairs: Vec<(HashSet<(TableName, String)>, Coordination)>,
 }
 impl Mockmaker {
     pub fn generate_coordinated_values(
@@ -227,33 +226,33 @@ impl Mockmaker {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum CoordinatedValue {
     String(String),
     F64(f64),
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum Coordination {
     /// Initialize multiple fields with the same value
-    InitializeEqual(Vec<FieldName>),
+    InitializeEqual(Vec<String>),
 
     /// Initialize fields in sequence (e.g., start < end dates)
     InitializeSequential {
-        field_names: Vec<FieldName>,
+        field_names: Vec<String>,
         increment: CoordinateIncrement,
     },
 
     /// Fields must sum to a total (e.g., percentage fields = 100)
     InitializeSum {
-        field_names: Vec<FieldName>,
+        field_names: Vec<String>,
         total: f64,
     },
 
     /// One field derives from another (e.g., full_name from first + last)
     InitializeDerive {
-        source_field_names: Vec<FieldName>,
-        target_field_name: FieldName,
+        source_field_names: Vec<String>,
+        target_field_name: String,
         derivation: DerivationType,
     },
 
@@ -261,7 +260,7 @@ pub enum Coordination {
     InitializeCoherent(CoherentDataset),
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum CoordinateIncrement {
     Days(i32),
     Hours(i32),
@@ -270,14 +269,14 @@ pub enum CoordinateIncrement {
     Custom(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum DerivationType {
     Concatenate(String), // separator
     Extract(ExtractType),
     Transform(TransformType),
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum ExtractType {
     FirstWord,
     LastWord,
@@ -286,7 +285,7 @@ pub enum ExtractType {
     Initials,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum TransformType {
     Uppercase,
     Lowercase,
@@ -295,28 +294,28 @@ pub enum TransformType {
     Hash,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, TryFromExpr)]
 pub enum CoherentDataset {
     Address {
-        city: FieldName,
-        state: FieldName,
-        zip: FieldName,
-        country: FieldName,
+        city: String,
+        state: String,
+        zip: String,
+        country: String,
     },
     PersonName {
-        first_name: FieldName,
-        last_name: FieldName,
-        full_name: FieldName,
+        first_name: String,
+        last_name: String,
+        full_name: String,
     },
     GeoLocation {
-        latitude: FieldName,
-        longitude: FieldName,
-        city: FieldName,
-        country: FieldName,
+        latitude: String,
+        longitude: String,
+        city: String,
+        country: String,
     },
     DateRange {
-        start_date: FieldName,
-        end_date: FieldName,
+        start_date: String,
+        end_date: String,
     },
 }
 

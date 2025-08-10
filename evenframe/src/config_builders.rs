@@ -5,7 +5,6 @@ use evenframe::{
     derive::attributes::{
         parse_mock_data_attribute, parse_relation_attribute, parse_table_validators,
     },
-    mockmake::{coordinate::Coordination, MockGenerationConfig},
     schemasync::table::TableConfig,
     schemasync::{DefineConfig, EdgeConfig, PermissionsConfig},
     types::{FieldType, StructConfig, StructField, TaggedUnion, Variant, VariantData},
@@ -13,9 +12,7 @@ use evenframe::{
 };
 use std::collections::HashMap;
 use std::fs;
-use syn::{
-    parse_file, Attribute, Expr, ExprArray, ExprLit, Fields, Item, ItemEnum, ItemStruct, Lit, Meta,
-};
+use syn::{parse_file, Fields, Item, ItemEnum, ItemStruct};
 use tracing::{debug, info, trace, warn};
 
 pub fn build_all_configs() -> (
@@ -104,26 +101,19 @@ pub fn build_all_configs() -> (
                                     config.name, name
                                 );
 
-                                // We don't have all struct_configs yet, so we can't parse coordination rules properly
-                                // But that's okay - we'll just parse them without full resolution for now
+                                // Parse mock data attribute which now returns MockGenerationConfig directly
+                                let mock_generation_config =
+                                    parse_mock_data_attribute(&item_struct.attrs).ok().flatten();
+
                                 let table_config = TableConfig {
                                     struct_config: config.clone(),
-                                    relation: parse_relation_attribute(&item_struct.attrs).ok().flatten(),
-                                    permissions: PermissionsConfig::parse(&item_struct.attrs).ok().flatten(),
-                                    mock_generation_config: parse_mock_data_attribute(&item_struct.attrs)
+                                    relation: parse_relation_attribute(&item_struct.attrs)
                                         .ok()
-                                        .flatten()
-                                        .map(|(n, _overrides, _coords)| MockGenerationConfig {
-                                            n,
-                                            table_level_override: None,
-                                            coordination_rules: vec![], // Empty for now, like it was before
-                                            preserve_unchanged: false,
-                                            preserve_modified: false,
-                                            batch_size: 1000,
-                                            regenerate_fields: vec!["updated_at".to_string(), "created_at".to_string()],
-                                            preservation_mode:
-                                               evenframe::schemasync::compare::PreservationMode::default(),
-                                        }),
+                                        .flatten(),
+                                    permissions: PermissionsConfig::parse(&item_struct.attrs)
+                                        .ok()
+                                        .flatten(),
+                                    mock_generation_config,
                                 };
                                 table_configs.insert(name, table_config);
                             }
@@ -287,86 +277,6 @@ fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
         enum_name,
         variants,
     })
-}
-
-/// Parse coordination rules from mock_data attribute, resolving dot notation
-fn parse_coordination_rules(
-    attrs: &[Attribute],
-    struct_configs: &HashMap<String, StructConfig>,
-) -> Vec<Coordination> {
-    let mut coordination_rules = Vec::new();
-
-    for attr in attrs {
-        if attr.path().is_ident("mock_data") {
-            if let Ok(metas) = attr.parse_args_with(
-                syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
-            ) {
-                for meta in metas {
-                    if let Meta::NameValue(nv) = meta {
-                        if nv.path.is_ident("coordinate") {
-                            if let Expr::Array(ExprArray { elems, .. }) = nv.value {
-                                for elem in elems {
-                                    if let Some(rule) =
-                                        parse_coordination_expr(&elem, struct_configs)
-                                    {
-                                        coordination_rules.push(rule);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    coordination_rules
-}
-
-/// Parse a single coordination expression
-fn parse_coordination_expr(
-    expr: &Expr,
-    struct_configs: &HashMap<String, StructConfig>,
-) -> Option<Coordination> {
-    trace!("Parsing coordination expression");
-    if let Expr::Call(call) = expr {
-        if let Expr::Path(path) = &*call.func {
-            if let Some(segment) = path.path.segments.last() {
-                let func_name = segment.ident.to_string();
-                trace!("Found coordination function: {}", func_name);
-
-                match func_name.as_str() {
-                    "InitializeEqual" => {
-                        if let Some(Expr::Array(arr)) = call.args.first() {
-                            let mut field_names = Vec::new();
-                            for elem in &arr.elems {
-                                if let Expr::Lit(ExprLit {
-                                    lit: Lit::Str(s), ..
-                                }) = elem
-                                {
-                                    let resolved_field =
-                                        resolve_field_path(&s.value(), struct_configs);
-                                    field_names.push(resolved_field);
-                                }
-                            }
-                            if !field_names.is_empty() {
-                                debug!(
-                                    "Created InitializeEqual coordination with {} fields",
-                                    field_names.len()
-                                );
-                                return Some(Coordination::InitializeEqual(field_names));
-                            }
-                        }
-                    }
-                    // Add other coordination types as needed
-                    _ => {
-                        trace!("Unknown coordination function: {}", func_name);
-                    }
-                }
-            }
-        }
-    }
-    None
 }
 
 /// Resolve a field path that may contain dot notation

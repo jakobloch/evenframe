@@ -2,8 +2,8 @@ use super::maker::Maker;
 use chrono::{Datelike, Duration, Utc};
 use quote::{quote, ToTokens};
 use regex::Regex;
-use syn_enum_derive::EnumTypeParse;
 use tracing;
+use try_from_expr::TryFromExpr;
 
 /// Generate a regex pattern for dates within a specified number of days from now
 fn generate_date_range_pattern(days: i64) -> String {
@@ -24,13 +24,14 @@ fn generate_date_range_pattern(days: i64) -> String {
 
     // Return the joined pattern
     let pattern = format!("({})", date_patterns.join("|"));
-    tracing::trace!(pattern_count = date_patterns.len(), "Date range pattern generated");
+    tracing::trace!(
+        pattern_count = date_patterns.len(),
+        "Date range pattern generated"
+    );
     pattern
 }
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, serde::Serialize, serde::Deserialize)]
 pub enum Format {
     /// Generate a random UUID string
     Uuid,
@@ -136,7 +137,7 @@ impl Format {
         let result = maker
             .generate(pattern)
             .unwrap_or_else(|e| panic!("Failed to generate value for {:?}: {}", self, e));
-        
+
         tracing::trace!(value_length = result.len(), "Generated value from regex");
         result
     }

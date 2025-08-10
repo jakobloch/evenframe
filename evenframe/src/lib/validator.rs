@@ -4,10 +4,10 @@ use ordered_float::OrderedFloat;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Serialize};
-use syn_enum_derive::{EnumTypeParse, SynEnum};
 use tracing::{debug, trace};
+use try_from_expr::TryFromExpr;
 
-#[derive(Debug, Clone, PartialEq, From, Eq, Hash, SynEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, From, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum Validator {
     StringValidator(StringValidator),
     NumberValidator(NumberValidator),
@@ -19,7 +19,7 @@ pub enum Validator {
 }
 
 /// Describes various string validation and transformation _requirements.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum StringValidator {
     /// A string
     String,
@@ -225,7 +225,7 @@ pub enum StringValidator {
     Uncapitalized,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum NumberValidator {
     /// Number greater than a value
     GreaterThan(OrderedFloat<f64>),
@@ -271,7 +271,7 @@ pub enum NumberValidator {
 }
 
 /// Describes array validation filters
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum ArrayValidator {
     /// Minimum number of items in the array
     MinItems(usize),
@@ -284,7 +284,7 @@ pub enum ArrayValidator {
 }
 
 /// Describes date validation filters
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum DateValidator {
     /// Must be a valid date (not Invalid Date)
     ValidDate,
@@ -306,7 +306,7 @@ pub enum DateValidator {
 }
 
 /// Describes BigInt validation filters
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum BigIntValidator {
     /// BigInt greater than a value
     GreaterThanBigInt(String),
@@ -337,7 +337,7 @@ pub enum BigIntValidator {
 }
 
 /// Describes BigDecimal validation filters
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum BigDecimalValidator {
     /// BigDecimal greater than a value
     GreaterThanBigDecimal(String),
@@ -368,7 +368,7 @@ pub enum BigDecimalValidator {
 }
 
 /// Describes Duration validation filters
-#[derive(Debug, Clone, PartialEq, Eq, Hash, EnumTypeParse, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, TryFromExpr, Serialize, Deserialize)]
 pub enum DurationValidator {
     /// Duration greater than a value
     GreaterThanDuration(String),

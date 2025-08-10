@@ -34,6 +34,7 @@ convert_case = { workspace = true }
 uuid = { workspace = true }
 axum = { workspace = true }
 ordered-float = { version = "5.0.0", features = ["serde"] }
-syn_enum_derive = { path = "../syn_enum_derive" }
+try_from_expr = { path = "../try_from_expr" }
 serde-value = { workspace = true }
 thiserror = { workspace = true }
+derive-syn-parse = "0.2.0"

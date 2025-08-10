@@ -1,10 +1,7 @@
-use tracing::{debug, error, info, trace};
 use crate::{
-    config::EvenframeConfig,
     derive::{
         attributes::{
             parse_format_attribute, parse_mock_data_attribute, parse_relation_attribute,
-            parse_table_validators,
         },
         deserialization_impl::generate_custom_deserialize,
         imports::generate_struct_imports,
@@ -17,27 +14,11 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Fields, LitStr};
+use tracing::{debug, error, info, trace};
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
     let ident = input.ident.clone();
     info!("Generating struct implementation for: {}", ident);
-    
-    debug!("Loading Evenframe configuration");
-    let evenframe_config = match EvenframeConfig::new() {
-        Ok(evenframe_config) => {
-            debug!("Successfully loaded Evenframe configuration");
-            evenframe_config
-        },
-        Err(e) => {
-            error!("Failed to load Evenframe configuration: {}", e);
-            return syn::Error::new(
-                ident.span(),
-                format!("Failed to load Evenframe configuration: {}\n\nMake sure evenframe.toml exists in your project root and is properly formatted.", e)
-            )
-            .to_compile_error()
-            .into();
-        }
-    };
 
     // Get centralized imports for struct implementations
     debug!("Generating struct imports");
@@ -79,10 +60,17 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             Err(err) => return err.to_compile_error().into(),
         };
 
-        // Parse table-level validators
-        let table_validators = match parse_table_validators(&input.attrs) {
+        // Parse table-level validators using the same parser as field validators
+        let table_validators = match parse_field_validators(&input.attrs) {
             Ok(validators) => validators,
-            Err(err) => return err.to_compile_error().into(),
+            Err(err) => {
+                return syn::Error::new(
+                    input.span(),
+                    format!("Failed to parse table validators: {}\n\nExample usage:\n#[validators(StringValidator::MinLength(5))]\nstruct MyStruct {{ ... }}", err)
+                )
+                .to_compile_error()
+                .into();
+            }
         };
 
         // Parse relation attribute
@@ -112,7 +100,11 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         let mut fetch_fields = Vec::new(); // For fields marked with #[fetch]
         let mut subqueries: Vec<String> = Vec::new();
         for (field_index, field) in fields_named.named.iter().enumerate() {
-            trace!("Processing field {} of {}", field_index + 1, fields_named.named.len());
+            trace!(
+                "Processing field {} of {}",
+                field_index + 1,
+                fields_named.named.len()
+            );
             let field_ident = match field.ident.as_ref() {
                 Some(ident) => ident,
                 None => {
@@ -305,43 +297,15 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             quote! { None }
         };
 
-        let _table_validators_tokens = if !table_validators.is_empty() {
-            let validator_strings = table_validators.iter().map(|v| quote! { #v.to_string() });
-            quote! {
-                vec![
-                    #(Validator::StringValidator(
-                        StringValidator::StringEmbedded(#validator_strings)
-                    )),*
-                ]
-            }
+        let table_validators_tokens = if !table_validators.is_empty() {
+            // The validators are already TokenStreams from parse_field_validators
+            quote! { vec![#(#table_validators),*] }
         } else {
             quote! { vec![] }
         };
 
-        let mock_data_tokens = if let Some((n, _overrides, coordinates)) = mock_data_config {
-            let coord_rules = if let Some(coords) = coordinates {
-                quote! { vec![#(#coords),*] }
-            } else {
-                quote! { vec![] }
-            };
-
-            let default_preservation_mode = evenframe_config
-                .schemasync
-                .mock_gen_config
-                .default_preservation_mode;
-
-            quote! {
-                Some(MockGenerationConfig {
-                    n: #n,
-                    table_level_override: None, // Overrides parsing is handled separately
-                    coordination_rules: #coord_rules,
-                    preserve_unchanged: false,
-                    preserve_modified: false,
-                    batch_size: 1000,
-                    regenerate_fields: vec!["updated_at".to_string(), "created_at".to_string()],
-                    preservation_mode: #default_preservation_mode,
-                })
-            }
+        let mock_data_tokens = if let Some(config) = mock_data_config {
+            quote! { Some(#config) }
         } else {
             quote! { None }
         };
@@ -360,7 +324,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                             struct_config: ::evenframe::types::StructConfig {
                                 name: #struct_name.to_case(Case::Snake),
                                 fields: vec![ #(#table_field_tokens),* ],
-                                validators: vec![],
+                                validators: #table_validators_tokens,
                             },
                             relation: #relation_tokens,
                             permissions: #permissions_config_tokens,
@@ -390,7 +354,10 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         };
 
         let output = if has_id {
-            info!("Successfully generated persistable struct implementation for: {}", ident);
+            info!(
+                "Successfully generated persistable struct implementation for: {}",
+                ident
+            );
             quote! {
                 const _: () = {
                     #imports
@@ -404,17 +371,26 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             // For app structs, we only generate deserialization if needed
             // The derive macro itself serves as the marker
             if has_field_validators {
-                info!("Successfully generated app struct implementation with validation for: {}", ident);
+                info!(
+                    "Successfully generated app struct implementation with validation for: {}",
+                    ident
+                );
                 deserialize_impl
             } else {
-                info!("Successfully generated app struct implementation (no validation) for: {}", ident);
+                info!(
+                    "Successfully generated app struct implementation (no validation) for: {}",
+                    ident
+                );
                 quote! {}
             }
         };
 
         output.into()
     } else {
-        error!("Attempted to use derive macro on non-struct type: {}", ident);
+        error!(
+            "Attempted to use derive macro on non-struct type: {}",
+            ident
+        );
         syn::Error::new(
             ident.span(),
             format!("The Evenframe derive macro can only be applied to structs.\n\nYou tried to apply it to: {}\n\nExample of correct usage:\n#[derive(Evenframe)]\nstruct MyStruct {{\n    id: String,\n    // ... other fields\n}}", ident)
