@@ -7,6 +7,7 @@ pub mod permissions;
 pub mod surql;
 pub mod table;
 
+use crate::error::{EvenframeError, Result};
 use std::collections::HashMap;
 use tracing::{debug, error, info, trace};
 
@@ -79,7 +80,7 @@ impl<'a> Schemasync<'a> {
     }
 
     /// Initialize database connection and config from environment
-    async fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn initialize(&mut self) -> Result<()> {
         info!("Initializing Schemasync database connection and configuration");
         dotenv::dotenv().ok();
         debug!("Loaded environment variables from .env file");
@@ -93,8 +94,10 @@ impl<'a> Schemasync<'a> {
         let db = Surreal::new::<Http>(&config.schemasync.database.url).await?;
         debug!("Created SurrealDB connection");
 
-        let username = std::env::var("SURREALDB_USER").expect("SURREALDB_USER not set");
-        let password = std::env::var("SURREALDB_PASSWORD").expect("SURREALDB_PASSWORD not set");
+        let username = std::env::var("SURREALDB_USER")
+            .map_err(|_| EvenframeError::EnvVarNotSet("SURREALDB_USER".to_string()))?;
+        let password = std::env::var("SURREALDB_PASSWORD")
+            .map_err(|_| EvenframeError::EnvVarNotSet("SURREALDB_PASSWORD".to_string()))?;
         debug!("Retrieved database credentials from environment");
 
         db.signin(Root {
@@ -118,7 +121,7 @@ impl<'a> Schemasync<'a> {
     }
 
     /// Run the complete schemasync pipeline
-    pub async fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(mut self) -> Result<()> {
         info!("Starting Schemasync pipeline execution");
         
         // Initialize database and config first
@@ -129,14 +132,14 @@ impl<'a> Schemasync<'a> {
         let db = self
             .db
             .take()
-            .ok_or("Database connection failed to initialize")?;
-        let tables = self.tables.ok_or("Tables not provided")?;
-        let objects = self.objects.ok_or("Objects not provided")?;
-        let enums = self.enums.ok_or("Enums not provided")?;
+            .ok_or_else(|| EvenframeError::config("Database connection failed to initialize"))?;
+        let tables = self.tables.ok_or_else(|| EvenframeError::config("Tables not provided"))?;
+        let objects = self.objects.ok_or_else(|| EvenframeError::config("Objects not provided"))?;
+        let enums = self.enums.ok_or_else(|| EvenframeError::config("Enums not provided"))?;
         let config = self
             .schemasync_config
             .take()
-            .ok_or("Config failed to initialize")?;
+            .ok_or_else(|| EvenframeError::config("Config failed to initialize"))?;
         
         info!("Pipeline validation completed - {} tables, {} objects, {} enums", 
               tables.len(), objects.len(), enums.len());
@@ -230,7 +233,7 @@ impl<'a> Schemasync<'a> {
         objects: &HashMap<String, StructConfig>,
         enums: &HashMap<String, TaggedUnion>,
         config: &crate::schemasync::config::SchemasyncConfig,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         debug!("Defining tables with full_refresh_mode: {}", config.mock_gen_config.full_refresh_mode);
         trace!("Table definitions for: {:?}", tables.keys().collect::<Vec<_>>());
         
@@ -245,7 +248,7 @@ impl<'a> Schemasync<'a> {
         .await
         .map_err(|e| {
             error!("Failed to execute table definitions: {}", e);
-            e
+            EvenframeError::from(e)
         })
     }
 }

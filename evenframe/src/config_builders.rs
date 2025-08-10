@@ -1,5 +1,6 @@
 use crate::workspace_scanner::WorkspaceScanner;
 use convert_case::{Case, Casing};
+use evenframe::config::EvenframeConfig;
 use evenframe::{
     derive::attributes::{
         parse_mock_data_attribute, parse_relation_attribute, parse_table_validators,
@@ -27,9 +28,18 @@ pub fn build_all_configs() -> (
     let mut table_configs = HashMap::new();
     let mut struct_configs = HashMap::new();
 
+    // Load the configuration to get apply_aliases
+    let config = match EvenframeConfig::new() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            warn!("Error loading configuration: {}", e);
+            return (HashMap::new(), HashMap::new(), HashMap::new());
+        }
+    };
+
     debug!("Creating workspace scanner");
     // Scan the workspace for all Evenframe types
-    let scanner = WorkspaceScanner::new();
+    let scanner = WorkspaceScanner::new(config.general.apply_aliases);
     let types = match scanner.scan_for_evenframe_types() {
         Ok(types) => {
             info!("Found {} Evenframe types", types.len());
@@ -89,7 +99,10 @@ pub fn build_all_configs() -> (
                             if evenframe_type.has_id_field {
                                 // Build table config immediately (like before)
                                 let name = config.name.to_case(Case::Snake);
-                                debug!("Building table config for: {} (snake_case: {})", config.name, name);
+                                debug!(
+                                    "Building table config for: {} (snake_case: {})",
+                                    config.name, name
+                                );
 
                                 // We don't have all struct_configs yet, so we can't parse coordination rules properly
                                 // But that's okay - we'll just parse them without full resolution for now
@@ -161,7 +174,11 @@ fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
     let mut fields = Vec::new();
 
     if let Fields::Named(ref fields_named) = item_struct.fields {
-        debug!("Processing {} fields for struct {}", fields_named.named.len(), name);
+        debug!(
+            "Processing {} fields for struct {}",
+            fields_named.named.len(),
+            name
+        );
         for field in &fields_named.named {
             let field_name = field.ident.as_ref()?.to_string();
             let field_name = field_name.trim_start_matches("r#").to_string();
@@ -273,7 +290,7 @@ fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
 }
 
 /// Parse coordination rules from mock_data attribute, resolving dot notation
-fn _parse_coordination_rules(
+fn parse_coordination_rules(
     attrs: &[Attribute],
     struct_configs: &HashMap<String, StructConfig>,
 ) -> Vec<Coordination> {
@@ -333,7 +350,10 @@ fn parse_coordination_expr(
                                 }
                             }
                             if !field_names.is_empty() {
-                                debug!("Created InitializeEqual coordination with {} fields", field_names.len());
+                                debug!(
+                                    "Created InitializeEqual coordination with {} fields",
+                                    field_names.len()
+                                );
                                 return Some(Coordination::InitializeEqual(field_names));
                             }
                         }
@@ -378,7 +398,11 @@ pub fn merge_tables_and_objects(
     tables: &HashMap<String, TableConfig>,
     objects: &HashMap<String, StructConfig>,
 ) -> HashMap<String, StructConfig> {
-    debug!("Merging {} tables and {} objects", tables.len(), objects.len());
+    debug!(
+        "Merging {} tables and {} objects",
+        tables.len(),
+        objects.len()
+    );
     let mut struct_configs = objects.clone();
 
     // Extract StructConfig from each TableConfig and merge into struct_configs
@@ -386,7 +410,10 @@ pub fn merge_tables_and_objects(
         trace!("Merging table config for: {}", name);
         struct_configs.insert(name.clone(), table_config.struct_config.clone());
     }
-    
-    debug!("Merge complete. Total struct configs: {}", struct_configs.len());
+
+    debug!(
+        "Merge complete. Total struct configs: {}",
+        struct_configs.len()
+    );
     struct_configs
 }

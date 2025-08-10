@@ -4,12 +4,13 @@ mod workspace_scanner;
 use evenframe::schemasync::Schemasync; // Import your new struct
 use evenframe::{
     config::EvenframeConfig,
+    error::Result,
     typesync::{arktype::generate_arktype_type_string, effect::generate_effect_schema_string},
 };
 use tracing::{debug, error, info};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     // Initialize tracing with environment variable control
     // Set RUST_LOG=debug for debug output, RUST_LOG=info for info only
     tracing_subscriber::fmt::init();
@@ -25,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => {
             error!("Failed to load configuration: {}", e);
-            return Err(e.into());
+            return Err(e);
         }
     };
 

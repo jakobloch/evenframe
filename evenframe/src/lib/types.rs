@@ -10,7 +10,7 @@ use core::fmt;
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use syn::Type as SynType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -180,242 +180,185 @@ impl ToTokens for FieldType {
 
 impl FieldType {
     pub fn parse_syn_ty(ty: &SynType) -> FieldType {
-        match ty {
-            // Handle simple paths (e.g. "String", "bool", etc.)
-            SynType::Path(type_path) => {
-                // If there's a single segment, we check for known identifiers.
-                if type_path.qself.is_none() && type_path.path.segments.len() == 1 {
-                    let segment = type_path.path.segments.first().unwrap();
-                    let ident = &segment.ident;
-
-                    // Check if this segment has generic arguments
-                    if let syn::PathArguments::AngleBracketed(ref args) = segment.arguments {
-                        // Handle generic types like HashMap<K, V>, Vec<T>, Option<T>, etc.
-                        match ident.to_string().as_str() {
-                            "HashMap" | "BTreeMap" => {
-                                if args.args.len() == 2 {
-                                    if let (
-                                        syn::GenericArgument::Type(key_ty),
-                                        syn::GenericArgument::Type(val_ty),
-                                    ) = (&args.args[0], &args.args[1])
-                                    {
-                                        let key_parsed = Self::parse_syn_ty(key_ty);
-                                        let val_parsed = Self::parse_syn_ty(val_ty);
-                                        if ident == "HashMap" {
-                                            return FieldType::HashMap(
-                                                Box::new(key_parsed),
-                                                Box::new(val_parsed),
-                                            );
-                                        } else {
-                                            return FieldType::BTreeMap(
-                                                Box::new(key_parsed),
-                                                Box::new(val_parsed),
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            "Vec" => {
-                                if args.args.len() == 1 {
-                                    if let syn::GenericArgument::Type(inner_ty) = &args.args[0] {
-                                        return FieldType::Vec(Box::new(Self::parse_syn_ty(
-                                            inner_ty,
-                                        )));
-                                    }
-                                }
-                            }
-                            "Option" => {
-                                if args.args.len() == 1 {
-                                    if let syn::GenericArgument::Type(inner_ty) = &args.args[0] {
-                                        return FieldType::Option(Box::new(Self::parse_syn_ty(
-                                            inner_ty,
-                                        )));
-                                    }
-                                }
-                            }
-                            "RecordLink" => {
-                                if args.args.len() == 1 {
-                                    if let syn::GenericArgument::Type(inner_ty) = &args.args[0] {
-                                        return FieldType::RecordLink(Box::new(
-                                            Self::parse_syn_ty(inner_ty),
-                                        ));
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    // No generic arguments, check for simple types
-                    match ident.to_string().as_str() {
-                        "String" => FieldType::String,
-                        "char" => FieldType::Char,
-                        "bool" => FieldType::Bool,
-                        "f32" => FieldType::F32,
-                        "f64" => FieldType::F64,
-                        "i8" => FieldType::I8,
-                        "i16" => FieldType::I16,
-                        "i32" => FieldType::I32,
-                        "i64" => FieldType::I64,
-                        "i128" => FieldType::I128,
-                        "isize" => FieldType::Isize,
-                        "u8" => FieldType::U8,
-                        "u16" => FieldType::U16,
-                        "u32" => FieldType::U32,
-                        "u64" => FieldType::U64,
-                        "u128" => FieldType::U128,
-                        "usize" => FieldType::Usize,
-                        "EvenframeRecordId" => FieldType::EvenframeRecordId,
-                        "DateTime" => FieldType::DateTime,
-                        "Duration" => FieldType::Duration,
-                        "Tz" => FieldType::Timezone,
-                        "Decimal" => FieldType::Decimal,
-                        "()" => FieldType::Unit,
-                        _ => {
-                            // Convert the type into a string and remove all whitespace.
-                            let type_str: String = type_path
-                                .to_token_stream()
-                                .to_string()
-                                .chars()
-                                .filter(|c| !c.is_whitespace())
-                                .collect();
-
-                            // Look for the generic delimiters.
-                            if let Some(start) = type_str.find('<') {
-                                if let Some(end) = type_str.rfind('>') {
-                                    let outer = &type_str[..start];
-                                    let inner = &type_str[start + 1..end];
-
-                                    if outer == "Option" {
-                                        if let Ok(inner_ty) = syn::parse_str::<SynType>(inner) {
-                                            let inner_parsed = Self::parse_syn_ty(&inner_ty);
-                                            FieldType::Option(Box::new(inner_parsed))
-                                        } else {
-                                            FieldType::Other(type_str)
-                                        }
-                                    } else if outer == "Vec" {
-                                        if let Ok(inner_ty) = syn::parse_str::<SynType>(inner) {
-                                            let inner_parsed = Self::parse_syn_ty(&inner_ty);
-                                            FieldType::Vec(Box::new(inner_parsed))
-                                        } else {
-                                            FieldType::Other(type_str)
-                                        }
-                                    } else if outer == "RecordLink" {
-                                        if let Ok(inner_ty) = syn::parse_str::<SynType>(inner) {
-                                            let inner_parsed = Self::parse_syn_ty(&inner_ty);
-                                            FieldType::RecordLink(Box::new(inner_parsed))
-                                        } else {
-                                            FieldType::Other(type_str)
-                                        }
-                                    } else if outer == "DateTime" {
-                                        // Handle DateTime<Utc> and similar types
-                                        FieldType::DateTime
-                                    } else if outer == "Duration" {
-                                        // Handle Duration and similar types
-                                        FieldType::Duration
-                                    } else {
-                                        FieldType::Other(type_str)
-                                    }
-                                } else {
-                                    FieldType::Other(type_str)
-                                }
-                            } else {
-                                FieldType::Other(type_str)
-                            }
-                        }
-                    }
-                } else {
-                    // For complex type paths, fallback to using their string representation.
-                    let type_str = type_path.to_token_stream().to_string();
-                    FieldType::Other(type_str)
-                }
+        use quote::ToTokens;
+        tracing::trace!("Parsing syn type: {}", ty.to_token_stream());
+        
+        let result = match ty {
+            // Path types (most common - String, Vec<T>, custom types, etc.)
+            SynType::Path(tp) => Self::handle_type_path(tp),
+            
+            // Tuple types - (T1, T2, ...) or unit ()
+            SynType::Tuple(t) => Self::handle_tuple(t),
+            
+            // [T] -> treat as Vec<T>
+            SynType::Slice(s) => FieldType::Vec(Box::new(Self::parse_syn_ty(&s.elem))),
+            
+            // [T; N] -> treat as Vec<T> (ignore size)
+            SynType::Array(arr) => FieldType::Vec(Box::new(Self::parse_syn_ty(&arr.elem))),
+            
+            // &T or &mut T -> parse inner type
+            SynType::Reference(r) => Self::parse_syn_ty(&r.elem),
+            
+            // *const T or *mut T -> parse inner type
+            SynType::Ptr(p) => Self::parse_syn_ty(&p.elem),
+            
+            // (T) -> unwrap parentheses
+            SynType::Paren(p) => Self::parse_syn_ty(&p.elem),
+            
+            // Group tokens -> unwrap
+            SynType::Group(g) => Self::parse_syn_ty(&g.elem),
+            
+            // impl Trait -> fallback to string
+            SynType::ImplTrait(it) => {
+                tracing::debug!("impl Trait not directly supported: {}", it.to_token_stream());
+                FieldType::Other(it.to_token_stream().to_string())
             }
-            // For tuple types, recursively convert each element.
-            SynType::Tuple(tuple) => {
-                let elems = tuple
-                    .elems
-                    .iter()
-                    .map(|elem| Self::parse_syn_ty(elem))
-                    .collect();
-                FieldType::Tuple(elems)
+            
+            // dyn Trait -> fallback to string
+            SynType::TraitObject(to) => {
+                tracing::debug!("Trait object not directly supported: {}", to.to_token_stream());
+                FieldType::Other(to.to_token_stream().to_string())
             }
-            // Fallback for any other type.
+            
+            // fn(...) -> ... -> fallback to string
+            SynType::BareFn(f) => {
+                tracing::debug!("Function pointer not directly supported: {}", f.to_token_stream());
+                FieldType::Other(f.to_token_stream().to_string())
+            }
+            
+            // _ (infer) -> fallback to string
+            SynType::Infer(i) => FieldType::Other(i.to_token_stream().to_string()),
+            
+            // ! (never) -> fallback to string
+            SynType::Never(n) => FieldType::Other(n.to_token_stream().to_string()),
+            
+            // type_macro!(...) -> fallback to string
+            SynType::Macro(m) => {
+                tracing::debug!("Type macro not supported: {}", m.to_token_stream());
+                FieldType::Other(m.to_token_stream().to_string())
+            }
+            
+            // Verbatim tokens from macro expansion -> fallback to string
+            SynType::Verbatim(ts) => FieldType::Other(ts.to_string()),
+            
+            // Future-proofing for new syn variants
             _ => {
-                // Convert the type into a string and remove all whitespace.
-                let type_str: String = ty
-                    .to_token_stream()
-                    .to_string()
-                    .chars()
-                    .filter(|c| !c.is_whitespace())
-                    .collect();
-
-                // Look for the generic delimiters.
-                if let Some(start) = type_str.find('<') {
-                    if let Some(end) = type_str.rfind('>') {
-                        let outer = &type_str[..start];
-                        let inner = &type_str[start + 1..end];
-
-                        if outer == "Option" {
-                            if let Ok(inner_ty) = syn::parse_str::<SynType>(inner) {
-                                let inner_parsed = Self::parse_syn_ty(&inner_ty);
-                                FieldType::Option(Box::new(inner_parsed))
-                            } else {
-                                FieldType::Other(type_str)
-                            }
-                        } else if outer == "Vec" {
-                            if let Ok(inner_ty) = syn::parse_str::<SynType>(inner) {
-                                let inner_parsed = Self::parse_syn_ty(&inner_ty);
-                                FieldType::Vec(Box::new(inner_parsed))
-                            } else {
-                                FieldType::Other(type_str)
-                            }
-                        } else if outer == "RecordLink" {
-                            if let Ok(inner_ty) = syn::parse_str::<SynType>(inner) {
-                                let inner_parsed = Self::parse_syn_ty(&inner_ty);
-                                FieldType::RecordLink(Box::new(inner_parsed))
-                            } else {
-                                FieldType::Other(type_str)
-                            }
-                        } else if outer == "HashMap" || outer == "BTreeMap" {
-                            // Parse HashMap<K, V> or BTreeMap<K, V>
-                            if let Some(comma_pos) = inner.find(',') {
-                                let key_str = inner[..comma_pos].trim();
-                                let value_str = inner[comma_pos + 1..].trim();
-                                if let (Ok(key_ty), Ok(value_ty)) = (
-                                    syn::parse_str::<SynType>(key_str),
-                                    syn::parse_str::<SynType>(value_str),
-                                ) {
-                                    let key_parsed = Self::parse_syn_ty(&key_ty);
-                                    let value_parsed = Self::parse_syn_ty(&value_ty);
-                                    if outer == "HashMap" {
-                                        FieldType::HashMap(
-                                            Box::new(key_parsed),
-                                            Box::new(value_parsed),
-                                        )
-                                    } else {
-                                        FieldType::BTreeMap(
-                                            Box::new(key_parsed),
-                                            Box::new(value_parsed),
-                                        )
-                                    }
-                                } else {
-                                    FieldType::Other(type_str)
-                                }
-                            } else {
-                                FieldType::Other(type_str)
-                            }
-                        } else {
-                            FieldType::Other(type_str)
-                        }
-                    } else {
-                        FieldType::Other(type_str)
-                    }
-                } else {
-                    FieldType::Other(type_str)
+                tracing::warn!("Unknown type variant: {}", ty.to_token_stream());
+                FieldType::Other(ty.to_token_stream().to_string())
+            }
+        };
+        
+        tracing::trace!("Parsed type as: {:?}", result);
+        result
+    }
+    
+    fn handle_tuple(t: &syn::TypeTuple) -> FieldType {
+        if t.elems.is_empty() {
+            // Unit type ()
+            FieldType::Unit
+        } else {
+            let elems = t.elems.iter().map(Self::parse_syn_ty).collect();
+            FieldType::Tuple(elems)
+        }
+    }
+    
+    fn handle_type_path(tp: &syn::TypePath) -> FieldType {
+        use quote::ToTokens;
+        
+        // If qualified self type (e.g., <T as Trait>::Assoc), fallback
+        if tp.qself.is_some() {
+            return FieldType::Other(tp.to_token_stream().to_string());
+        }
+        
+        // Get the last segment (works for both `String` and `std::string::String`)
+        let last = match tp.path.segments.last() {
+            Some(s) => s,
+            None => return FieldType::Other(tp.to_token_stream().to_string()),
+        };
+        
+        let ident = last.ident.to_string();
+        
+        // Handle generic types with angle brackets
+        if let syn::PathArguments::AngleBracketed(args) = &last.arguments {
+            // Extract only type arguments (ignore lifetimes and const generics)
+            let type_args: Vec<_> = args
+                .args
+                .iter()
+                .filter_map(|ga| match ga {
+                    syn::GenericArgument::Type(t) => Some(t),
+                    _ => None,
+                })
+                .collect();
+            
+            match ident.as_str() {
+                "Option" if type_args.len() == 1 => {
+                    return FieldType::Option(Box::new(Self::parse_syn_ty(type_args[0])));
+                }
+                "Vec" if type_args.len() == 1 => {
+                    return FieldType::Vec(Box::new(Self::parse_syn_ty(type_args[0])));
+                }
+                "HashMap" if type_args.len() == 2 => {
+                    return FieldType::HashMap(
+                        Box::new(Self::parse_syn_ty(type_args[0])),
+                        Box::new(Self::parse_syn_ty(type_args[1])),
+                    );
+                }
+                "BTreeMap" if type_args.len() == 2 => {
+                    return FieldType::BTreeMap(
+                        Box::new(Self::parse_syn_ty(type_args[0])),
+                        Box::new(Self::parse_syn_ty(type_args[1])),
+                    );
+                }
+                "RecordLink" if type_args.len() == 1 => {
+                    return FieldType::RecordLink(Box::new(Self::parse_syn_ty(type_args[0])));
+                }
+                "OrderedFloat" if type_args.len() == 1 => {
+                    tracing::debug!("Found OrderedFloat with inner type");
+                    return FieldType::OrderedFloat(Box::new(Self::parse_syn_ty(type_args[0])));
+                }
+                "DateTime" => {
+                    // DateTime<Utc>, DateTime<Local>, etc. all become DateTime
+                    return FieldType::DateTime;
+                }
+                _ => {
+                    // Unknown generic type, fall through to check if it's a known non-generic
                 }
             }
         }
+        
+        // Match known types without generics
+        match ident.as_str() {
+            "String" | "str" => FieldType::String,
+            "char" => FieldType::Char,
+            "bool" => FieldType::Bool,
+            "f32" => FieldType::F32,
+            "f64" => FieldType::F64,
+            "i8" => FieldType::I8,
+            "i16" => FieldType::I16,
+            "i32" => FieldType::I32,
+            "i64" => FieldType::I64,
+            "i128" => FieldType::I128,
+            "isize" => FieldType::Isize,
+            "u8" => FieldType::U8,
+            "u16" => FieldType::U16,
+            "u32" => FieldType::U32,
+            "u64" => FieldType::U64,
+            "u128" => FieldType::U128,
+            "usize" => FieldType::Usize,
+            "EvenframeRecordId" => FieldType::EvenframeRecordId,
+            "DateTime" => FieldType::DateTime,
+            "Duration" => FieldType::Duration,
+            "Tz" | "Timezone" => FieldType::Timezone,
+            "Decimal" => FieldType::Decimal,
+            _ => {
+                // Unknown type - store as Other
+                let type_str = tp.to_token_stream().to_string();
+                tracing::trace!("Unknown type '{}', storing as Other", type_str);
+                FieldType::Other(type_str)
+            }
+        }
     }
+    
 
     pub fn parse_type_str(type_str: &str) -> FieldType {
         // Remove whitespace for consistent parsing
@@ -616,7 +559,10 @@ impl StructField {
                 FieldType::Timezone => ("string".to_string(), false, None),
                 FieldType::Decimal => ("decimal".to_string(), false, None),
                 FieldType::F32 | FieldType::F64 => ("float".to_string(), false, None),
-                FieldType::OrderedFloat(_inner) => ("float".to_string(), false, None),
+                FieldType::OrderedFloat(_inner) => {
+                    tracing::debug!("Converting OrderedFloat to float for field {}", field_name);
+                    ("float".to_string(), false, None)
+                },
                 FieldType::I8
                 | FieldType::I16
                 | FieldType::I32
@@ -710,16 +656,33 @@ impl StructField {
                                     );
                                     variant_type
                                 } else {
-                                    format!("{}", variant.name)
+                                    format!("\"{}\"", variant.name)
                                 }
                             })
                             .collect();
                         (variants.join(" | "), false, None)
                     } else if let Some(app_struct) = app_structs.get(name) {
+                        tracing::debug!("Processing app_struct {} for field {}", name, field_name);
+                        
+                        // Special handling for known recursive types
+                        // If this is RecurrenceRule or Appointment, just return 'object' to avoid infinite recursion
+                        if name == "RecurrenceRule" || name == "Appointment" {
+                            tracing::debug!("Detected potentially recursive type {}, using 'object' type", name);
+                            return ("object".to_string(), false, None);
+                        }
+                        
                         let field_defs: Vec<String> = app_struct
                             .fields
                             .iter()
                             .map(|f: &StructField| {
+                                // Also check for recursive fields within the struct
+                                if let FieldType::Other(ref field_type_name) = f.field_type {
+                                    if field_type_name == name {
+                                        tracing::debug!("  Struct field {} is self-referential, using 'object'", f.field_name);
+                                        return format!("{}: object", f.field_name);
+                                    }
+                                }
+                                
                                 let (field_type, _, _) = field_type_to_surql_type(
                                     &f.field_name,
                                     table_name,
@@ -728,6 +691,7 @@ impl StructField {
                                     app_structs,
                                     persistable_structs,
                                 );
+                                tracing::debug!("  Struct field {}: {:?} -> {}", f.field_name, &f.field_type, field_type);
                                 format!("{}: {}", f.field_name, field_type)
                             })
                             .collect();
@@ -821,6 +785,7 @@ impl StructField {
             if def.should_skip {
                 ("".to_string(), false, None)
             } else if let Some(ref data_type) = def.data_type {
+                tracing::warn!("Field {} has data_type override: {}", self.field_name, data_type);
                 (data_type.clone(), false, None)
             } else {
                 field_type_to_surql_type(

@@ -1,1 +1,19 @@
-Record count differences: {}
+Record count differences: {
+    "order": 20,
+    "account": 13,
+    "tax_rate": 3,
+    "represents": 13,
+    "promotion": 4,
+    "ordered": 13,
+    "payment": 4,
+    "lead": 4,
+    "package": 2,
+    "appointment": 13,
+    "company": 1,
+    "product": 4,
+    "site": 50,
+    "route": 10,
+    "employee": 32,
+    "user": 15,
+    "service": 12,
+}

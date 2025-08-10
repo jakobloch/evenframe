@@ -1,12 +1,25 @@
+use crate::error::{EvenframeError, Result};
 use serde::{Deserialize, Serialize};
 use std::{env, fs, path::Path};
 use toml;
 use tracing::{debug, error, info, trace, warn};
 
+/// General configuration for Evenframe operations
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct GeneralConfig {
+    /// Attribute macro names that expand to include Evenframe derive
+    /// These are used with #[apply(...)] and automatically include Evenframe
+    #[serde(default)]
+    pub apply_aliases: Vec<String>,
+}
+
 /// Unified configuration for Evenframe operations
 /// This is the root configuration that contains both schemasync and typesync configurations
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EvenframeConfig {
+    /// General configuration
+    #[serde(default)]
+    pub general: GeneralConfig,
     /// Schema synchronization configuration (database operations)
     pub schemasync: crate::schemasync::config::SchemasyncConfig,
     /// Type synchronization configuration (TypeScript/Effect type generation)
@@ -15,7 +28,7 @@ pub struct EvenframeConfig {
 
 impl EvenframeConfig {
     /// Load configuration from evenframe.toml
-    pub fn new() -> Result<EvenframeConfig, Box<dyn std::error::Error>> {
+    pub fn new() -> Result<EvenframeConfig> {
         info!("Loading Evenframe configuration");
         dotenv::dotenv().ok();
         debug!("Environment variables loaded from .env");
@@ -23,9 +36,8 @@ impl EvenframeConfig {
         let absolute_path = env::var("ABSOLUTE_PATH")
             .map_err(|e| {
                 error!("ABSOLUTE_PATH environment variable not set: {}", e);
-                e
-            })
-            .expect("ABSOLUTE_PATH is not set");
+                EvenframeError::EnvVarNotSet("ABSOLUTE_PATH".to_string())
+            })?;
         
         let config_path_string = format!(
             "{}{}",
@@ -39,7 +51,7 @@ impl EvenframeConfig {
 
         if !config_path.exists() {
             error!("Configuration file not found at: {:?}", config_path);
-            return Err("evenframe.toml not found. Configuration file is required.".into());
+            return Err(EvenframeError::config("evenframe.toml not found. Configuration file is required."));
         }
         info!("Found configuration file at: {:?}", config_path);
 

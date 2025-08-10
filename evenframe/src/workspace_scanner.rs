@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use syn::{parse_file, Attribute, Item, Meta};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
+use evenframe::error::{EvenframeError, Result};
 
 #[allow(unused)]
 #[derive(Debug, Clone)]
@@ -22,23 +23,27 @@ pub enum TypeKind {
 
 pub struct WorkspaceScanner {
     handlers_path: PathBuf,
+    apply_aliases: Vec<String>,
 }
 
 impl WorkspaceScanner {
-    pub fn new() -> Self {
+    pub fn new(apply_aliases: Vec<String>) -> Self {
         let handlers_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
-            .unwrap()
+            .expect("Failed to get parent directory")
             .join("handlers")
             .join("src")
             .join("lib");
 
-        Self { handlers_path }
+        Self { 
+            handlers_path,
+            apply_aliases,
+        }
     }
 
     pub fn scan_for_evenframe_types(
         &self,
-    ) -> Result<Vec<EvenframeType>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<EvenframeType>> {
         info!("Starting workspace scan for Evenframe types");
         debug!("Scanning path: {:?}", self.handlers_path);
         
@@ -60,13 +65,15 @@ impl WorkspaceScanner {
         types: &mut Vec<EvenframeType>,
         base_module: &str,
         depth: usize,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         trace!("Scanning directory: {:?}, module: {}, depth: {}", dir, base_module, depth);
         
         // Prevent excessive recursion
         if depth > 10 {
-            warn!("Maximum recursion depth reached at {:?}", dir);
-            return Ok(());
+            return Err(EvenframeError::MaxRecursionDepth {
+                depth: 10,
+                path: dir.to_path_buf(),
+            });
         }
         
         for entry in fs::read_dir(dir)? {
@@ -109,14 +116,14 @@ impl WorkspaceScanner {
         path: &Path,
         types: &mut Vec<EvenframeType>,
         module_path: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         trace!("Scanning file: {:?}", path);
         
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 error!("Failed to read file {:?}: {}", path, e);
-                return Err(e.into());
+                return Err(EvenframeError::from(e));
             }
         };
         
@@ -126,7 +133,7 @@ impl WorkspaceScanner {
             Ok(tree) => tree,
             Err(e) => {
                 error!("Failed to parse file {:?}: {}", path, e);
-                return Err(e.into());
+                return Err(EvenframeError::parse_error(path, e.to_string()));
             }
         };
         
@@ -137,7 +144,7 @@ impl WorkspaceScanner {
         for item in syntax_tree.items {
             match item {
                 Item::Struct(item_struct) => {
-                    if has_evenframe_derive(&item_struct.attrs) {
+                    if has_evenframe_derive(&item_struct.attrs) || self.has_apply_alias(&item_struct.attrs) {
                         let has_id = has_id_field(&item_struct.fields);
                         let struct_name = item_struct.ident.to_string();
                         
@@ -157,7 +164,7 @@ impl WorkspaceScanner {
                     }
                 }
                 Item::Enum(item_enum) => {
-                    if has_evenframe_derive(&item_enum.attrs) {
+                    if has_evenframe_derive(&item_enum.attrs) || self.has_apply_alias(&item_enum.attrs) {
                         let enum_name = item_enum.ident.to_string();
                         
                         debug!(
@@ -184,6 +191,25 @@ impl WorkspaceScanner {
         }
 
         Ok(())
+    }
+
+    fn has_apply_alias(&self, attrs: &[Attribute]) -> bool {
+        for attr in attrs {
+            if attr.path().is_ident("apply") {
+                // Parse the attribute to get the name inside apply(...)
+                if let Meta::List(meta_list) = &attr.meta {
+                    let tokens = meta_list.tokens.to_string();
+                    // Check if any of our apply_aliases match
+                    for alias in &self.apply_aliases {
+                        if tokens == *alias {
+                            trace!("Found apply alias: {}", alias);
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 }
 

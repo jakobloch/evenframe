@@ -5,6 +5,7 @@ pub mod config;
 pub mod default;
 pub mod dependency;
 pub mod derive;
+pub mod error;
 pub mod log;
 pub mod traits;
 pub mod types;
@@ -17,4 +18,5 @@ pub mod typesync;
 pub mod schemasync;
 
 // Re-export commonly used items for convenience
+pub use error::{EvenframeError, Result};
 pub use schemasync::{compare, mockmake, mockmake::coordinate, mockmake::format};

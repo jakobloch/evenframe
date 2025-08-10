@@ -36,3 +36,4 @@ axum = { workspace = true }
 ordered-float = { version = "5.0.0", features = ["serde"] }
 syn_enum_derive = { path = "../syn_enum_derive" }
 serde-value = { workspace = true }
+thiserror = { workspace = true }
