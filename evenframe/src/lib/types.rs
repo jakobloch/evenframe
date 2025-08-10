@@ -10,7 +10,7 @@ use core::fmt;
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use syn::Type as SynType;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -182,76 +182,85 @@ impl FieldType {
     pub fn parse_syn_ty(ty: &SynType) -> FieldType {
         use quote::ToTokens;
         tracing::trace!("Parsing syn type: {}", ty.to_token_stream());
-        
+
         let result = match ty {
             // Path types (most common - String, Vec<T>, custom types, etc.)
             SynType::Path(tp) => Self::handle_type_path(tp),
-            
+
             // Tuple types - (T1, T2, ...) or unit ()
             SynType::Tuple(t) => Self::handle_tuple(t),
-            
+
             // [T] -> treat as Vec<T>
             SynType::Slice(s) => FieldType::Vec(Box::new(Self::parse_syn_ty(&s.elem))),
-            
+
             // [T; N] -> treat as Vec<T> (ignore size)
             SynType::Array(arr) => FieldType::Vec(Box::new(Self::parse_syn_ty(&arr.elem))),
-            
+
             // &T or &mut T -> parse inner type
             SynType::Reference(r) => Self::parse_syn_ty(&r.elem),
-            
+
             // *const T or *mut T -> parse inner type
             SynType::Ptr(p) => Self::parse_syn_ty(&p.elem),
-            
+
             // (T) -> unwrap parentheses
             SynType::Paren(p) => Self::parse_syn_ty(&p.elem),
-            
+
             // Group tokens -> unwrap
             SynType::Group(g) => Self::parse_syn_ty(&g.elem),
-            
+
             // impl Trait -> fallback to string
             SynType::ImplTrait(it) => {
-                tracing::debug!("impl Trait not directly supported: {}", it.to_token_stream());
+                tracing::debug!(
+                    "impl Trait not directly supported: {}",
+                    it.to_token_stream()
+                );
                 FieldType::Other(it.to_token_stream().to_string())
             }
-            
+
             // dyn Trait -> fallback to string
             SynType::TraitObject(to) => {
-                tracing::debug!("Trait object not directly supported: {}", to.to_token_stream());
+                tracing::debug!(
+                    "Trait object not directly supported: {}",
+                    to.to_token_stream()
+                );
                 FieldType::Other(to.to_token_stream().to_string())
             }
-            
+
             // fn(...) -> ... -> fallback to string
             SynType::BareFn(f) => {
-                tracing::debug!("Function pointer not directly supported: {}", f.to_token_stream());
+                tracing::debug!(
+                    "Function pointer not directly supported: {}",
+                    f.to_token_stream()
+                );
                 FieldType::Other(f.to_token_stream().to_string())
             }
-            
+
             // _ (infer) -> fallback to string
             SynType::Infer(i) => FieldType::Other(i.to_token_stream().to_string()),
-            
+
             // ! (never) -> fallback to string
             SynType::Never(n) => FieldType::Other(n.to_token_stream().to_string()),
-            
+
             // type_macro!(...) -> fallback to string
             SynType::Macro(m) => {
                 tracing::debug!("Type macro not supported: {}", m.to_token_stream());
                 FieldType::Other(m.to_token_stream().to_string())
             }
-            
+
             // Verbatim tokens from macro expansion -> fallback to string
             SynType::Verbatim(ts) => FieldType::Other(ts.to_string()),
-            
+
             // Future-proofing for new syn variants
             _ => {
                 tracing::warn!("Unknown type variant: {}", ty.to_token_stream());
                 FieldType::Other(ty.to_token_stream().to_string())
             }
         };
-        
+
         tracing::trace!("Parsed type as: {:?}", result);
         result
     }
-    
+
     fn handle_tuple(t: &syn::TypeTuple) -> FieldType {
         if t.elems.is_empty() {
             // Unit type ()
@@ -261,23 +270,23 @@ impl FieldType {
             FieldType::Tuple(elems)
         }
     }
-    
+
     fn handle_type_path(tp: &syn::TypePath) -> FieldType {
         use quote::ToTokens;
-        
+
         // If qualified self type (e.g., <T as Trait>::Assoc), fallback
         if tp.qself.is_some() {
             return FieldType::Other(tp.to_token_stream().to_string());
         }
-        
+
         // Get the last segment (works for both `String` and `std::string::String`)
         let last = match tp.path.segments.last() {
             Some(s) => s,
             None => return FieldType::Other(tp.to_token_stream().to_string()),
         };
-        
+
         let ident = last.ident.to_string();
-        
+
         // Handle generic types with angle brackets
         if let syn::PathArguments::AngleBracketed(args) = &last.arguments {
             // Extract only type arguments (ignore lifetimes and const generics)
@@ -289,7 +298,7 @@ impl FieldType {
                     _ => None,
                 })
                 .collect();
-            
+
             match ident.as_str() {
                 "Option" if type_args.len() == 1 => {
                     return FieldType::Option(Box::new(Self::parse_syn_ty(type_args[0])));
@@ -325,7 +334,7 @@ impl FieldType {
                 }
             }
         }
-        
+
         // Match known types without generics
         match ident.as_str() {
             "String" | "str" => FieldType::String,
@@ -358,7 +367,6 @@ impl FieldType {
             }
         }
     }
-    
 
     pub fn parse_type_str(type_str: &str) -> FieldType {
         // Remove whitespace for consistent parsing
@@ -562,7 +570,7 @@ impl StructField {
                 FieldType::OrderedFloat(_inner) => {
                     tracing::debug!("Converting OrderedFloat to float for field {}", field_name);
                     ("float".to_string(), false, None)
-                },
+                }
                 FieldType::I8
                 | FieldType::I16
                 | FieldType::I32
@@ -663,14 +671,17 @@ impl StructField {
                         (variants.join(" | "), false, None)
                     } else if let Some(app_struct) = app_structs.get(name) {
                         tracing::debug!("Processing app_struct {} for field {}", name, field_name);
-                        
+
                         // Special handling for known recursive types
                         // If this is RecurrenceRule or Appointment, just return 'object' to avoid infinite recursion
                         if name == "RecurrenceRule" || name == "Appointment" {
-                            tracing::debug!("Detected potentially recursive type {}, using 'object' type", name);
+                            tracing::debug!(
+                                "Detected potentially recursive type {}, using 'object' type",
+                                name
+                            );
                             return ("object".to_string(), false, None);
                         }
-                        
+
                         let field_defs: Vec<String> = app_struct
                             .fields
                             .iter()
@@ -678,11 +689,14 @@ impl StructField {
                                 // Also check for recursive fields within the struct
                                 if let FieldType::Other(ref field_type_name) = f.field_type {
                                     if field_type_name == name {
-                                        tracing::debug!("  Struct field {} is self-referential, using 'object'", f.field_name);
+                                        tracing::debug!(
+                                            "  Struct field {} is self-referential, using 'object'",
+                                            f.field_name
+                                        );
                                         return format!("{}: object", f.field_name);
                                     }
                                 }
-                                
+
                                 let (field_type, _, _) = field_type_to_surql_type(
                                     &f.field_name,
                                     table_name,
@@ -691,7 +705,12 @@ impl StructField {
                                     app_structs,
                                     persistable_structs,
                                 );
-                                tracing::debug!("  Struct field {}: {:?} -> {}", f.field_name, &f.field_type, field_type);
+                                tracing::debug!(
+                                    "  Struct field {}: {:?} -> {}",
+                                    f.field_name,
+                                    &f.field_type,
+                                    field_type
+                                );
                                 format!("{}: {}", f.field_name, field_type)
                             })
                             .collect();
@@ -785,7 +804,11 @@ impl StructField {
             if def.should_skip {
                 ("".to_string(), false, None)
             } else if let Some(ref data_type) = def.data_type {
-                tracing::warn!("Field {} has data_type override: {}", self.field_name, data_type);
+                tracing::warn!(
+                    "Field {} has data_type override: {}",
+                    self.field_name,
+                    data_type
+                );
                 (data_type.clone(), false, None)
             } else {
                 field_type_to_surql_type(

@@ -1,50 +1,67 @@
 
-Successfully executed define statements for table represents
-Successfully executed define statements for table route
-Successfully executed define statements for table appointment
-Successfully executed define statements for table payment
-Successfully executed define statements for table order
-Successfully executed define statements for table service
-Successfully executed define statements for table site
-Successfully executed define statements for table lead
-Successfully executed define statements for table user
-Successfully executed define statements for table promotion
-Successfully executed define statements for table account
-Successfully executed define statements for table package
-Successfully executed define statements for table company
-Successfully executed define statements for table ordered
-Successfully executed define statements for table product
-Successfully executed define statements for table employee
+Successfully executed 11 define statements for table all with 11 results
 Successfully executed define statements for table tax_rate
+Successfully executed 2 define statements for table all with 2 results
+Successfully executed define statements for table payment
+Successfully executed 10 define statements for table all with 10 results
+Successfully executed define statements for table product
+Successfully executed 30 define statements for table all with 30 results
+Successfully executed define statements for table order
+Successfully executed 11 define statements for table all with 11 results
+Successfully executed define statements for table service
+Successfully executed 20 define statements for table all with 20 results
+Successfully executed define statements for table account
+Successfully executed 2 define statements for table all with 2 results
+Successfully executed define statements for table package
+Successfully executed 2 define statements for table all with 2 results
+Successfully executed define statements for table promotion
+Successfully executed 10 define statements for table all with 10 results
+Successfully executed define statements for table user
+Successfully executed 14 define statements for table all with 14 results
+Successfully executed define statements for table appointment
+Successfully executed 34 define statements for table all with 34 results
+Successfully executed define statements for table lead
+Successfully executed 2 define statements for table all with 2 results
+Successfully executed define statements for table ordered
+Successfully executed 27 define statements for table all with 27 results
+Successfully executed define statements for table company
+Successfully executed 2 define statements for table all with 2 results
+Successfully executed define statements for table represents
+Successfully executed 18 define statements for table all with 18 results
+Successfully executed define statements for table employee
+Successfully executed 12 define statements for table all with 12 results
+Successfully executed define statements for table site
+Successfully executed 11 define statements for table all with 11 results
+Successfully executed define statements for table route
 Successfully executed define access statements for db northern_lightning_wash
-Table 'represents' depends on: {"account", "route", "employee"}
-Table 'route' depends on: {"employee", "route"}
-Table 'appointment' depends on: {"employee", "route", "site", "appointment"}
-Table 'order' depends on: {"product", "represents", "payment", "package", "employee", "order", "route", "appointment", "tax_rate", "site", "account", "ordered", "service", "promotion"}
-Table 'lead' depends on: {"represents", "site", "route", "tax_rate", "employee"}
-Table 'account' depends on: {"ordered", "package", "service", "represents", "site", "route", "employee", "order", "payment", "appointment", "promotion", "product", "account", "tax_rate"}
+Table 'order' depends on: {"appointment", "promotion", "ordered", "tax_rate", "route", "site", "represents", "account", "order", "package", "product", "service", "payment", "employee"}
+Table 'account' depends on: {"route", "ordered", "package", "product", "service", "employee", "appointment", "payment", "represents", "order", "site", "tax_rate", "promotion", "account"}
+Table 'appointment' depends on: {"employee", "site", "appointment", "route"}
+Table 'lead' depends on: {"route", "tax_rate", "site", "employee", "represents"}
+Table 'ordered' depends on: {"employee", "service", "tax_rate", "site", "order", "represents", "ordered", "package", "account", "product", "payment", "appointment", "route", "promotion"}
 Table 'company' depends on: {"tax_rate"}
-Table 'ordered' depends on: {"tax_rate", "employee", "route", "payment", "package", "promotion", "appointment", "product", "service", "site", "account", "represents", "ordered", "order"}
-Table 'employee' depends on: {"employee", "route"}
+Table 'represents' depends on: {"employee", "route", "account"}
+Table 'employee' depends on: {"route", "employee"}
+Table 'route' depends on: {"employee", "route"}
 Circular dependency detected among tables: ["employee", "route"]
 Circular dependency detected among tables: ["account", "order", "ordered", "represents"]
 Tables with no dependencies (adding at beginning): ["user"]
-Final sorted table order: ["user", "tax_rate", "product", "promotion", "site", "employee", "route", "appointment", "payment", "service", "package", "account", "order", "ordered", "represents", "lead", "company"]
-Sorted table order: ["user", "tax_rate", "product", "promotion", "site", "employee", "route", "appointment", "payment", "service", "package", "account", "order", "ordered", "represents", "lead", "company"]
+Final sorted table order: ["user", "tax_rate", "company", "site", "employee", "route", "appointment", "payment", "service", "product", "package", "promotion", "account", "order", "ordered", "represents", "lead"]
+Sorted table order: ["user", "tax_rate", "company", "site", "employee", "route", "appointment", "payment", "service", "product", "package", "promotion", "account", "order", "ordered", "represents", "lead"]
 Successfully executed 15 UPSERT statements for table user with 15 results
 Successfully executed 3 UPSERT statements for table tax_rate with 3 results
-Successfully executed 4 UPSERT statements for table product with 4 results
-Successfully executed 4 UPSERT statements for table promotion with 4 results
+Successfully executed 1 UPSERT statements for table company with 1 results
 Successfully executed 50 UPSERT statements for table site with 50 results
 Successfully executed 32 UPSERT statements for table employee with 32 results
 Successfully executed 10 UPSERT statements for table route with 10 results
 Successfully executed 13 UPSERT statements for table appointment with 13 results
 Successfully executed 4 UPSERT statements for table payment with 4 results
 Successfully executed 12 UPSERT statements for table service with 12 results
+Successfully executed 4 UPSERT statements for table product with 4 results
 Successfully executed 2 UPSERT statements for table package with 2 results
+Successfully executed 4 UPSERT statements for table promotion with 4 results
 Successfully executed 13 UPSERT statements for table account with 13 results
 Successfully executed 20 UPSERT statements for table order with 20 results
 Successfully executed 13 UPSERT statements for table ordered with 13 results
 Successfully executed 13 UPSERT statements for table represents with 13 results
 Successfully executed 4 UPSERT statements for table lead with 4 results
-Successfully executed 1 UPSERT statements for table company with 1 results

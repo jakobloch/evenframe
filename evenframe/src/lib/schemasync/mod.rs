@@ -7,7 +7,11 @@ pub mod permissions;
 pub mod surql;
 pub mod table;
 
-use crate::error::{EvenframeError, Result};
+use crate::{
+    error::{EvenframeError, Result},
+    schemasync::surql::{define::generate_define_statements, execute::execute_and_validate},
+};
+use convert_case::{Case, Casing};
 use std::collections::HashMap;
 use tracing::{debug, error, info, trace};
 
@@ -29,7 +33,6 @@ pub use table::TableConfig;
 use crate::{
     evenframe_log,
     mockmake::Mockmaker,
-    schemasync::surql::define::define_tables,
     types::{StructConfig, TaggedUnion},
 };
 
@@ -88,7 +91,10 @@ impl<'a> Schemasync<'a> {
         let config = crate::config::EvenframeConfig::new()?;
         debug!("Loaded Evenframe configuration successfully");
         trace!("Database URL: {}", config.schemasync.database.url);
-        trace!("Database namespace: {}", config.schemasync.database.namespace);
+        trace!(
+            "Database namespace: {}",
+            config.schemasync.database.namespace
+        );
         trace!("Database name: {}", config.schemasync.database.database);
 
         let db = Surreal::new::<Http>(&config.schemasync.database.url).await?;
@@ -110,8 +116,10 @@ impl<'a> Schemasync<'a> {
         db.use_ns(&config.schemasync.database.namespace)
             .use_db(&config.schemasync.database.database)
             .await?;
-        info!("Connected to database namespace '{}' and database '{}'", 
-              config.schemasync.database.namespace, config.schemasync.database.database);
+        info!(
+            "Connected to database namespace '{}' and database '{}'",
+            config.schemasync.database.namespace, config.schemasync.database.database
+        );
 
         self.db = Some(db);
         self.schemasync_config = Some(config.schemasync);
@@ -123,7 +131,7 @@ impl<'a> Schemasync<'a> {
     /// Run the complete schemasync pipeline
     pub async fn run(mut self) -> Result<()> {
         info!("Starting Schemasync pipeline execution");
-        
+
         // Initialize database and config first
         self.initialize().await?;
 
@@ -133,16 +141,26 @@ impl<'a> Schemasync<'a> {
             .db
             .take()
             .ok_or_else(|| EvenframeError::config("Database connection failed to initialize"))?;
-        let tables = self.tables.ok_or_else(|| EvenframeError::config("Tables not provided"))?;
-        let objects = self.objects.ok_or_else(|| EvenframeError::config("Objects not provided"))?;
-        let enums = self.enums.ok_or_else(|| EvenframeError::config("Enums not provided"))?;
+        let tables = self
+            .tables
+            .ok_or_else(|| EvenframeError::config("Tables not provided"))?;
+        let objects = self
+            .objects
+            .ok_or_else(|| EvenframeError::config("Objects not provided"))?;
+        let enums = self
+            .enums
+            .ok_or_else(|| EvenframeError::config("Enums not provided"))?;
         let config = self
             .schemasync_config
             .take()
             .ok_or_else(|| EvenframeError::config("Config failed to initialize"))?;
-        
-        info!("Pipeline validation completed - {} tables, {} objects, {} enums", 
-              tables.len(), objects.len(), enums.len());
+
+        info!(
+            "Pipeline validation completed - {} tables, {} objects, {} enums",
+            tables.len(),
+            objects.len(),
+            enums.len()
+        );
 
         evenframe_log!("", "all_statements.surql");
         evenframe_log!("", "results.log");
@@ -170,6 +188,14 @@ impl<'a> Schemasync<'a> {
         mockmaker.comparator = Some(comparator.run().await?);
         debug!("Schema comparison completed");
 
+        // Continue with the rest of the mockmaker pipeline
+        info!("Removing old data from database");
+        mockmaker.remove_old_data().await.map_err(|e| {
+            error!("Failed to remove old data: {}", e);
+            e
+        })?;
+        debug!("Old data removal completed");
+
         // Define tables (this stays in Schemasync)
         info!("Defining database tables and schema");
         self.define_tables(
@@ -187,37 +213,25 @@ impl<'a> Schemasync<'a> {
         })?;
         debug!("Table definitions completed successfully");
 
-        // Continue with the rest of the mockmaker pipeline
-        info!("Removing old data from database");
-        mockmaker.remove_old_data().await
-            .map_err(|e| {
-                error!("Failed to remove old data: {}", e);
-                e
-            })?;
-        debug!("Old data removal completed");
-
         info!("Executing access control setup");
-        mockmaker.execute_access().await
-            .map_err(|e| {
-                error!("Failed to execute access setup: {}", e);
-                e
-            })?;
+        mockmaker.execute_access().await.map_err(|e| {
+            error!("Failed to execute access setup: {}", e);
+            e
+        })?;
         debug!("Access control setup completed");
 
         info!("Filtering schema changes");
-        mockmaker.filter_changes().await
-            .map_err(|e| {
-                error!("Failed to filter changes: {}", e);
-                e
-            })?;
+        mockmaker.filter_changes().await.map_err(|e| {
+            error!("Failed to filter changes: {}", e);
+            e
+        })?;
         debug!("Schema changes filtering completed");
 
         info!("Generating mock data");
-        mockmaker.generate_mock_data().await
-            .map_err(|e| {
-                error!("Failed to generate mock data: {}", e);
-                e
-            })?;
+        mockmaker.generate_mock_data().await.map_err(|e| {
+            error!("Failed to generate mock data: {}", e);
+            e
+        })?;
         debug!("Mock data generation completed");
 
         info!("Schemasync pipeline execution completed successfully");
@@ -234,21 +248,50 @@ impl<'a> Schemasync<'a> {
         enums: &HashMap<String, TaggedUnion>,
         config: &crate::schemasync::config::SchemasyncConfig,
     ) -> Result<()> {
-        debug!("Defining tables with full_refresh_mode: {}", config.mock_gen_config.full_refresh_mode);
-        trace!("Table definitions for: {:?}", tables.keys().collect::<Vec<_>>());
-        
-        define_tables(
-            db,
-            new_schema,
-            tables,
-            objects,
-            enums,
-            config.mock_gen_config.full_refresh_mode,
-        )
-        .await
-        .map_err(|e| {
-            error!("Failed to execute table definitions: {}", e);
-            EvenframeError::from(e)
-        })
+        debug!(
+            "Defining tables with full_refresh_mode: {}",
+            config.mock_gen_config.full_refresh_mode
+        );
+        trace!(
+            "Table definitions for: {:?}",
+            tables.keys().collect::<Vec<_>>()
+        );
+
+        evenframe_log!("", "define_statements.surql");
+        for (table_name, table) in tables {
+            let snake_table_name = &table_name.to_case(Case::Snake);
+            let define_stmts = generate_define_statements(
+                snake_table_name,
+                table,
+                tables,
+                objects,
+                enums,
+                config.mock_gen_config.full_refresh_mode,
+            );
+            evenframe_log!(&define_stmts, "define_statements.surql", true);
+
+            // Execute and check define statements
+            let _ = new_schema.query(&define_stmts).await?;
+            let define_result = execute_and_validate(db, &define_stmts, "define", "all").await;
+            match define_result {
+                Ok(_) => evenframe_log!(
+                    &format!(
+                        "Successfully executed define statements for table {}",
+                        table_name
+                    ),
+                    "results.log",
+                    true
+                ),
+                Err(e) => {
+                    let error_msg = format!(
+                        "Failed to execute define statements for table {}: {}",
+                        table_name, e
+                    );
+                    evenframe_log!(&error_msg, "results.log", true);
+                    return Err(e.into());
+                }
+            }
+        }
+        Ok(())
     }
 }

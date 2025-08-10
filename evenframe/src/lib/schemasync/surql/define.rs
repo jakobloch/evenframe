@@ -1,17 +1,10 @@
 use crate::{
-    compare::PreservationMode,
-    evenframe_log,
     schemasync::table::TableConfig,
     types::{StructConfig, TaggedUnion},
 };
-use convert_case::{Case, Casing};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::HashMap;
-use surrealdb::{
-    engine::{local::Db, remote::http::Client},
-    Surreal,
-};
 use syn::{parenthesized, LitStr};
 use tracing::{debug, info, trace};
 
@@ -257,51 +250,6 @@ impl DefineConfig {
     }
 }
 
-pub async fn define_tables(
-    db: &Surreal<Client>,
-    new_schema: &Surreal<Db>,
-    tables: &HashMap<String, TableConfig>,
-    objects: &HashMap<String, StructConfig>,
-    enums: &HashMap<String, TaggedUnion>,
-    full_refresh_mode: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    for (table_name, table) in tables {
-        let snake_table_name = &table_name.to_case(Case::Snake);
-        let define_stmts = generate_define_statements(
-            snake_table_name,
-            table,
-            tables,
-            objects,
-            enums,
-            full_refresh_mode,
-        );
-        evenframe_log!(&define_stmts, "define_statements.surql", true);
-
-        // Execute and check define statements
-        let _ = new_schema.query(&define_stmts).await?;
-        let define_result = db.query(&define_stmts).await;
-        match define_result {
-            Ok(_) => evenframe_log!(
-                &format!(
-                    "Successfully executed define statements for table {}",
-                    table_name
-                ),
-                "results.log",
-                true
-            ),
-            Err(e) => {
-                let error_msg = format!(
-                    "Failed to execute define statements for table {}: {}",
-                    table_name, e
-                );
-                evenframe_log!(&error_msg, "results.log", true);
-                return Err(e.into());
-            }
-        }
-    }
-    Ok(())
-}
-
 pub fn generate_define_statements(
     table_name: &str,
     ds: &TableConfig,
@@ -311,7 +259,12 @@ pub fn generate_define_statements(
     full_refresh_mode: bool,
 ) -> String {
     info!(table_name = %table_name, full_refresh_mode = %full_refresh_mode, "Generating define statements for table");
-    debug!(query_details_count = query_details.len(), server_only_count = server_only.len(), enum_count = enums.len(), "Context sizes");
+    debug!(
+        query_details_count = query_details.len(),
+        server_only_count = server_only.len(),
+        enum_count = enums.len(),
+        "Context sizes"
+    );
     trace!("Table config: {:?}", ds);
     let table_type = if ds.relation.is_some() {
         let relation = ds.relation.as_ref().unwrap();
@@ -344,15 +297,6 @@ pub fn generate_define_statements(
 
     let mut output = "".to_owned();
     debug!(table_name = %table_name, "Starting statement generation");
-
-    if let Some(mock_config) = &ds.mock_generation_config {
-        if mock_config.preservation_mode == PreservationMode::None || full_refresh_mode {
-            // We do one DELETE to clear old data
-            output.push_str(&format!("REMOVE TABLE {table_name};\n"));
-        }
-    } else if full_refresh_mode {
-        output.push_str(&format!("REMOVE TABLE {table_name};\n"));
-    }
 
     output.push_str(&format!(
         "DEFINE TABLE OVERWRITE {table_name} SCHEMAFULL TYPE {table_type} CHANGEFEED 3d PERMISSIONS FOR select {select_permissions} FOR update {update_permissions} FOR create {create_permissions} FOR delete {delete_permissions};\n"
