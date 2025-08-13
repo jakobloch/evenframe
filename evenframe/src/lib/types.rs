@@ -658,9 +658,9 @@ impl StructField {
                                         field_name,
                                         table_name,
                                         variant_data_field_type,
-                                        &enums,
-                                        &app_structs,
-                                        &persistable_structs,
+                                        enums,
+                                        app_structs,
+                                        persistable_structs,
                                     );
                                     variant_type
                                 } else {

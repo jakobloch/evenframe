@@ -55,13 +55,13 @@ impl Mockmaker {
             }
 
             if has_accesses_to_remove {
-                output.push_str("\n");
+                output.push('\n');
             }
         }
 
         // Process excess records (negative diffs mean we have too many records)
         let mut has_excess_records = false;
-        for (_table_name, diff) in &self.record_diffs {
+        for diff in self.record_diffs.values() {
             if *diff < 0 {
                 has_excess_records = true;
                 break;
@@ -73,7 +73,7 @@ impl Mockmaker {
             for (table_name, diff) in &self.record_diffs {
                 if *diff < 0 {
                     let table_name_snake = table_name.to_case(Case::Snake);
-                    let excess_count = diff.abs() as usize;
+                    let excess_count = diff.unsigned_abs() as usize;
 
                     // Get the IDs for this table
                     if let Some(table_ids) = self.id_map.get(table_name) {
@@ -95,7 +95,7 @@ impl Mockmaker {
                     ));
                 }
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Process removed fields first (before removing tables)
@@ -110,7 +110,7 @@ impl Mockmaker {
                         field_name, table_name
                     ));
                 }
-                output.push_str("\n");
+                output.push('\n');
             }
         }
 
@@ -121,7 +121,7 @@ impl Mockmaker {
                 let table_name_snake = table_name.to_case(Case::Snake);
                 output.push_str(&format!("REMOVE TABLE IF EXISTS {};\n", table_name_snake));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         output

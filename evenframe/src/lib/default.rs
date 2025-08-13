@@ -15,35 +15,38 @@ pub fn field_type_to_default_value(
         FieldType::String | FieldType::Char => {
             trace!("Generating default for String/Char type");
             r#""""#.to_string()
-        },
+        }
         FieldType::Bool => {
             trace!("Generating default for Bool type");
             "false".to_string()
-        },
+        }
         FieldType::DateTime => {
             trace!("Generating default for DateTime type");
             r#""2024-01-01T00:00:00Z""#.to_string()
-        },
+        }
         FieldType::Duration => {
             trace!("Generating default for Duration type");
             "0".to_string() // nanoseconds
-        },
+        }
         FieldType::Timezone => {
             trace!("Generating default for Timezone type");
             r#""UTC""#.to_string() // IANA timezone string
-        },
+        }
         FieldType::Unit => {
             trace!("Generating default for Unit type");
             "undefined".to_string()
-        },
+        }
         FieldType::Decimal => {
             trace!("Generating default for Decimal type");
             r#""0""#.to_string()
-        },
+        }
         FieldType::OrderedFloat(inner) => {
-            trace!("Generating default for OrderedFloat with inner: {:?}", inner);
+            trace!(
+                "Generating default for OrderedFloat with inner: {:?}",
+                inner
+            );
             field_type_to_default_value(inner, structs, enums)
-        },
+        }
         FieldType::F32
         | FieldType::F64
         | FieldType::I8
@@ -60,13 +63,16 @@ pub fn field_type_to_default_value(
         | FieldType::Usize => {
             trace!("Generating default for numeric type");
             "0".to_string()
-        },
+        }
         FieldType::EvenframeRecordId => {
             trace!("Generating default for EvenframeRecordId");
             "''".to_string()
-        },
+        }
         FieldType::Tuple(inner_types) => {
-            trace!("Generating default for Tuple with {} types", inner_types.len());
+            trace!(
+                "Generating default for Tuple with {} types",
+                inner_types.len()
+            );
             let tuple_defaults: Vec<String> = inner_types
                 .iter()
                 .map(|ty| field_type_to_default_value(ty, structs, enums))
@@ -103,13 +109,21 @@ pub fn field_type_to_default_value(
         }
         FieldType::HashMap(key, value) => {
             // Return an empty object as default
-            trace!("Generating default for HashMap with key: {:?}, value: {:?}", key, value);
+            trace!(
+                "Generating default for HashMap with key: {:?}, value: {:?}",
+                key,
+                value
+            );
             "{}".to_string()
         }
 
         FieldType::BTreeMap(key, value) => {
             // Return an empty object as default
-            trace!("Generating default for BTreeMap with key: {:?}, value: {:?}", key, value);
+            trace!(
+                "Generating default for BTreeMap with key: {:?}, value: {:?}",
+                key,
+                value
+            );
             "{}".to_string()
         }
 
@@ -127,7 +141,11 @@ pub fn field_type_to_default_value(
 
             // First check for an enum of this name
             if let Some(enum_schema) = enums.values().find(|e| e.enum_name == *name) {
-                debug!("Found enum {} with {} variants", name, enum_schema.variants.len());
+                debug!(
+                    "Found enum {} with {} variants",
+                    name,
+                    enum_schema.variants.len()
+                );
                 let mut rng = rng();
                 if let Some(chosen_variant) = enum_schema.variants.choose(&mut rng) {
                     trace!("Chosen variant: {}", chosen_variant.name);
@@ -141,10 +159,10 @@ pub fn field_type_to_default_value(
                         };
                         let data_default =
                             field_type_to_default_value(variant_data_field_type, structs, enums);
-                        return format!("{}", data_default);
+                        return data_default;
                     } else {
                         // A variant without data
-                        return format!("'{}'", chosen_variant.name);
+                        return format!("'\"{}\"", chosen_variant.name);
                     }
                 } else {
                     // If no variants, fallback to undefined
@@ -156,7 +174,11 @@ pub fn field_type_to_default_value(
                 .values()
                 .find(|sc| sc.name.to_case(Case::Pascal) == name.to_case(Case::Pascal))
             {
-                debug!("Found struct {} with {} fields", name, struct_config.fields.len());
+                debug!(
+                    "Found struct {} with {} fields",
+                    name,
+                    struct_config.fields.len()
+                );
                 // We treat this similarly to a struct:
                 let fields_str = struct_config
                     .fields
@@ -173,7 +195,10 @@ pub fn field_type_to_default_value(
                 format!("{{ {} }}", fields_str)
             } else {
                 // Not an enum or known table
-                trace!("Type {} not found in enums or structs, returning undefined", name);
+                trace!(
+                    "Type {} not found in enums or structs, returning undefined",
+                    name
+                );
                 "undefined".to_string()
             }
         }
@@ -191,17 +216,21 @@ pub fn field_type_to_surql_default(
     app_structs: &HashMap<String, StructConfig>,
     persistable_structs: &HashMap<String, TableConfig>,
 ) -> String {
-    trace!("Generating SURQL default for field '{}' in table '{}', type: {:?}", 
-           field_name, table_name, field_type);
+    trace!(
+        "Generating SURQL default for field '{}' in table '{}', type: {:?}",
+        field_name,
+        table_name,
+        field_type
+    );
     let result = match field_type {
         FieldType::String | FieldType::Char => {
             trace!("Generating SURQL default for String/Char");
             "\'\'".to_string()
-        },
+        }
         FieldType::Bool => {
             trace!("Generating SURQL default for Bool");
             "false".to_string()
-        },
+        }
         FieldType::DateTime => {
             // Generate current timestamp in SurrealDB datetime format
             trace!("Generating SURQL default for DateTime");
@@ -220,19 +249,22 @@ pub fn field_type_to_surql_default(
         FieldType::Unit => {
             trace!("Generating SURQL default for Unit");
             "NULL".to_string()
-        },
+        }
         FieldType::Decimal => {
             trace!("Generating SURQL default for Decimal");
             "0.00dec".to_string()
-        },
+        }
         FieldType::OrderedFloat(inner) => {
-            trace!("Generating SURQL default for OrderedFloat with inner: {:?}", inner);
+            trace!(
+                "Generating SURQL default for OrderedFloat with inner: {:?}",
+                inner
+            );
             "0.0f".to_string() // OrderedFloat is treated as float
-        },
+        }
         FieldType::F32 | FieldType::F64 => {
             trace!("Generating SURQL default for float type");
             "0.0f".to_string()
-        },
+        }
         FieldType::I8
         | FieldType::I16
         | FieldType::I32
@@ -247,18 +279,17 @@ pub fn field_type_to_surql_default(
         | FieldType::Usize => {
             trace!("Generating SURQL default for integer type");
             "0".to_string()
-        },
+        }
         FieldType::EvenframeRecordId => {
             // For id fields, let SurrealDB auto-generate
             debug!("Generating RecordId default for field '{}'", field_name);
-            if field_name == "id" {
-                "NONE".to_string()
-            } else {
-                "NONE".to_string()
-            }
+            "NONE".to_string()
         }
         FieldType::Tuple(inner_types) => {
-            trace!("Generating SURQL default for Tuple with {} types", inner_types.len());
+            trace!(
+                "Generating SURQL default for Tuple with {} types",
+                inner_types.len()
+            );
             let tuple_defaults: Vec<String> = inner_types
                 .iter()
                 .map(|ty| {
@@ -275,7 +306,10 @@ pub fn field_type_to_surql_default(
             format!("[{}]", tuple_defaults.join(", "))
         }
         FieldType::Struct(fields) => {
-            trace!("Generating SURQL default for Struct with {} fields", fields.len());
+            trace!(
+                "Generating SURQL default for Struct with {} fields",
+                fields.len()
+            );
             let fields_str = fields
                 .iter()
                 .map(|(name, ftype)| {
@@ -297,26 +331,40 @@ pub fn field_type_to_surql_default(
             format!("{{ {} }}", fields_str)
         }
         FieldType::Option(inner) => {
-            trace!("Generating SURQL default for Option with inner: {:?}", inner);
+            trace!(
+                "Generating SURQL default for Option with inner: {:?}",
+                inner
+            );
             "NULL".to_string()
-        },
+        }
         FieldType::Vec(inner) => {
             trace!("Generating SURQL default for Vec with inner: {:?}", inner);
             "[]".to_string()
-        },
+        }
         FieldType::HashMap(key, value) | FieldType::BTreeMap(key, value) => {
-            trace!("Generating SURQL default for Map with key: {:?}, value: {:?}", key, value);
+            trace!(
+                "Generating SURQL default for Map with key: {:?}, value: {:?}",
+                key,
+                value
+            );
             "{}".to_string()
-        },
+        }
         FieldType::RecordLink(inner) => {
-            trace!("Generating SURQL default for RecordLink with inner: {:?}", inner);
+            trace!(
+                "Generating SURQL default for RecordLink with inner: {:?}",
+                inner
+            );
             "NULL".to_string()
-        },
+        }
         FieldType::Other(name) => {
             debug!("Processing Other type '{}' for SURQL default", name);
             // Check if it's an enum
             if let Some(enum_schema) = enums.values().find(|e| e.enum_name == *name) {
-                trace!("Found enum '{}' with {} variants", name, enum_schema.variants.len());
+                trace!(
+                    "Found enum '{}' with {} variants",
+                    name,
+                    enum_schema.variants.len()
+                );
                 let chosen_variant = &enum_schema.variants[0];
                 if let Some(variant_data) = &chosen_variant.data {
                     let variant_data_field_type = match variant_data {
@@ -344,7 +392,11 @@ pub fn field_type_to_surql_default(
                 .values()
                 .find(|sc| sc.name.to_case(Case::Pascal) == name.to_case(Case::Pascal))
             {
-                debug!("Found app struct '{}' with {} fields", name, struct_config.fields.len());
+                debug!(
+                    "Found app struct '{}' with {} fields",
+                    name,
+                    struct_config.fields.len()
+                );
                 let fields_str = struct_config
                     .fields
                     .iter()
@@ -389,41 +441,48 @@ pub fn field_type_to_surreal_type(
     app_structs: &HashMap<String, StructConfig>,
     persistable_structs: &HashMap<String, TableConfig>,
 ) -> (String, bool, Option<String>) {
-    trace!("Converting field '{}' in table '{}' to SurrealDB type, field_type: {:?}", 
-           field_name, table_name, field_type);
+    trace!(
+        "Converting field '{}' in table '{}' to SurrealDB type, field_type: {:?}",
+        field_name,
+        table_name,
+        field_type
+    );
     let result = match field_type {
         FieldType::String | FieldType::Char => {
             trace!("Converting String/Char to SurrealDB type");
             ("string".to_string(), false, None)
-        },
+        }
         FieldType::Bool => {
             trace!("Converting Bool to SurrealDB type");
             ("bool".to_string(), false, None)
-        },
+        }
         FieldType::DateTime => {
             trace!("Converting DateTime to SurrealDB type");
             ("datetime".to_string(), false, None)
-        },
+        }
         FieldType::Duration => {
             trace!("Converting Duration to SurrealDB type");
             ("duration".to_string(), false, None)
-        },
+        }
         FieldType::Timezone => {
             trace!("Converting Timezone to SurrealDB type");
             ("string".to_string(), false, None)
-        },
+        }
         FieldType::Decimal => {
             trace!("Converting Decimal to SurrealDB type");
             ("decimal".to_string(), false, None)
-        },
+        }
         FieldType::OrderedFloat(inner) => {
-            trace!("Converting OrderedFloat to SurrealDB type with inner: {:?}", inner);
+            trace!(
+                "Converting OrderedFloat to SurrealDB type with inner: {:?}",
+                inner
+            );
             ("float".to_string(), false, None) // OrderedFloat is treated as float
-        },
+        }
         FieldType::F32 | FieldType::F64 => {
             trace!("Converting float to SurrealDB type");
             ("float".to_string(), false, None)
-        },
+        }
         FieldType::I8
         | FieldType::I16
         | FieldType::I32
@@ -438,7 +497,7 @@ pub fn field_type_to_surreal_type(
         | FieldType::Usize => {
             trace!("Converting integer to SurrealDB type");
             ("int".to_string(), false, None)
-        },
+        }
         FieldType::EvenframeRecordId => {
             let type_str = if field_name == "id" {
                 debug!("Creating record type for id field in table {}", table_name);
@@ -452,7 +511,7 @@ pub fn field_type_to_surreal_type(
         FieldType::Unit => {
             trace!("Converting Unit to SurrealDB type");
             ("any".to_string(), false, None)
-        },
+        }
         FieldType::HashMap(_key, value) => {
             trace!("Converting HashMap to SurrealDB type");
             let (value_type, _, _) = field_type_to_surreal_type(
@@ -478,7 +537,10 @@ pub fn field_type_to_surreal_type(
             ("object".to_string(), true, Some(value_type))
         }
         FieldType::RecordLink(inner) => {
-            trace!("Converting RecordLink to SurrealDB type with inner: {:?}", inner);
+            trace!(
+                "Converting RecordLink to SurrealDB type with inner: {:?}",
+                inner
+            );
             let (inner_type, needs_wildcard, wildcard_type) = field_type_to_surreal_type(
                 field_name,
                 table_name,
@@ -490,10 +552,17 @@ pub fn field_type_to_surreal_type(
             (inner_type, needs_wildcard, wildcard_type)
         }
         FieldType::Other(name) => {
-            debug!("Processing Other type '{}' for SurrealDB type conversion", name);
+            debug!(
+                "Processing Other type '{}' for SurrealDB type conversion",
+                name
+            );
             // If this type name is defined as an enum, output its union literal.
             if let Some(enum_def) = enums.get(name) {
-                debug!("Found enum '{}' with {} variants", name, enum_def.variants.len());
+                debug!(
+                    "Found enum '{}' with {} variants",
+                    name,
+                    enum_def.variants.len()
+                );
                 let variants: Vec<String> = enum_def
                     .variants
                     .iter()
@@ -509,9 +578,9 @@ pub fn field_type_to_surreal_type(
                                 field_name,
                                 table_name,
                                 variant_data_field_type,
-                                &enums,
-                                &app_structs,
-                                &persistable_structs,
+                                enums,
+                                app_structs,
+                                persistable_structs,
                             );
                             variant_type
                         } else {
@@ -521,8 +590,11 @@ pub fn field_type_to_surreal_type(
                     .collect();
                 (variants.join(" | "), false, None)
             } else if let Some(app_struct) = app_structs.get(name) {
-                debug!("Found app struct '{}' with {} fields for type conversion", 
-                       name, app_struct.fields.len());
+                debug!(
+                    "Found app struct '{}' with {} fields for type conversion",
+                    name,
+                    app_struct.fields.len()
+                );
                 let field_defs: Vec<String> = app_struct
                     .fields
                     .iter()
@@ -553,7 +625,10 @@ pub fn field_type_to_surreal_type(
             }
         }
         FieldType::Option(inner) => {
-            trace!("Converting Option to SurrealDB type with inner: {:?}", inner);
+            trace!(
+                "Converting Option to SurrealDB type with inner: {:?}",
+                inner
+            );
             let (inner_type, needs_wildcard, wildcard_type) = field_type_to_surreal_type(
                 field_name,
                 table_name,
@@ -581,7 +656,10 @@ pub fn field_type_to_surreal_type(
             (format!("array<{}>", inner_type), false, None)
         }
         FieldType::Tuple(inner_types) => {
-            trace!("Converting Tuple to SurrealDB type with {} types", inner_types.len());
+            trace!(
+                "Converting Tuple to SurrealDB type with {} types",
+                inner_types.len()
+            );
             let inner: Vec<String> = inner_types
                 .iter()
                 .map(|t| {
@@ -600,7 +678,10 @@ pub fn field_type_to_surreal_type(
             (format!("array<{}>", inner.join(", ")), false, None)
         }
         FieldType::Struct(fields) => {
-            trace!("Converting Struct to SurrealDB type with {} fields", fields.len());
+            trace!(
+                "Converting Struct to SurrealDB type with {} fields",
+                fields.len()
+            );
             let field_defs: Vec<String> = fields
                 .iter()
                 .map(|(name, t)| {

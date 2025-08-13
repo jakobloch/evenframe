@@ -13,8 +13,10 @@ use crate::{
         TableConfig,
     },
     types::{FieldType, StructConfig, StructField, TaggedUnion, VariantData},
+    Result,
 };
 pub use import::SchemaImporter;
+use import::{AccessDefinition, FieldDefinition, ObjectType, SchemaDefinition, TableDefinition};
 use quote::{quote, ToTokens};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -22,8 +24,6 @@ use std::collections::HashSet;
 use surrealdb::engine::local::{Db, Mem};
 use surrealdb::{engine::remote::http::Client, Surreal};
 use tracing;
-
-use import::{AccessDefinition, FieldDefinition, ObjectType, SchemaDefinition, TableDefinition};
 
 pub struct Comparator {
     db: Surreal<Client>,
@@ -55,7 +55,7 @@ impl Comparator {
         }
     }
 
-    pub async fn run(mut self) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn run(mut self) -> Result<Self> {
         tracing::info!("Starting Comparator pipeline");
 
         tracing::debug!("Setting up schemas");
@@ -75,7 +75,7 @@ impl Comparator {
     }
 
     /// Setup backup and create in-memory schemas
-    async fn setup_schemas(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn setup_schemas(&mut self) -> Result<()> {
         tracing::trace!("Creating backup and in-memory schemas");
         let (remote_schema, new_schema) = setup_backup_and_schemas(&self.db).await?;
         self.remote_schema = Some(remote_schema);
@@ -85,7 +85,7 @@ impl Comparator {
     }
 
     /// Setup access definitions
-    async fn setup_access(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn setup_access(&mut self) -> Result<()> {
         tracing::trace!("Setting up access definitions");
         let new_schema = self.new_schema.as_ref().unwrap();
         self.access_query = setup_access_definitions(new_schema, &self.schemasync_config).await?;
@@ -97,7 +97,7 @@ impl Comparator {
     }
 
     /// Export schemas for comparison
-    async fn export_schemas(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn export_schemas(&mut self) -> Result<()> {
         tracing::trace!("Exporting schemas");
         let remote_schema = self.remote_schema.as_ref().unwrap();
         let new_schema = self.new_schema.as_ref().unwrap();
@@ -117,7 +117,7 @@ impl Comparator {
     }
 
     /// Compare schemas to find changes
-    async fn compare_schemas(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn compare_schemas(&mut self) -> Result<()> {
         tracing::trace!("Starting schema comparison");
         let changes = compare_schemas(
             &self.db,
@@ -151,20 +151,15 @@ impl Comparator {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
 pub enum PreservationMode {
     /// No preservation - generate all new data
     None,
+    #[default]
     /// Smart preservation - preserve unchanged fields, regenerate modified fields
     Smart,
     /// Full preservation - preserve all existing data, only generate for new fields
     Full,
-}
-
-impl Default for PreservationMode {
-    fn default() -> Self {
-        PreservationMode::Smart
-    }
 }
 
 impl ToTokens for PreservationMode {
@@ -197,7 +192,7 @@ impl<'a> Merger<'a> {
         client: &'a Surreal<Client>,
         default_mock_gen_config: SchemasyncMockGenConfig,
         performance: PerformanceConfig,
-    ) -> Result<Self, String> {
+    ) -> Result<Self> {
         Ok(Self {
             client,
             default_mock_gen_config,
@@ -206,9 +201,9 @@ impl<'a> Merger<'a> {
     }
 
     /// Import schema from production database
-    pub async fn import_schema_from_db(&self) -> Result<import::SchemaDefinition, String> {
+    pub async fn import_schema_from_db(&self) -> Result<import::SchemaDefinition> {
         tracing::debug!("Importing schema from production database");
-        let importer = SchemaImporter::new(&self.client);
+        let importer = SchemaImporter::new(self.client);
         let schema = importer.import_schema_only().await?;
         tracing::debug!(
             tables = schema.tables.len(),
@@ -223,7 +218,7 @@ impl<'a> Merger<'a> {
     pub fn generate_schema_from_structs(
         &self,
         tables: &HashMap<String, TableConfig>,
-    ) -> Result<import::SchemaDefinition, String> {
+    ) -> Result<import::SchemaDefinition> {
         tracing::debug!(
             table_count = tables.len(),
             "Generating schema from Rust structs"
@@ -237,20 +232,17 @@ impl<'a> Merger<'a> {
         Ok(schema)
     }
 
-    /// Compare two schemas using the new dual-export approach
-
-    /// Compare two schemas (legacy method)
     pub fn compare_schemas(
         &self,
         old: &import::SchemaDefinition,
         new: &import::SchemaDefinition,
-    ) -> Result<SchemaChanges, String> {
+    ) -> Result<SchemaChanges> {
         tracing::debug!("Comparing schemas using legacy method");
         Comparator::compare(old, new)
     }
 
     /// Export mock data to file
-    pub async fn export_mock_data(&self, _file_path: &str) -> Result<(), String> {
+    pub async fn export_mock_data(&self, _file_path: &str) -> Result<()> {
         // Implementation will use the generated statements
         // and write them to the specified file
         todo!("Implement export_mock_data")
@@ -280,9 +272,6 @@ impl<'a> Merger<'a> {
             PreservationMode::Smart => {
                 // Smart preservation - keep unchanged fields, regenerate specified fields
                 if existing_count > 0 {
-                    // Preserve existing records up to target count
-                    let preserve_count = existing_count.min(target_count);
-
                     // Determine which fields need regeneration
                     let mut fields_to_regenerate = mock_config.regenerate_fields.clone();
 
@@ -308,9 +297,7 @@ impl<'a> Merger<'a> {
                         }
                     }
 
-                    for i in 0..preserve_count {
-                        let mut record = existing_records[i].clone();
-
+                    for mut record in existing_records {
                         // Regenerate specified fields
                         if let Value::Object(ref mut map) = record {
                             // First, add any new fields that don't exist in the record
@@ -764,10 +751,7 @@ impl SchemaChanges {
 
 impl Comparator {
     /// Compare two schemas and return the differences
-    pub fn compare(
-        old: &SchemaDefinition,
-        new: &SchemaDefinition,
-    ) -> Result<SchemaChanges, String> {
+    pub fn compare(old: &SchemaDefinition, new: &SchemaDefinition) -> Result<SchemaChanges> {
         tracing::debug!("Starting detailed schema comparison");
 
         let mut changes = SchemaChanges {
@@ -894,7 +878,7 @@ impl Comparator {
         table_name: &str,
         old_table: &TableDefinition,
         new_table: &TableDefinition,
-    ) -> Result<Option<TableChanges>, String> {
+    ) -> Result<Option<TableChanges>> {
         let mut table_changes = TableChanges {
             table_name: table_name.to_string(),
             new_fields: Vec::new(),
@@ -930,14 +914,18 @@ impl Comparator {
 
         // Find modified fields
         for field in old_fields.intersection(&new_fields) {
-            let old_field = old_table.fields.get(field).expect(&format!(
-                "Something went wrong getting the old field from old_table.fields: {:#?}",
-                field
-            ));
-            let new_field = new_table.fields.get(field).expect(&format!(
-                "Something went wrong getting the new field from new_table.fields: {:#?}",
-                field
-            ));
+            let old_field = old_table.fields.get(field).unwrap_or_else(|| {
+                panic!(
+                    "Something went wrong getting the old field from old_table.fields: {:#?}",
+                    field
+                )
+            });
+            let new_field = new_table.fields.get(field).unwrap_or_else(|| {
+                panic!(
+                    "Something went wrong getting the new field from new_table.fields: {:#?}",
+                    field
+                )
+            });
 
             // First check if the types are different for deep comparison
             if old_field.field_type != new_field.field_type {
@@ -1427,10 +1415,11 @@ pub fn filter_changed_tables_and_objects(
                             match field_change.change_type {
                                 ChangeType::Removed => {
                                     // Track removed nested fields
-                                    nested_changes
-                                        .entry(parent_field)
-                                        .or_insert_with(Vec::new)
-                                        .push((nested_field, FieldType::Unit, ChangeType::Removed));
+                                    nested_changes.entry(parent_field).or_default().push((
+                                        nested_field,
+                                        FieldType::Unit,
+                                        ChangeType::Removed,
+                                    ));
                                 }
                                 ChangeType::Added => {
                                     // For added nested fields, create partial struct similar to removed fields
@@ -1456,7 +1445,7 @@ pub fn filter_changed_tables_and_objects(
                                                         {
                                                             nested_changes
                                                                 .entry(parent_field.clone())
-                                                                .or_insert_with(Vec::new)
+                                                                .or_default()
                                                                 .push((
                                                                     nested_field.clone(),
                                                                     nested_field_def
@@ -1478,7 +1467,7 @@ pub fn filter_changed_tables_and_objects(
                                                     {
                                                         nested_changes
                                                             .entry(parent_field.clone())
-                                                            .or_insert_with(Vec::new)
+                                                            .or_default()
                                                             .push((
                                                                 nested_field.clone(),
                                                                 nested_field_def.field_type.clone(),
@@ -1642,9 +1631,8 @@ fn collect_referenced_objects(
                                 objects_to_process.push(inline_struct.name.clone())
                             }
                             VariantData::DataStructureRef(referenced_field_type) => {
-                                match referenced_field_type {
-                                    FieldType::Other(data) => objects_to_process.push(data.clone()),
-                                    _ => {}
+                                if let FieldType::Other(data) = referenced_field_type {
+                                    objects_to_process.push(data.clone());
                                 }
                             }
                         }
@@ -1680,7 +1668,7 @@ pub async fn compare_schemas(
     db: &Surreal<Client>,
     remote_schema_string: &str,
     new_schema_string: &str,
-) -> Result<SchemaChanges, Box<dyn std::error::Error>> {
+) -> Result<SchemaChanges> {
     tracing::debug!("Parsing and comparing schema exports");
     let importer = SchemaImporter::new(db);
 
@@ -1700,7 +1688,7 @@ pub async fn compare_schemas(
 pub async fn export_schemas(
     remote_schema: &Surreal<Db>,
     new_schema: &Surreal<Db>,
-) -> Result<(String, String), Box<dyn std::error::Error>> {
+) -> Result<(String, String)> {
     tracing::trace!("Exporting remote schema");
     remote_schema
         .export("remote_schema.surql")
@@ -1743,9 +1731,7 @@ pub async fn export_schemas(
     Ok((remote_schema_string, new_schema_string))
 }
 
-pub async fn setup_backup_and_schemas(
-    db: &Surreal<Client>,
-) -> Result<(Surreal<Db>, Surreal<Db>), Box<dyn std::error::Error>> {
+pub async fn setup_backup_and_schemas(db: &Surreal<Client>) -> Result<(Surreal<Db>, Surreal<Db>)> {
     tracing::trace!("Creating database backup");
     db.export("backup.surql").await?;
     let remote_schema = Surreal::new::<Mem>(())

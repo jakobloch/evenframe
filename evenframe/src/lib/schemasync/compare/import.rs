@@ -1,13 +1,16 @@
+use crate::{
+    schemasync::{config::AccessType, TableConfig},
+    EvenframeError, Result,
+};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+};
 use surrealdb::engine::remote::http::Client;
 use surrealdb::Surreal;
 use tracing;
-
-use crate::schemasync::config::AccessType;
-
-use crate::schemasync::TableConfig;
 
 /// Represents a complex object type definition in SurrealDB
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -24,24 +27,23 @@ pub enum ObjectType {
     Nullable(Box<ObjectType>),
 }
 
-impl ObjectType {
-    /// Convert to string representation for comparison
-    pub fn to_string(&self) -> String {
+impl Display for ObjectType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            ObjectType::Simple(s) => s.clone(),
+            ObjectType::Simple(s) => write!(f, "{}", s),
             ObjectType::Object(fields) => {
                 let field_strs: Vec<String> = fields
                     .iter()
-                    .map(|(name, field_type)| format!("{}: {}", name, field_type.to_string()))
+                    .map(|(name, field_type)| format!("{}: {}", name, field_type))
                     .collect();
-                format!("{{ {} }}", field_strs.join(", "))
+                write!(f, "{{ {} }}", field_strs.join(", "))
             }
-            ObjectType::Array(inner) => format!("array<{}>", inner.to_string()),
+            ObjectType::Array(inner) => write!(f, "array<{}>", inner),
             ObjectType::Union(types) => {
                 let type_strs: Vec<String> = types.iter().map(|t| t.to_string()).collect();
-                type_strs.join(" | ")
+                write!(f, "({})", type_strs.join(" | "))
             }
-            ObjectType::Nullable(inner) => format!("null | {}", inner.to_string()),
+            ObjectType::Nullable(inner) => write!(f, "null | {}", inner),
         }
     }
 }
@@ -120,8 +122,11 @@ pub struct SchemaDefinition {
 
 impl SchemaDefinition {
     /// Create from TableConfig HashMap (for code-based schema generation)
-    pub fn from_table_configs(tables: &HashMap<String, TableConfig>) -> Result<Self, String> {
-        tracing::debug!(table_count = tables.len(), "Creating SchemaDefinition from TableConfigs");
+    pub fn from_table_configs(tables: &HashMap<String, TableConfig>) -> Result<Self> {
+        tracing::debug!(
+            table_count = tables.len(),
+            "Creating SchemaDefinition from TableConfigs"
+        );
         let mut schema_tables = HashMap::new();
         let mut schema_edges = HashMap::new();
 
@@ -147,19 +152,19 @@ impl SchemaDefinition {
             edges: schema_edges.clone(),
             accesses: Vec::new(), // TODO: Extract accesses from config if available
         };
-        
+
         tracing::debug!(
             tables = definition.tables.len(),
             edges = definition.edges.len(),
             "SchemaDefinition created from configs"
         );
-        
+
         Ok(definition)
     }
 
     fn extract_fields_from_config(
         config: &TableConfig,
-    ) -> Result<HashMap<String, FieldDefinition>, String> {
+    ) -> Result<HashMap<String, FieldDefinition>> {
         let mut fields = HashMap::new();
 
         for field in &config.struct_config.fields {
@@ -234,7 +239,7 @@ impl<'a> SchemaImporter<'a> {
     }
 
     /// Import schema-only (no data) from the database
-    pub async fn import_schema_only(&self) -> Result<SchemaDefinition, String> {
+    pub async fn import_schema_only(&self) -> Result<SchemaDefinition> {
         // Export schema only (no records)
         let mut export_stream = self
             .client
@@ -242,7 +247,9 @@ impl<'a> SchemaImporter<'a> {
             .with_config()
             .records(false) // Schema only, no data
             .await
-            .map_err(|e| format!("Failed to export schema from database: {}", e))?;
+            .map_err(|e| {
+                EvenframeError::comparison(format!("Failed to export schema from database: {e}"))
+            })?;
 
         let mut schema_statements = Vec::new();
         let mut statement_count = 0;
@@ -253,10 +260,9 @@ impl<'a> SchemaImporter<'a> {
                 Ok(bytes) => {
                     statement_count += 1;
                     let statement = String::from_utf8(bytes).map_err(|e| {
-                        format!(
-                            "Failed to parse export data at statement {}: {}",
-                            statement_count, e
-                        )
+                        EvenframeError::comparison(format!(
+                            "Failed to parse export data at statement {statement_count}: {e}",
+                        ))
                     })?;
 
                     // Skip empty statements
@@ -265,17 +271,18 @@ impl<'a> SchemaImporter<'a> {
                     }
                 }
                 Err(e) => {
-                    return Err(format!(
-                        "Error reading export stream at statement {}: {}",
-                        statement_count, e
-                    ));
+                    return Err(EvenframeError::comparison(format!(
+                        "Error reading export stream at statement {statement_count}: {e}",
+                    )));
                 }
             }
         }
 
         // Check if we got any statements
         if schema_statements.is_empty() {
-            return Err("No schema statements found in database export".to_string());
+            return Err(EvenframeError::comparison(
+                "No schema statements found in database export".to_string(),
+            ));
         }
 
         // Parse the exported statements into our schema structure
@@ -283,19 +290,20 @@ impl<'a> SchemaImporter<'a> {
     }
 
     /// Export schema only as raw DEFINE statements
-    pub async fn export_schema_only(&self) -> Result<String, String> {
+    pub async fn export_schema_only(&self) -> Result<String> {
         // Export schema only (no records)
         let mut export_stream = self
             .client
             .export(())
             .await
-            .map_err(|e| format!("Failed to export schema: {}", e))?;
+            .map_err(|e| EvenframeError::comparison(format!("Failed to export schema: {e}")))?;
 
         let mut schema_statements = Vec::new();
 
         while let Some(Ok(bytes)) = export_stream.next().await {
-            let statement = String::from_utf8(bytes)
-                .map_err(|e| format!("Failed to parse export data: {}", e))?;
+            let statement = String::from_utf8(bytes).map_err(|e| {
+                EvenframeError::comparison(format!("Failed to parse export data: {e}"))
+            })?;
 
             // Only keep schema-related statements (DEFINE)
             let trimmed = statement.trim();
@@ -308,7 +316,7 @@ impl<'a> SchemaImporter<'a> {
     }
 
     /// Parse schema from raw export string
-    pub fn parse_schema_from_export(&self, export_data: &str) -> Result<SchemaDefinition, String> {
+    pub fn parse_schema_from_export(&self, export_data: &str) -> Result<SchemaDefinition> {
         let statements: Vec<String> = export_data
             .lines()
             .map(|s| s.to_string())
@@ -319,7 +327,7 @@ impl<'a> SchemaImporter<'a> {
     }
 
     /// Parse SurrealDB export statements into structured schema
-    fn parse_schema_statements(&self, statements: Vec<String>) -> Result<SchemaDefinition, String> {
+    fn parse_schema_statements(&self, statements: Vec<String>) -> Result<SchemaDefinition> {
         let mut tables = HashMap::new();
         let edges = HashMap::new();
         let mut accesses = Vec::new();
@@ -697,7 +705,7 @@ impl<'a> SchemaImporter<'a> {
                 .next()?
                 .trim_start_matches('`')
                 .trim_end_matches('`');
-            (format!("{}[*]", actual_name), Some(actual_name.to_string()))
+            (format!("{actual_name}[*]"), Some(actual_name.to_string()))
         } else {
             let name = after_field
                 .split_whitespace()
@@ -718,7 +726,7 @@ impl<'a> SchemaImporter<'a> {
         let mut in_quotes = false;
         let mut quote_char = ' ';
 
-        for (i, ch) in after_type.chars().enumerate() {
+        for (i, ch) in after_type.char_indices() {
             // Handle quotes
             if !in_quotes && (ch == '\'' || ch == '"') {
                 in_quotes = true;
@@ -779,7 +787,7 @@ impl<'a> SchemaImporter<'a> {
                 let mut in_quotes = false;
                 let mut quote_char = ' ';
 
-                for (i, ch) in after_default.chars().enumerate() {
+                for (i, ch) in after_default.char_indices() {
                     if !in_quotes && (ch == '\'' || ch == '"') {
                         in_quotes = true;
                         quote_char = ch;

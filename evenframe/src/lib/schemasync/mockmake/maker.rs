@@ -65,15 +65,15 @@ pub enum RegexComponent {
     // Character classes
     CharClass(Vec<char>),
     CharRange(char, char),
-    DigitClass,    // \d or [0-9]
-    HexClass,      // [0-9a-fA-F]
-    AlphaClass,    // [a-zA-Z]
-    LowerClass,    // [a-z]
-    UpperClass,    // [A-Z]
-    AlphaNumClass, // [a-zA-Z0-9]
-    Base64Class,   // [A-Za-z0-9+/]
+    DigitClass,      // \d or [0-9]
+    HexClass,        // [0-9a-fA-F]
+    AlphaClass,      // [a-zA-Z]
+    LowerClass,      // [a-z]
+    UpperClass,      // [A-Z]
+    AlphaNumClass,   // [a-zA-Z0-9]
+    Base64Class,     // [A-Za-z0-9+/]
     WhitespaceClass, // \s
-    AnyChar,       // . (any character except newline)
+    AnyChar,         // . (any character except newline)
 
     // Quantifiers
     Repeat {
@@ -92,7 +92,7 @@ pub enum RegexComponent {
 
     // Special patterns
     Optional(Box<RegexComponent>),
-    
+
     // Numeric range pattern
     NumericRange {
         min: u32,
@@ -103,6 +103,7 @@ pub enum RegexComponent {
 }
 
 /// A regex pattern generator that creates random strings matching regex patterns
+#[derive(Default)]
 pub struct Maker {
     rng: rand::rngs::ThreadRng,
 }
@@ -133,7 +134,10 @@ impl Maker {
         let components = self.parse_pattern(pattern)?;
         #[cfg(test)]
         println!("Parsed components: {:?}", components);
-        tracing::trace!(component_count = components.len(), "Pattern parsed successfully");
+        tracing::trace!(
+            component_count = components.len(),
+            "Pattern parsed successfully"
+        );
         let result = self.generate_from_components(&components);
         tracing::trace!(
             pattern = %pattern,
@@ -147,7 +151,7 @@ impl Maker {
         tracing::trace!(pattern = %pattern, "Parsing regex pattern");
         // Remove anchors ^ and $
         let pattern = pattern.trim_start_matches('^').trim_end_matches('$');
-        
+
         // Check if this is a top-level alternation (but not inside parentheses)
         let mut paren_depth = 0;
         let mut has_top_level_pipe = false;
@@ -162,7 +166,7 @@ impl Maker {
                 _ => {}
             }
         }
-        
+
         if has_top_level_pipe {
             // Handle top-level alternation
             return Ok(vec![self.parse_alternation(pattern)?]);
@@ -250,12 +254,13 @@ impl Maker {
                 '(' => {
                     let group_content = self.parse_group(&mut chars);
                     // Check for non-capturing group
-                    if group_content.starts_with("?:") {
-                        let non_capturing_content = &group_content[2..];
+                    if let Some(non_capturing_content) = &group_content.strip_prefix("?:") {
                         if non_capturing_content.contains('|') {
                             components.push(self.parse_alternation(non_capturing_content)?);
                         } else {
-                            components.push(RegexComponent::Group(self.parse_pattern(non_capturing_content)?));
+                            components.push(RegexComponent::Group(
+                                self.parse_pattern(non_capturing_content)?,
+                            ));
                         }
                     } else if group_content.contains('|') {
                         components.push(self.parse_alternation(&group_content)?);
@@ -291,7 +296,9 @@ impl Maker {
                 }
                 '-' if chars.peek() == Some(&'?') => {
                     chars.next(); // consume '?'
-                    components.push(RegexComponent::Optional(Box::new(RegexComponent::Literal("-".to_string()))));
+                    components.push(RegexComponent::Optional(Box::new(RegexComponent::Literal(
+                        "-".to_string(),
+                    ))));
                 }
                 _ => {
                     components.push(RegexComponent::Literal(ch.to_string()));
@@ -310,7 +317,7 @@ impl Maker {
         let mut class_content = String::new();
         let mut bracket_count = 1;
 
-        while let Some(ch) = chars.next() {
+        for ch in chars.into_iter() {
             if ch == '[' {
                 bracket_count += 1;
             } else if ch == ']' {
@@ -341,17 +348,23 @@ impl Maker {
             "1-9" => RegexComponent::CharClass(vec!['1', '2', '3', '4', '5', '6', '7', '8', '9']),
             "A-Za-z\\s" => {
                 let mut chars = Vec::new();
-                for c in 'A'..='Z' { chars.push(c); }
-                for c in 'a'..='z' { chars.push(c); }
+                for c in 'A'..='Z' {
+                    chars.push(c);
+                }
+                for c in 'a'..='z' {
+                    chars.push(c);
+                }
                 chars.push(' ');
                 RegexComponent::CharClass(chars)
-            },
+            }
             "a-z\\s" => {
                 let mut chars = Vec::new();
-                for c in 'a'..='z' { chars.push(c); }
+                for c in 'a'..='z' {
+                    chars.push(c);
+                }
                 chars.push(' ');
                 RegexComponent::CharClass(chars)
-            },
+            }
             content if content.contains('-') && content.len() == 3 => {
                 let chars: Vec<char> = content.chars().collect();
                 if chars[1] == '-' {
@@ -369,7 +382,7 @@ impl Maker {
                 // Handle character sets like [s.\-] or specific character lists
                 let mut result_chars = Vec::new();
                 let mut content_chars = class_content.chars().peekable();
-                
+
                 while let Some(ch) = content_chars.next() {
                     match ch {
                         '\\' => {
@@ -379,28 +392,28 @@ impl Maker {
                                     's' => {
                                         result_chars.push(' ');
                                         result_chars.push('\t');
-                                    },
+                                    }
                                     'd' => {
                                         // Add digits
                                         for c in '0'..='9' {
                                             result_chars.push(c);
                                         }
-                                    },
+                                    }
                                     '-' | '.' | '+' | '[' | ']' => {
                                         result_chars.push(escaped);
-                                    },
+                                    }
                                     _ => result_chars.push(escaped),
                                 }
                             }
-                        },
+                        }
                         _ => result_chars.push(ch),
                     }
                 }
-                
+
                 // Remove duplicates
                 result_chars.sort();
                 result_chars.dedup();
-                
+
                 RegexComponent::CharClass(result_chars)
             }
         };
@@ -413,7 +426,7 @@ impl Maker {
     ) -> Result<(usize, Option<usize>)> {
         let mut quantifier_content = String::new();
 
-        while let Some(ch) = chars.next() {
+        for ch in chars.into_iter() {
             if ch == '}' {
                 break;
             }
@@ -447,7 +460,7 @@ impl Maker {
         let mut group_content = String::new();
         let mut paren_count = 1;
 
-        while let Some(ch) = chars.next() {
+        for ch in chars.into_iter() {
             if ch == '(' {
                 paren_count += 1;
             } else if ch == ')' {
@@ -461,32 +474,33 @@ impl Maker {
 
         group_content
     }
-    
+
     fn is_numeric_range_alternation(&self, alternatives: &[String]) -> bool {
         // Check if all alternatives are numeric patterns
         alternatives.iter().all(|alt| {
             // Check for patterns like "25[0-5]", "2[0-4][0-9]", "[01]?[0-9][0-9]?", "[0-9]"
-            alt.chars().all(|c| c.is_ascii_digit() || c == '[' || c == ']' || c == '-' || c == '?')
+            alt.chars()
+                .all(|c| c.is_ascii_digit() || c == '[' || c == ']' || c == '-' || c == '?')
         })
     }
-    
+
     fn parse_numeric_range_alternation(&self, alternatives: &[String]) -> Option<RegexComponent> {
         // Try to detect common numeric range patterns
         // For example: "0?[0-9]|1[0-1]" (0-11), "[0-1]?[0-9]|2[0-3]" (0-23), etc.
-        
+
         let mut min = u32::MAX;
         let mut max = 0u32;
         let mut has_leading_zeros = false;
         let mut min_digits = usize::MAX;
         let mut max_digits = 0;
-        
+
         for alt in alternatives {
-            if let Some((alt_min, alt_max, alt_digits)) = self.analyze_numeric_pattern(alt) {
+            if let Some((alt_min, alt_max, alt_digits)) = Self::analyze_numeric_pattern(alt) {
                 min = min.min(alt_min);
                 max = max.max(alt_max);
                 min_digits = min_digits.min(alt_digits);
                 max_digits = max_digits.max(alt_digits);
-                
+
                 // Check if any alternative has leading zeros
                 if alt.starts_with('0') || alt.contains("[0") {
                     has_leading_zeros = true;
@@ -495,33 +509,37 @@ impl Maker {
                 return None;
             }
         }
-        
+
         if min <= max {
             Some(RegexComponent::NumericRange {
                 min,
                 max,
                 leading_zeros: has_leading_zeros,
-                digits: if min_digits == max_digits { Some(min_digits) } else { None },
+                digits: if min_digits == max_digits {
+                    Some(min_digits)
+                } else {
+                    None
+                },
             })
         } else {
             None
         }
     }
-    
-    fn analyze_numeric_pattern(&self, pattern: &str) -> Option<(u32, u32, usize)> {
+
+    fn analyze_numeric_pattern(pattern: &str) -> Option<(u32, u32, usize)> {
         // Analyze patterns like "25[0-5]", "2[0-4][0-9]", "[01]?[0-9]"
-        
+
         // Simple single digit
         if pattern.len() == 1 && pattern.chars().next()?.is_ascii_digit() {
             let digit = pattern.parse::<u32>().ok()?;
             return Some((digit, digit, 1));
         }
-        
+
         // Pattern like "[0-9]"
         if pattern == "[0-9]" {
             return Some((0, 9, 1));
         }
-        
+
         // Pattern like "[0-5]"
         if pattern.len() == 5 && pattern.starts_with('[') && pattern.ends_with(']') {
             let inner = &pattern[1..4];
@@ -531,7 +549,7 @@ impl Maker {
                 return Some((start, end, 1));
             }
         }
-        
+
         // Pattern like "2[0-4]" or "25[0-5]"
         if let Some(bracket_pos) = pattern.find('[') {
             let prefix = &pattern[..bracket_pos];
@@ -555,53 +573,53 @@ impl Maker {
                 }
             }
         }
-        
+
         // Pattern like "[01]?[0-9]"
         if pattern == "[01]?[0-9]" {
             return Some((0, 19, 1)); // Can be 0-9 or 10-19
         }
-        
+
         // Pattern like "[0-1]?[0-9]"
         if pattern == "[0-1]?[0-9]" {
             return Some((0, 19, 1)); // Can be 0-9 or 10-19
         }
-        
+
         // Pattern like "[0-2]?[0-9]"
         if pattern == "[0-2]?[0-9]" {
             return Some((0, 29, 1)); // Can be 0-9 or 10-29
         }
-        
+
         // Pattern like "0?[0-9]"
         if pattern == "0?[0-9]" {
             return Some((0, 9, 1)); // With optional leading zero
         }
-        
+
         // Pattern like "[0-9]{1,2}"
         if pattern == "[0-9]{1,2}" {
             return Some((0, 99, 1));
         }
-        
+
         // Pattern like "[0-9]{1,4}"
         if pattern == "[0-9]{1,4}" {
             return Some((0, 9999, 1));
         }
-        
+
         // Pattern like "[01]?[0-9][0-9]?"
         if pattern == "[01]?[0-9][0-9]?" {
             return Some((0, 199, 1)); // Can be 0-199
         }
-        
+
         // Pattern like "\\d{1,2}"
         if pattern == "\\d{1,2}" {
             return Some((0, 99, 1));
         }
-        
+
         // Pattern like "(\\d{1,2})"
         if pattern.starts_with('(') && pattern.ends_with(')') {
-            let inner = &pattern[1..pattern.len()-1];
-            return self.analyze_numeric_pattern(inner);
+            let inner = &pattern[1..pattern.len() - 1];
+            return Self::analyze_numeric_pattern(inner);
         }
-        
+
         None
     }
 
@@ -611,9 +629,9 @@ impl Maker {
         let mut alternatives = Vec::new();
         let mut current = String::new();
         let mut paren_depth = 0;
-        let mut chars = content.chars();
-        
-        while let Some(ch) = chars.next() {
+        let chars = content.chars();
+
+        for ch in chars.into_iter() {
             match ch {
                 '(' => {
                     paren_depth += 1;
@@ -633,19 +651,19 @@ impl Maker {
                 }
             }
         }
-        
+
         // Don't forget the last alternative
         if !current.is_empty() {
             alternatives.push(current.trim().to_string());
         }
-        
+
         // Try to detect numeric range patterns
         if self.is_numeric_range_alternation(&alternatives) {
             if let Some(range) = self.parse_numeric_range_alternation(&alternatives) {
                 return Ok(range);
             }
         }
-        
+
         let parsed_alternatives: Result<Vec<Vec<RegexComponent>>> = alternatives
             .into_iter()
             .map(|alt| self.parse_pattern(&alt))
@@ -655,7 +673,10 @@ impl Maker {
     }
 
     fn generate_from_components(&mut self, components: &[RegexComponent]) -> String {
-        tracing::trace!(component_count = components.len(), "Generating from components");
+        tracing::trace!(
+            component_count = components.len(),
+            "Generating from components"
+        );
         let mut result = String::new();
 
         for component in components {
@@ -717,7 +738,7 @@ impl Maker {
                 let idx = self.rng.random_range(0..BASE64_CHARS.len());
                 BASE64_CHARS.chars().nth(idx).unwrap().to_string()
             }
-            
+
             RegexComponent::WhitespaceClass => {
                 // Return a space most of the time, occasionally a tab
                 if self.rng.random_bool(0.9) {
@@ -726,7 +747,7 @@ impl Maker {
                     "\t".to_string()
                 }
             }
-            
+
             RegexComponent::AnyChar => {
                 // Generate a random printable ASCII character
                 // Exclude single quotes to avoid SQL injection issues
@@ -755,7 +776,7 @@ impl Maker {
             RegexComponent::Group(components) => {
                 // Generate the content of the group
                 self.generate_from_components(components)
-            },
+            }
 
             RegexComponent::Alternation(alternatives) => {
                 let idx = self.rng.random_range(0..alternatives.len());
@@ -770,18 +791,23 @@ impl Maker {
                     String::new()
                 }
             }
-            
-            RegexComponent::NumericRange { min, max, leading_zeros, digits } => {
+
+            RegexComponent::NumericRange {
+                min,
+                max,
+                leading_zeros,
+                digits,
+            } => {
                 let num = self.rng.random_range(*min..=*max);
                 let mut result = num.to_string();
-                
+
                 if let Some(d) = digits {
                     if *leading_zeros && result.len() < *d {
                         // Pad with leading zeros
                         result = format!("{:0width$}", num, width = d);
                     }
                 }
-                
+
                 result
             }
         }
@@ -906,7 +932,7 @@ mod tests {
     #[test]
     fn test_ip_address_pattern() {
         let mut gen = Maker::new();
-        
+
         // Test the full IP address pattern
         let ip_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
         let result = gen.generate(ip_pattern);
@@ -917,13 +943,15 @@ mod tests {
                 let parts: Vec<&str> = ip.split('.').collect();
                 assert_eq!(parts.len(), 4, "IP should have 4 parts, got: {}", ip);
                 for part in parts {
-                    let num: u32 = part.parse().expect(&format!("Each part should be a number, got: {}", part));
+                    let num: u32 = part
+                        .parse()
+                        .unwrap_or_else(|_| panic!("Each part should be a number, got: {part}"));
                     assert!(num <= 255, "Each octet should be <= 255, got: {}", num);
                 }
             }
-            Err(e) => panic!("Failed to generate IP: {:?}", e)
+            Err(e) => panic!("Failed to generate IP: {:?}", e),
         }
-        
+
         // Run it multiple times to ensure it's stable
         for _ in 0..5 {
             let ip = gen.generate(ip_pattern).unwrap();
@@ -931,39 +959,46 @@ mod tests {
             assert!(ip.split('.').count() == 4);
         }
     }
-    
+
     #[test]
     fn test_numeric_range_patterns() {
         let mut gen = Maker::new();
-        
+
         // Test patterns with numeric ranges
         let test_cases = vec![
-            ("0?[0-9]|1[0-1]", 0, 11),  // Months 0-11
-            ("[0-1]?[0-9]|2[0-3]", 0, 23),  // Hours 0-23
-            ("[0-5]?[0-9]", 0, 59),  // Minutes/seconds 0-59
-            ("[0-2]?[0-9]", 0, 29),  // Days 0-29
-            ("\\d{1,2}", 0, 99),  // Any 1-2 digit number
-            ("\\d{1,4}", 0, 9999),  // Any 1-4 digit number
+            ("0?[0-9]|1[0-1]", 0, 11),     // Months 0-11
+            ("[0-1]?[0-9]|2[0-3]", 0, 23), // Hours 0-23
+            ("[0-5]?[0-9]", 0, 59),        // Minutes/seconds 0-59
+            ("[0-2]?[0-9]", 0, 29),        // Days 0-29
+            ("\\d{1,2}", 0, 99),           // Any 1-2 digit number
+            ("\\d{1,4}", 0, 9999),         // Any 1-4 digit number
         ];
-        
+
         for (pattern, min, max) in test_cases {
             println!("Testing pattern: {}", pattern);
-            
+
             // Generate multiple times to check range
             for _ in 0..10 {
                 let result = gen.generate(pattern).unwrap();
-                let num: u32 = result.parse().expect(&format!("Should be a number: {}", result));
-                assert!(num >= min && num <= max, 
-                    "Pattern {} generated {} which is outside range {}-{}", 
-                    pattern, num, min, max);
+                let num: u32 = result
+                    .parse()
+                    .unwrap_or_else(|_| panic!("Should be a number: {result}"));
+                assert!(
+                    num >= min && num <= max,
+                    "Pattern {} generated {} which is outside range {}-{}",
+                    pattern,
+                    num,
+                    min,
+                    max
+                );
             }
         }
     }
-    
+
     #[test]
     fn test_15_minute_intervals() {
         let mut gen = Maker::new();
-        
+
         // Test 15-minute interval patterns
         let patterns = vec![
             ("(0|15|30|45)", "Simple alternation"),
@@ -971,20 +1006,20 @@ mod tests {
             (r"\d{2}:(00|15|30|45)", "Time with 15-min intervals"),
             (r"\d{2}:(00|15|30|45):\d{2}", "Full time HH:MM:SS"),
         ];
-        
+
         for (pattern, desc) in patterns {
             println!("Testing {}: {}", desc, pattern);
             for _ in 0..5 {
                 let result = gen.generate(pattern).unwrap();
                 println!("  Generated: {}", result);
-                
+
                 // Validate 15-minute intervals
                 if pattern.contains("(00|15|30|45)") || pattern.contains("(0|15|30|45)") {
-                    let has_valid_minutes = result.contains("00") || 
-                                          result.contains("15") || 
-                                          result.contains("30") || 
-                                          result.contains("45") ||
-                                          result.ends_with("0");
+                    let has_valid_minutes = result.contains("00")
+                        || result.contains("15")
+                        || result.contains("30")
+                        || result.contains("45")
+                        || result.ends_with("0");
                     assert!(has_valid_minutes, "Should contain valid 15-minute interval");
                 }
             }
@@ -995,7 +1030,7 @@ mod tests {
     #[test]
     fn test_duration_pattern() {
         let mut gen = Maker::new();
-        
+
         // Test simpler duration components first
         let simple_patterns = vec![
             ("P\\d{1,2}Y", "Year only"),
@@ -1006,7 +1041,7 @@ mod tests {
             ("PT([0-5]?[0-9])M", "Minute only"),
             ("PT([0-5]?[0-9])S", "Second only"),
         ];
-        
+
         for (pattern, desc) in simple_patterns {
             println!("Testing {}: {}", desc, pattern);
             match gen.generate(pattern) {
@@ -1019,51 +1054,73 @@ mod tests {
                 }
             }
         }
-        
+
         // Test the actual Duration format pattern
         let duration_pattern = r"^P((\d{1,2}Y)?(0?[0-9]|1[0-1]M)?(\d{1,4}W)?([0-2]?[0-9]D)?)?(T([0-1]?[0-9]|2[0-3]H)?([0-5]?[0-9]M)?([0-5]?[0-9](\.\d{1,3})?S)?)?$";
-        
+
         println!("\nTesting actual Duration format pattern");
         for i in 0..10 {
             match gen.generate(duration_pattern) {
                 Ok(duration) => {
-                    println!("  Duration {}: {}", i+1, duration);
+                    println!("  Duration {}: {}", i + 1, duration);
                     assert!(duration.starts_with('P'), "Duration should start with P");
-                    
+
                     // Validate normalized ranges
                     if duration.contains('M') && !duration.contains('T') {
                         // Month is in date part
-                        let month_match = duration.split('M').next().unwrap()
-                            .chars().rev().take_while(|c| c.is_ascii_digit())
-                            .collect::<String>().chars().rev().collect::<String>();
+                        let month_match = duration
+                            .split('M')
+                            .next()
+                            .unwrap()
+                            .chars()
+                            .rev()
+                            .take_while(|c| c.is_ascii_digit())
+                            .collect::<String>()
+                            .chars()
+                            .rev()
+                            .collect::<String>();
                         if let Ok(month) = month_match.parse::<u32>() {
                             assert!(month <= 11, "Month should be 0-11, got {}", month);
                         }
                     }
-                    
+
                     if duration.contains('D') && !duration.contains('T') {
                         // Day is in date part
-                        let day_match = duration.split('D').next().unwrap()
-                            .chars().rev().take_while(|c| c.is_ascii_digit())
-                            .collect::<String>().chars().rev().collect::<String>();
+                        let day_match = duration
+                            .split('D')
+                            .next()
+                            .unwrap()
+                            .chars()
+                            .rev()
+                            .take_while(|c| c.is_ascii_digit())
+                            .collect::<String>()
+                            .chars()
+                            .rev()
+                            .collect::<String>();
                         if let Ok(day) = day_match.parse::<u32>() {
                             assert!(day <= 29, "Day should be 0-29, got {}", day);
                         }
                     }
-                    
+
                     if let Some(t_pos) = duration.find('T') {
-                        let time_part = &duration[t_pos+1..];
-                        
+                        let time_part = &duration[t_pos + 1..];
+
                         if time_part.contains('H') {
                             let hour_match = time_part.split('H').next().unwrap();
                             if let Ok(hour) = hour_match.parse::<u32>() {
                                 assert!(hour <= 23, "Hour should be 0-23, got {}", hour);
                             }
                         }
-                        
+
                         if time_part.contains('M') {
                             let min_part = if time_part.contains('H') {
-                                time_part.split('H').nth(1).unwrap().split('M').next().unwrap()
+                                time_part
+                                    .split('H')
+                                    .nth(1)
+                                    .unwrap()
+                                    .split('M')
+                                    .next()
+                                    .unwrap()
                             } else {
                                 time_part.split('M').next().unwrap()
                             };
@@ -1071,22 +1128,34 @@ mod tests {
                                 assert!(min <= 59, "Minute should be 0-59, got {}", min);
                             }
                         }
-                        
+
                         if time_part.contains('S') {
                             let sec_part = if time_part.contains('M') {
-                                time_part.split('M').last().unwrap().split('S').next().unwrap()
+                                time_part
+                                    .split('M')
+                                    .next_back()
+                                    .unwrap()
+                                    .split('S')
+                                    .next()
+                                    .unwrap()
                             } else if time_part.contains('H') {
-                                time_part.split('H').last().unwrap().split('S').next().unwrap()
+                                time_part
+                                    .split('H')
+                                    .next_back()
+                                    .unwrap()
+                                    .split('S')
+                                    .next()
+                                    .unwrap()
                             } else {
                                 time_part.split('S').next().unwrap()
                             };
-                            
+
                             let sec_int = if sec_part.contains('.') {
                                 sec_part.split('.').next().unwrap()
                             } else {
                                 sec_part
                             };
-                            
+
                             if let Ok(sec) = sec_int.parse::<u32>() {
                                 assert!(sec <= 59, "Second should be 0-59, got {}", sec);
                             }
@@ -1094,7 +1163,7 @@ mod tests {
                     }
                 }
                 Err(e) => {
-                    println!("  Error {}: {:?}", i+1, e);
+                    println!("  Error {}: {:?}", i + 1, e);
                 }
             }
         }

@@ -36,6 +36,7 @@ use crate::{
     types::{StructConfig, TaggedUnion},
 };
 
+#[derive(Default)]
 pub struct Schemasync<'a> {
     // Input parameters - set via builder methods
     tables: Option<&'a HashMap<String, TableConfig>>,

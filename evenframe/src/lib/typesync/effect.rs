@@ -1,14 +1,9 @@
-use crate::types::{FieldType, TaggedUnion, VariantData};
+use crate::dependency::{analyse_recursion, deps_of, RecursionInfo};
 use crate::types::StructConfig;
+use crate::types::{FieldType, TaggedUnion, VariantData};
 use crate::validator::{
     ArrayValidator, BigDecimalValidator, BigIntValidator, DateValidator, DurationValidator,
     NumberValidator, StringValidator, Validator,
-};
-use crate::{
- 
-        dependency::{analyse_recursion, deps_of, RecursionInfo},
-       
-   
 };
 use convert_case::{Case, Casing};
 use petgraph::{algo::toposort, graphmap::DiGraphMap};
@@ -26,7 +21,7 @@ pub fn generate_effect_schema_string(
         print_types = print_types,
         "Generating Effect Schema string"
     );
-    
+
     // 1.  analyse once
     tracing::debug!("Analyzing recursion in types");
     let rec = analyse_recursion(structs, enums);
@@ -36,14 +31,14 @@ pub fn generate_effect_schema_string(
     tracing::debug!("Generating encoded interfaces for structs");
     for sc in structs.values() {
         tracing::trace!(struct_name = %sc.name, "Generating encoded interface");
-        out_encoded.push_str(&encoded_interface_for_struct(sc, structs, enums));
+        out_encoded.push_str(&encoded_interface_for_struct(sc));
     }
 
     /* every union/enum gets a type alias */
     tracing::debug!("Generating encoded aliases for enums");
     for e in enums.values() {
         tracing::trace!(enum_name = %e.enum_name, "Generating encoded alias");
-        out_encoded.push_str(&encoded_alias_for_enum(e, structs, enums));
+        out_encoded.push_str(&encoded_alias_for_enum(e));
     }
 
     // 2.  topologically sort components so all **non-recursive**
@@ -78,7 +73,7 @@ pub fn generate_effect_schema_string(
 
     // helper closure for field conversion that has access to `rec`
     let to_schema = |ft: &FieldType, cur: &str, proc: &HashSet<String>| -> String {
-        field_type_to_effect_schema(ft, structs, enums, cur, &rec, &proc)
+        field_type_to_effect_schema(ft, structs, cur, &rec, proc)
     };
 
     for comp_id in ordered_comps {
@@ -121,7 +116,10 @@ pub fn generate_effect_schema_string(
                     "export type {}Type = typeof {}.Type;\n",
                     name, name
                 ));
-            } else if let Some(sc) = structs.values().find(|sc| sc.name.to_case(Case::Pascal) == name) {
+            } else if let Some(sc) = structs
+                .values()
+                .find(|sc| sc.name.to_case(Case::Pascal) == name)
+            {
                 // ---- struct --------------------------------------------------
                 out_classes.push_str(&format!(
                     "export class {} extends Schema.Class<{}>(\"{}\")( {{\n",
@@ -159,17 +157,16 @@ pub fn generate_effect_schema_string(
     } else {
         format!("{out_classes}\n{out_encoded}")
     };
-    
-    tracing::info!(output_length = result.len(), "Effect Schema generation complete");
+
+    tracing::info!(
+        output_length = result.len(),
+        "Effect Schema generation complete"
+    );
     result
 }
 
 // ----- for classes ---------------------------------------------------------
-fn encoded_interface_for_struct(
-    struct_config: &StructConfig,
-    structs: &HashMap<String, StructConfig>,
-    enums: &HashMap<String, TaggedUnion>,
-) -> String {
+fn encoded_interface_for_struct(struct_config: &StructConfig) -> String {
     let name = struct_config.name.to_case(Case::Pascal);
     let body = struct_config
         .fields
@@ -178,7 +175,7 @@ fn encoded_interface_for_struct(
             format!(
                 "  readonly {}: {};",
                 f.field_name.to_case(Case::Camel),
-                field_type_to_ts_encoded(&f.field_type, structs, enums)
+                field_type_to_ts_encoded(&f.field_type)
             )
         })
         .collect::<Vec<_>>()
@@ -188,11 +185,7 @@ fn encoded_interface_for_struct(
 }
 
 // ----- for unions / enums --------------------------------------------------
-fn encoded_alias_for_enum(
-    en: &TaggedUnion,
-    structs: &HashMap<String, StructConfig>,
-    enums: &HashMap<String, TaggedUnion>,
-) -> String {
+fn encoded_alias_for_enum(en: &TaggedUnion) -> String {
     tracing::trace!(enum_name = %en.enum_name, "Creating encoded alias for enum");
     let name = en.enum_name.to_case(Case::Pascal);
     let union = en
@@ -206,7 +199,7 @@ fn encoded_alias_for_enum(
                         format!("{}Encoded", v.name.to_case(Case::Pascal))
                     }
                     VariantData::DataStructureRef(field_type) => {
-                        field_type_to_ts_encoded(field_type, structs, enums)
+                        field_type_to_ts_encoded(field_type)
                     }
                 }
             }
@@ -221,14 +214,13 @@ fn encoded_alias_for_enum(
 fn field_type_to_effect_schema(
     field_type: &FieldType,
     structs: &HashMap<String, StructConfig>,
-    enums: &HashMap<String, TaggedUnion>,
-    current: &str,       // NEW: name of the type we are expanding
-    rec: &RecursionInfo, // NEW: recursion helper
+    current: &str,
+    rec: &RecursionInfo,
     processed: &HashSet<String>,
 ) -> String {
     // helper to recurse with the same context
     let field = |inner: &FieldType| -> String {
-        field_type_to_effect_schema(inner, structs, enums, current, rec, processed)
+        field_type_to_effect_schema(inner, structs, current, rec, processed)
     };
     match field_type {
         FieldType::String => "Schema.String".to_string(),
@@ -302,13 +294,9 @@ fn field_type_to_effect_schema(
     }
 }
 
-fn field_type_to_ts_encoded(
-    ft: &FieldType,
-    structs: &HashMap<String, StructConfig>,
-    enums: &HashMap<String, TaggedUnion>,
-) -> String {
+fn field_type_to_ts_encoded(ft: &FieldType) -> String {
     // small closure so we don't repeat the arg list everywhere
-    let enc = |f: &FieldType| field_type_to_ts_encoded(f, structs, enums);
+    let enc = |f: &FieldType| field_type_to_ts_encoded(f);
 
     match ft {
         // primitives --------------------------------------------------------
@@ -370,7 +358,7 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
     }
 
     let mut result = schema;
-    
+
     for validator in validators {
         result = match validator {
             // String validators
@@ -390,7 +378,7 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
                 StringValidator::RegexLiteral(format_variant) => format!("{}.pipe(Schema.pattern(/{}/))", result, format_variant.to_owned().into_regex().as_str()),
                 _ => result, // Other validators don't have direct Effect Schema equivalents
             },
-            
+
             // Number validators
             Validator::NumberValidator(nv) => match nv {
                 NumberValidator::GreaterThan(value) => format!("{}.pipe(Schema.greaterThan({}))", result, value.0),
@@ -408,14 +396,14 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
                 NumberValidator::MultipleOf(value) => format!("{}.pipe(Schema.multipleOf({}))", result, value.0),
                 NumberValidator::Uint8 => result, // Schema.Uint8 should be used as base type instead
             },
-            
+
             // Array validators
             Validator::ArrayValidator(av) => match av {
                 ArrayValidator::MinItems(count) => format!("{}.pipe(Schema.minItems({}))", result, count),
                 ArrayValidator::MaxItems(count) => format!("{}.pipe(Schema.maxItems({}))", result, count),
                 ArrayValidator::ItemsCount(count) => format!("{}.pipe(Schema.itemsCount({}))", result, count),
             },
-            
+
             // Date validators
             Validator::DateValidator(dv) => match dv {
                 DateValidator::ValidDate => format!("{}.pipe(Schema.validDate())", result),
@@ -425,7 +413,7 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
                 DateValidator::LessThanOrEqualToDate(date) => format!("{}.pipe(Schema.lessThanOrEqualToDate(new Date(\"{}\")))", result, date),
                 DateValidator::BetweenDate(start, end) => format!("{}.pipe(Schema.betweenDate(new Date(\"{}\"), new Date(\"{}\")))", result, start, end),
             },
-            
+
             // BigInt validators
             Validator::BigIntValidator(biv) => match biv {
                 BigIntValidator::GreaterThanBigInt(value) => format!("{}.pipe(Schema.greaterThanBigInt({}n))", result, value),
@@ -438,7 +426,7 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
                 BigIntValidator::NegativeBigInt => format!("{}.pipe(Schema.negativeBigInt())", result),
                 BigIntValidator::NonPositiveBigInt => format!("{}.pipe(Schema.nonPositiveBigInt())", result),
             },
-            
+
             // BigDecimal validators
             Validator::BigDecimalValidator(bdv) => match bdv {
                 BigDecimalValidator::GreaterThanBigDecimal(value) => format!("{}.pipe(Schema.greaterThanBigDecimal(BigDecimal.unsafeFromNumber({})))", result, value),
@@ -451,7 +439,7 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
                 BigDecimalValidator::NegativeBigDecimal => format!("{}.pipe(Schema.negativeBigDecimal())", result),
                 BigDecimalValidator::NonPositiveBigDecimal => format!("{}.pipe(Schema.nonPositiveBigDecimal())", result),
             },
-            
+
             // Duration validators
             Validator::DurationValidator(dv) => match dv {
                 DurationValidator::GreaterThanDuration(value) => format!("{}.pipe(Schema.greaterThanDuration(\"{}\"))", result, value),
@@ -462,6 +450,6 @@ fn apply_validators_to_schema(schema: String, validators: &[Validator]) -> Strin
             },
         }
     }
-    
+
     result
 }

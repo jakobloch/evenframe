@@ -110,7 +110,7 @@ impl Mockmaker {
                 };
 
             // Query existing IDs
-            let query = format!("SELECT id FROM {};", snake_case_table_name);
+            let query = format!("SELECT id FROM {snake_case_table_name};",);
             tracing::trace!(query = %query, "Querying existing IDs");
             let mut response = self.db.query(query).await.expect(
                 "Something went wrong getting the ids from the db for mock data generation",
@@ -159,7 +159,7 @@ impl Mockmaker {
                 // Generate additional IDs
                 let mut next_id = existing_count + 1;
                 while ids.len() < desired_count {
-                    ids.push(format!("{}:{}", snake_case_table_name, next_id));
+                    ids.push(format!("{snake_case_table_name}:{next_id}"));
                     next_id += 1;
                 }
             }
@@ -268,7 +268,7 @@ impl Mockmaker {
         );
 
         evenframe_log!(
-            &format!("Sorted table order: {:?}", sorted_table_names),
+            &format!("Sorted table order: {sorted_table_names:?}"),
             "results.log",
             true
         );
@@ -470,11 +470,9 @@ impl Mockmaker {
             let mut formatted_sum = 0.0;
 
             // Format all but the last value
-            for i in 0..generated_values.len() - 1 {
-                let formatted = format!("{:.1}", generated_values[i]);
-                let parsed = formatted
-                    .parse::<f64>()
-                    .unwrap_or_else(|_| generated_values[i]);
+            for value in generated_values {
+                let formatted = format!("{:.1}", value);
+                let parsed = formatted.parse::<f64>().unwrap_or(value);
                 formatted_sum += parsed;
                 formatted_values.push(formatted);
             }
@@ -978,16 +976,14 @@ impl Mockmaker {
                     .collect();
                 format!("{{ {} }}", entries.join(", "))
             }
-            FieldType::RecordLink(inner) => {
-                return self.generate_field_value_with_coordination(
-                    gen_details,
-                    field_name,
-                    None,
-                    inner,
-                    None,
-                    coordinated_values,
-                );
-            }
+            FieldType::RecordLink(inner) => self.generate_field_value_with_coordination(
+                gen_details,
+                field_name,
+                None,
+                inner,
+                None,
+                coordinated_values,
+            ),
             // For other types, try to see if the type is actually a reference to another table, a server-only schema, or an enum.
             FieldType::Other(ref type_name) => {
                 let snake_case_name = type_name.to_case(Case::Snake);

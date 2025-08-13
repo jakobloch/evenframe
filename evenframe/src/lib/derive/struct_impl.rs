@@ -1,8 +1,6 @@
 use crate::{
     derive::{
-        attributes::{
-            parse_format_attribute, parse_mock_data_attribute, parse_relation_attribute,
-        },
+        attributes::{parse_format_attribute, parse_mock_data_attribute, parse_relation_attribute},
         deserialization_impl::generate_custom_deserialize,
         imports::generate_struct_imports,
         type_parser::parse_data_type,
@@ -36,8 +34,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 ident.span(),
                 format!("Evenframe derive macro only supports structs with named fields.\n\nExample of a valid struct:\n\nstruct {} {{\n    id: String,\n    name: String,\n}}", ident),
             )
-            .to_compile_error()
-            .into();
+            .to_compile_error();
         };
 
         // Parse struct-level attributes
@@ -49,15 +46,14 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         input.span(),
                         format!("Failed to parse permissions configuration: {}\n\nExample usage:\n#[permissions(\n    select = \"true\",\n    create = \"auth.role == 'admin'\",\n    update = \"$auth.id == id\",\n    delete = \"false\"\n)]\nstruct MyStruct {{ ... }}", err)
                     )
-                    .to_compile_error()
-                    .into();
+                    .to_compile_error();
             }
         };
 
         // Parse mock_data attribute
         let mock_data_config = match parse_mock_data_attribute(&input.attrs) {
             Ok(config) => config,
-            Err(err) => return err.to_compile_error().into(),
+            Err(err) => return err.to_compile_error(),
         };
 
         // Parse table-level validators using the same parser as field validators
@@ -68,15 +64,14 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                     input.span(),
                     format!("Failed to parse table validators: {}\n\nExample usage:\n#[validators(StringValidator::MinLength(5))]\nstruct MyStruct {{ ... }}", err)
                 )
-                .to_compile_error()
-                .into();
+                .to_compile_error();
             }
         };
 
         // Parse relation attribute
         let relation_config = match parse_relation_attribute(&input.attrs) {
             Ok(config) => config,
-            Err(err) => return err.to_compile_error().into(),
+            Err(err) => return err.to_compile_error(),
         };
 
         // Check if an "id" field exists.
@@ -112,8 +107,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         field.span(),
                         "Internal error: Field identifier is missing. This should not happen with named fields."
                     )
-                    .to_compile_error()
-                    .into();
+                    .to_compile_error();
                 }
             };
             let field_name = field_ident.to_string();
@@ -132,8 +126,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         field.span(),
                         format!("Failed to parse edge configuration for field '{}': {}\n\nExample usage:\n#[edge(name = \"has_user\", direction = \"from\", to = \"User\")]\npub user: RecordLink<User>", field_name, err)
                     )
-                    .to_compile_error()
-                    .into();
+                    .to_compile_error();
                 }
             };
 
@@ -145,8 +138,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         field.span(),
                         format!("Failed to parse define configuration for field '{}': {}\n\nExample usage:\n#[define(default = \"0\", readonly = true)]\npub count: u32", field_name, err)
                     )
-                    .to_compile_error()
-                    .into();
+                    .to_compile_error();
                 }
             };
 
@@ -161,8 +153,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                             field_name, err
                         ),
                     )
-                    .to_compile_error()
-                    .into();
+                    .to_compile_error();
                 }
             };
 
@@ -174,8 +165,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                         field.span(),
                         format!("Failed to parse validators for field '{}': {}\n\nExample usage:\n#[validate(min_length = 3, max_length = 50)]\npub name: String\n\n#[validate(email)]\npub email: String", field_name, err)
                     )
-                    .to_compile_error()
-                    .into();
+                    .to_compile_error();
                 }
             };
 
@@ -201,7 +191,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 .transpose();
 
             match has_explicit_subquery {
-                Err(err) => return err.to_compile_error().into(),
+                Err(err) => return err.to_compile_error(),
                 Ok(Some(())) => {} // Explicit subquery was added
                 Ok(None) => {
                     // No explicit subquery attribute, generate default from edge config
@@ -385,7 +375,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             }
         };
 
-        output.into()
+        output
     } else {
         error!(
             "Attempted to use derive macro on non-struct type: {}",
@@ -396,6 +386,5 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             format!("The Evenframe derive macro can only be applied to structs.\n\nYou tried to apply it to: {}\n\nExample of correct usage:\n#[derive(Evenframe)]\nstruct MyStruct {{\n    id: String,\n    // ... other fields\n}}", ident)
         )
         .to_compile_error()
-        .into()
     }
 }

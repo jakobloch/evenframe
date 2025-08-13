@@ -83,9 +83,7 @@ impl Mockmaker {
 pub fn random_string(len: usize) -> String {
     use rand::distr::Alphanumeric;
     let mut rng = rand::rng();
-    (0..len)
-        .map(|_| rng.sample(&Alphanumeric) as char)
-        .collect()
+    (0..len).map(|_| rng.sample(Alphanumeric) as char).collect()
 }
 
 /// Generate a CREATE or UPDATE query for SurrealDB using a given schema definition and object
@@ -333,7 +331,7 @@ fn to_surreal_string(field_type: &FieldType, value: &Value) -> String {
                 // Check for "Id" => string
                 if let Some(id_value) = obj.get("Id") {
                     if let Some(id_str) = id_value.as_str() {
-                        format!("r{}", id_str.to_string())
+                        format!("r{id_str}")
                     } else {
                         "null".to_string()
                     }

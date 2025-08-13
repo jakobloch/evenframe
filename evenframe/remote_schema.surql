@@ -8,7 +8,7 @@ OPTION IMPORT;
 -- ACCESSES
 -- ------------------------------
 
-DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'Wa1fh8rVnjMcVWlr6c8kaOBPai2drcZqLain4hD7RwjYBvXUqWUOf2y5XC6yPUIpJGyANdhVsUdTZO6SMaxcuJVUbIXKesF6Xh0yeBJCQs9ak2enG5TIe8mgcXWAWIFZ' WITH ISSUER KEY 'Wa1fh8rVnjMcVWlr6c8kaOBPai2drcZqLain4hD7RwjYBvXUqWUOf2y5XC6yPUIpJGyANdhVsUdTZO6SMaxcuJVUbIXKesF6Xh0yeBJCQs9ak2enG5TIe8mgcXWAWIFZ' DURATION FOR TOKEN 15m, FOR SESSION 6h;
+DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'y9oRHyldz7IAGdnLsul3BTnN8mz9tbb9DD5b8V4HFFxIFfMLHISPdN2cVxepE5iHw8IDjVYdFMCfbClnLSO1Vt2fGnytURLvl7UTrNTOXm2jJWVOiQ1NzXsmWU3knCKK' WITH ISSUER KEY 'y9oRHyldz7IAGdnLsul3BTnN8mz9tbb9DD5b8V4HFFxIFfMLHISPdN2cVxepE5iHw8IDjVYdFMCfbClnLSO1Vt2fGnytURLvl7UTrNTOXm2jJWVOiQ1NzXsmWU3knCKK' DURATION FOR TOKEN 15m, FOR SESSION 6h;
 
 -- ------------------------------
 -- TABLE: account

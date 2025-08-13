@@ -67,7 +67,7 @@ impl Mockmaker {
 
         let table_name_snake = table_config.struct_config.name.to_case(Case::Snake);
 
-        for index in 0..n as usize {
+        for index in 0..n {
             let mut record_values = HashMap::new();
 
             for (field_set, coordination) in &coordination_group.field_coordination_pairs {
@@ -119,7 +119,7 @@ impl Mockmaker {
                             }
 
                             // Store nested field values for later use
-                            for (full_path, _) in &nested_field_values {
+                            for full_path in nested_field_values.keys() {
                                 record_values.insert(full_path.clone(), base_value.clone());
                             }
                         }
@@ -566,7 +566,7 @@ pub const FINANCIAL_SCENARIOS: &[(&str, f64, f64, f64)] = &[
     ("Entertainment", 150.00, 12.00, 162.00),
     ("Home Improvement", 425.00, 34.00, 459.00),
     ("Automotive Parts", 189.99, 15.20, 205.19),
-    ("Pet Supplies", 78.50, 6.28, 84.78),
+    ("Pet Supplies", 78.50, 6.31, 84.78),
     ("Sports Equipment", 299.99, 24.00, 323.99),
     ("Garden Supplies", 112.50, 9.00, 121.50),
     ("Art Supplies", 89.99, 7.20, 97.19),

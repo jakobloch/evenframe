@@ -91,64 +91,60 @@ impl Mockmaker {
 
             // Then, process remaining fields that weren't coordinated
             for table_field in &table_config.struct_config.fields {
-                if !processed_fields.contains(&table_field.field_name) {
-                    if table_field.edge_config.is_none()
+                if !processed_fields.contains(&table_field.field_name)
+                    && (table_field.edge_config.is_none()
                         || (table_field.define_config.is_some()
-                            && !table_field.define_config.as_ref().unwrap().should_skip)
-                    {
-                        // Skip readonly fields
-                        if let Some(ref define_config) = table_field.define_config {
-                            if let Some(true) = define_config.readonly {
-                                continue;
-                            }
+                            && !table_field.define_config.as_ref().unwrap().should_skip))
+                {
+                    // Skip readonly fields
+                    if let Some(ref define_config) = table_field.define_config {
+                        if let Some(true) = define_config.readonly {
+                            continue;
                         }
-                        let field_val = if let Some(coord_value) = coordinated_values
-                            .get(i)
-                            .and_then(|cv| cv.get(&table_field.field_name))
-                        {
-                            // Use coordinated value if available
-                            match &table_field.field_type {
-                                crate::types::FieldType::DateTime => {
-                                    format!("d'{}'", coord_value)
-                                }
-                                crate::types::FieldType::String => {
-                                    format!("'{}'", coord_value)
-                                }
-                                _ => coord_value.clone(),
+                    }
+                    let field_val = if let Some(coord_value) = coordinated_values
+                        .get(i)
+                        .and_then(|cv| cv.get(&table_field.field_name))
+                    {
+                        // Use coordinated value if available
+                        match &table_field.field_type {
+                            crate::types::FieldType::DateTime => {
+                                format!("d'{}'", coord_value)
                             }
+                            crate::types::FieldType::String => {
+                                format!("'{}'", coord_value)
+                            }
+                            _ => coord_value.clone(),
+                        }
+                    } else {
+                        // Pass coordinated values for nested fields
+                        let field_coordinated_values = if i < coordinated_values.len() {
+                            &coordinated_values[i]
                         } else {
-                            // Pass coordinated values for nested fields
-                            let field_coordinated_values = if i < coordinated_values.len() {
-                                &coordinated_values[i]
-                            } else {
-                                &HashMap::new()
-                            };
-
-                            self.generate_field_value_with_format_and_coordination(
-                                table_field,
-                                table_config,
-                                Some(&table_name.to_string()),
-                                field_coordinated_values,
-                                Some(i),
-                            )
+                            &HashMap::new()
                         };
 
-                        // Check if this field needs null preservation
-                        let needs_conditional = super::needs_null_preservation(
-                            &table_field,
-                            self.tables.get(table_name),
-                        );
+                        self.generate_field_value_with_format_and_coordination(
+                            table_field,
+                            table_config,
+                            Some(&table_name.to_string()),
+                            field_coordinated_values,
+                            Some(i),
+                        )
+                    };
 
-                        if needs_conditional {
-                            // Wrap in conditional to preserve NULL state
-                            field_assignments.push(format!(
-                                "{}: (IF {} != NULL THEN {} ELSE NULL END)",
-                                table_field.field_name, table_field.field_name, field_val
-                            ));
-                        } else {
-                            field_assignments
-                                .push(format!("{}: {field_val}", table_field.field_name));
-                        }
+                    // Check if this field needs null preservation
+                    let needs_conditional =
+                        super::needs_null_preservation(table_field, self.tables.get(table_name));
+
+                    if needs_conditional {
+                        // Wrap in conditional to preserve NULL state
+                        field_assignments.push(format!(
+                            "{}: (IF {} != NULL THEN {} ELSE NULL END)",
+                            table_field.field_name, table_field.field_name, field_val
+                        ));
+                    } else {
+                        field_assignments.push(format!("{}: {field_val}", table_field.field_name));
                     }
                 }
             }

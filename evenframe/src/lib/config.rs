@@ -33,42 +33,37 @@ impl EvenframeConfig {
         dotenv::dotenv().ok();
         debug!("Environment variables loaded from .env");
 
-        let absolute_path = env::var("ABSOLUTE_PATH")
-            .map_err(|e| {
-                error!("ABSOLUTE_PATH environment variable not set: {}", e);
-                EvenframeError::EnvVarNotSet("ABSOLUTE_PATH".to_string())
-            })?;
-        
-        let config_path_string = format!(
-            "{}{}",
-            absolute_path,
-            "/backend/evenframe.toml"
-        );
+        let absolute_path = env::var("ABSOLUTE_PATH").map_err(|e| {
+            error!("ABSOLUTE_PATH environment variable not set: {}", e);
+            EvenframeError::EnvVarNotSet("ABSOLUTE_PATH".to_string())
+        })?;
+
+        let config_path_string = format!("{}{}", absolute_path, "/backend/evenframe.toml");
         debug!("Looking for config file at: {}", config_path_string);
-        
+
         // Try to find evenframe.toml in the backend directory
         let config_path = Path::new(&config_path_string);
 
         if !config_path.exists() {
             error!("Configuration file not found at: {:?}", config_path);
-            return Err(EvenframeError::config("evenframe.toml not found. Configuration file is required."));
+            return Err(EvenframeError::config(
+                "evenframe.toml not found. Configuration file is required.",
+            ));
         }
         info!("Found configuration file at: {:?}", config_path);
 
-        let contents = fs::read_to_string(config_path)
-            .map_err(|e| {
-                error!("Failed to read configuration file: {}", e);
-                e
-            })?;
-        
+        let contents = fs::read_to_string(config_path).map_err(|e| {
+            error!("Failed to read configuration file: {}", e);
+            e
+        })?;
+
         debug!("Configuration file size: {} bytes", contents.len());
-        
-        let mut config: EvenframeConfig = toml::from_str(&contents)
-            .map_err(|e| {
-                error!("Failed to parse TOML configuration: {}", e);
-                e
-            })?;
-        
+
+        let mut config: EvenframeConfig = toml::from_str(&contents).map_err(|e| {
+            error!("Failed to parse TOML configuration: {}", e);
+            e
+        })?;
+
         debug!("Successfully parsed TOML configuration");
 
         // Process environment variable substitutions for all database-related fields
@@ -78,9 +73,10 @@ impl EvenframeConfig {
             Self::substitute_env_vars(&config.schemasync.database.namespace);
         config.schemasync.database.database =
             Self::substitute_env_vars(&config.schemasync.database.database);
-        
+
         info!("Configuration loaded successfully");
-        debug!("Schemasync enabled: {}, Typesync arktype: {}, effect: {}",
+        debug!(
+            "Schemasync enabled: {}, Typesync arktype: {}, effect: {}",
             config.schemasync.should_generate_mocks,
             config.typesync.should_generate_arktype_types,
             config.typesync.should_generate_effect_types
@@ -102,20 +98,25 @@ impl EvenframeConfig {
         for cap in re.captures_iter(value) {
             let var_name = &cap[1];
             let default_value = cap.get(2).map(|m| m.as_str()).unwrap_or("");
-            
+
             trace!("Looking for environment variable: {}", var_name);
-            
+
             let replacement = env::var(var_name)
-                .map_err(|e| {
+                .inspect(|_| {
                     if default_value.is_empty() {
-                        error!("Environment variable {} not set and no default provided", var_name);
+                        error!(
+                            "Environment variable {} not set and no default provided",
+                            var_name
+                        );
                     } else {
-                        warn!("Environment variable {} not set, using default: {}", var_name, default_value);
+                        warn!(
+                            "Environment variable {} not set, using default: {}",
+                            var_name, default_value
+                        );
                     }
-                    e
                 })
-                .expect(&format!("{} was not set", var_name));
-            
+                .unwrap_or_else(|_| panic!("{var_name} was not set"));
+
             let full_match = &cap[0];
             debug!("Replacing {} with value from {}", full_match, var_name);
             result = result.replace(full_match, &replacement);

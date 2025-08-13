@@ -118,10 +118,7 @@ pub fn field_type_to_arktype(
                                 }
                                 VariantData::DataStructureRef(field_type) => field_type,
                             };
-                            format!(
-                                "{}",
-                                field_type_to_arktype(variant_data_field_type, structs, enums)
-                            )
+                            field_type_to_arktype(variant_data_field_type, structs, enums)
                         } else {
                             format!("'{}'", variant.name.to_case(Case::Pascal))
                         }
@@ -157,7 +154,10 @@ pub fn generate_arktype_type_string(
     // First, process all enums
     for schema_enum in enums.values() {
         // Write the Arktype binding name
-        scope_output.push_str(&format!("{}: ", schema_enum.enum_name.to_case(Case::Pascal)));
+        scope_output.push_str(&format!(
+            "{}: ",
+            schema_enum.enum_name.to_case(Case::Pascal)
+        ));
 
         // We'll accumulate the "nesting" into this string.
         let mut union_ast = String::new();
@@ -226,7 +226,7 @@ pub fn generate_arktype_type_string(
                 scope_output.push_str(",\n");
                 defaults_output.push_str(",\n");
             } else {
-                scope_output.push_str("\n");
+                scope_output.push('\n');
             }
         }
 
@@ -247,6 +247,9 @@ pub fn generate_arktype_type_string(
         output.push_str(&format!("{scope_output}\n{defaults_output}"));
     }
 
-    tracing::info!(output_length = output.len(), "Arktype type string generation complete");
+    tracing::info!(
+        output_length = output.len(),
+        "Arktype type string generation complete"
+    );
     output
 }

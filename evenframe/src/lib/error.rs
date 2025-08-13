@@ -112,7 +112,7 @@ pub enum EvenframeError {
     Export(String),
 
     #[error("Comparison error: {0}")]
-    Comparison(String),
+    Comparison(Box<String>),
 
     #[error("Filter error: {0}")]
     Filter(String),
@@ -268,7 +268,7 @@ impl EvenframeError {
     }
 
     pub fn comparison(message: impl Into<String>) -> Self {
-        EvenframeError::Comparison(message.into())
+        EvenframeError::Comparison(Box::new(message.into()))
     }
 
     pub fn filter(message: impl Into<String>) -> Self {

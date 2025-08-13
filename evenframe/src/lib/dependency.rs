@@ -77,7 +77,11 @@ pub fn analyse_recursion(
             g.add_edge(from.as_str(), to.as_str(), ());
         }
     }
-    tracing::trace!(node_count = g.node_count(), edge_count = g.edge_count(), "Graph built");
+    tracing::trace!(
+        node_count = g.node_count(),
+        edge_count = g.edge_count(),
+        "Graph built"
+    );
 
     // Strongly connected components
     tracing::debug!("Finding strongly connected components");
@@ -118,7 +122,10 @@ pub fn deps_of(
     let mut acc = HashSet::new();
 
     // If `name` is a struct, walk its fields
-    if let Some(sc) = structs.values().find(|sc| sc.name.to_case(Case::Pascal) == name) {
+    if let Some(sc) = structs
+        .values()
+        .find(|sc| sc.name.to_case(Case::Pascal) == name)
+    {
         tracing::trace!(struct_name = %sc.name, field_count = sc.fields.len(), "Walking struct fields for dependencies");
         for f in &sc.fields {
             collect_refs(&f.field_type, &known, &mut acc);
@@ -172,7 +179,10 @@ pub fn collect_refs(ft: &FieldType, known: &HashSet<String>, acc: &mut HashSet<S
 pub fn analyse_recursion_tables(
     tables: &HashMap<String, crate::schemasync::TableConfig>,
 ) -> RecursionInfo {
-    tracing::info!(table_count = tables.len(), "Analyzing recursion in table dependencies");
+    tracing::info!(
+        table_count = tables.len(),
+        "Analyzing recursion in table dependencies"
+    );
     // Convert tables to structs for analysis
     let structs: HashMap<String, StructConfig> = tables
         .iter()
@@ -196,7 +206,10 @@ pub fn deps_of_table(
     tracing::debug!(table_name = %table_name, "Getting dependencies of table");
     // Build set of known table names in PascalCase
     let known: HashSet<_> = tables.keys().map(|s| s.to_case(Case::Pascal)).collect();
-    tracing::trace!(known_table_count = known.len(), "Built set of known table names");
+    tracing::trace!(
+        known_table_count = known.len(),
+        "Built set of known table names"
+    );
 
     // Build a map from PascalCase to original table names
     let pascal_to_original: HashMap<String, String> = tables
@@ -221,10 +234,14 @@ pub fn deps_of_table(
     }
 
     // Convert PascalCase dependencies back to original table names
-    let result: HashSet<String> = acc.into_iter()
+    let result: HashSet<String> = acc
+        .into_iter()
         .filter_map(|pascal_name| pascal_to_original.get(&pascal_name).cloned())
         .collect();
-    tracing::debug!(dependency_count = result.len(), "Table dependencies collected");
+    tracing::debug!(
+        dependency_count = result.len(),
+        "Table dependencies collected"
+    );
     result
 }
 
@@ -270,7 +287,10 @@ fn collect_table_dependencies(
         }
 
         // Analyze each field in the table
-        tracing::trace!(field_count = table.struct_config.fields.len(), "Analyzing table fields");
+        tracing::trace!(
+            field_count = table.struct_config.fields.len(),
+            "Analyzing table fields"
+        );
         for field in &table.struct_config.fields {
             collect_field_type_dependencies(
                 &field.field_type,
@@ -493,7 +513,10 @@ pub fn sort_tables_by_dependencies(
     // Detect strongly connected components for circular dependencies
     tracing::debug!("Detecting strongly connected components");
     let sccs = petgraph::algo::kosaraju_scc(&graph);
-    tracing::info!(scc_count = sccs.len(), "Found strongly connected components");
+    tracing::info!(
+        scc_count = sccs.len(),
+        "Found strongly connected components"
+    );
 
     // Build condensation graph (DAG of SCCs)
     tracing::debug!("Building condensation graph");
@@ -523,7 +546,7 @@ pub fn sort_tables_by_dependencies(
         Ok(order) => {
             tracing::debug!("Topological sort successful");
             order
-        },
+        }
         Err(_) => {
             // If there's still a cycle (shouldn't happen with SCC), fall back to arbitrary order
             tracing::warn!("Cycle detected in SCC condensation graph, using arbitrary order");
@@ -598,10 +621,7 @@ pub fn sort_tables_by_dependencies(
             true
         );
         // Add tables with no dependencies at the beginning
-        result = missing_tables
-            .into_iter()
-            .chain(result.into_iter())
-            .collect();
+        result = missing_tables.into_iter().chain(result).collect();
     }
 
     tracing::info!(
