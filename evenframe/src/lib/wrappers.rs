@@ -13,7 +13,7 @@ impl From<String> for EvenframeRecordId {
     fn from(value: String) -> Self {
         let mut parts = value.splitn(2, ':');
         let key = parts.next().unwrap_or("");
-        let val = parts.next().unwrap_or("").replace('⟩', "").replace('⟨', "");
+        let val = parts.next().unwrap_or("").replace(['⟨', '⟩'], "");
         EvenframeRecordId((key, val).into())
     }
 }
@@ -38,7 +38,11 @@ impl EvenframeRecordId {
 
 impl fmt::Display for EvenframeRecordId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_string().replace("⟩", "").replace("⟨", ""))
+        write!(
+            f,
+            "{}",
+            self.0.to_string().replace("⟩", "").replace("⟨", "")
+        )
     }
 }
 impl serde::Serialize for EvenframeRecordId {
@@ -47,7 +51,7 @@ impl serde::Serialize for EvenframeRecordId {
         S: serde::Serializer,
     {
         // Use the to_string method on the inner RecordId
-        serializer.serialize_str(&self.0.to_string().replace("⟩", "").replace("⟨", ""))
+        serializer.serialize_str(&self.0.to_string().replace(['⟨', '⟩'], ""))
     }
 }
 impl<'de> Deserialize<'de> for EvenframeRecordId {
@@ -71,7 +75,7 @@ impl<'de> Deserialize<'de> for EvenframeRecordId {
             {
                 let mut parts = value.splitn(2, ':');
                 let key = parts.next().unwrap_or("");
-                let val = parts.next().unwrap_or("").replace('⟩', "").replace('⟨', "");
+                let val = parts.next().unwrap_or("").replace(['⟨', '⟩'], "");
                 Ok(EvenframeRecordId((key, val).into()))
             }
 
@@ -104,7 +108,7 @@ impl<'de> Deserialize<'de> for EvenframeRecordId {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvenframePhantomData<T>(pub PhantomData<T>);
 

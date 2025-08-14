@@ -63,7 +63,7 @@ pub fn build_all_configs() -> (
     // First pass: Parse all structs and enums to build struct_configs
     for (file_path, file_types) in &types_by_file {
         trace!("Processing file: {}", file_path);
-        let content = match fs::read_to_string(&file_path) {
+        let content = match fs::read_to_string(file_path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Error reading file {}: {}", file_path, e);
@@ -85,9 +85,8 @@ pub fn build_all_configs() -> (
             match item {
                 Item::Struct(item_struct) => {
                     // Check if this struct is in our list of Evenframe types
-                    if let Some(evenframe_type) = file_types
-                        .iter()
-                        .find(|t| t.name == item_struct.ident.to_string())
+                    if let Some(evenframe_type) =
+                        file_types.iter().find(|&t| item_struct.ident == t.name)
                     {
                         debug!("Found Evenframe struct: {}", item_struct.ident);
                         if let Some(config) = parse_struct_config(&item_struct) {
@@ -122,10 +121,7 @@ pub fn build_all_configs() -> (
                 }
                 Item::Enum(item_enum) => {
                     // Check if this enum is in our list of Evenframe types
-                    if file_types
-                        .iter()
-                        .any(|t| t.name == item_enum.ident.to_string())
-                    {
+                    if file_types.iter().any(|t| item_enum.ident == t.name) {
                         debug!("Found Evenframe enum: {}", item_enum.ident);
                         if let Some(tagged_union) = parse_enum_config(&item_enum) {
                             enum_configs
@@ -203,7 +199,7 @@ fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
         .unwrap_or_default();
 
     Some(StructConfig {
-        name: name, // Keep original name, don't convert to snake_case
+        name, // Keep original name, don't convert to snake_case
         fields,
         validators: table_validators
             .into_iter()

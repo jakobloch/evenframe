@@ -364,10 +364,10 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                         }
                         _ => {
                             let missing = vec![
-                                edge_name.is_none().then(|| "edge_name"),
-                                from.is_none().then(|| "from"),
-                                to.is_none().then(|| "to"),
-                                direction.is_none().then(|| "direction"),
+                                edge_name.is_none().then_some("edge_name"),
+                                from.is_none().then_some("from"),
+                                to.is_none().then_some("to"),
+                                direction.is_none().then_some("direction"),
                             ]
                             .into_iter()
                             .flatten()

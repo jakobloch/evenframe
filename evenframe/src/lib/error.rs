@@ -22,7 +22,7 @@ pub enum EvenframeError {
     TomlSerialize(#[from] toml::ser::Error),
 
     #[error("Database error: {0}")]
-    Database(#[from] surrealdb::Error),
+    Database(Box<String>),
 
     #[error("Configuration error: {0}")]
     Config(String),
@@ -112,7 +112,7 @@ pub enum EvenframeError {
     Export(String),
 
     #[error("Comparison error: {0}")]
-    Comparison(Box<String>),
+    Comparison(String),
 
     #[error("Filter error: {0}")]
     Filter(String),
@@ -177,6 +177,10 @@ impl EvenframeError {
             file: file.into(),
             message: message.into(),
         }
+    }
+
+    pub fn database(message: impl Into<String>) -> Self {
+        EvenframeError::Database(Box::new(message.into()))
     }
 
     pub fn config(message: impl Into<String>) -> Self {
@@ -268,7 +272,7 @@ impl EvenframeError {
     }
 
     pub fn comparison(message: impl Into<String>) -> Self {
-        EvenframeError::Comparison(Box::new(message.into()))
+        EvenframeError::Comparison(message.into())
     }
 
     pub fn filter(message: impl Into<String>) -> Self {

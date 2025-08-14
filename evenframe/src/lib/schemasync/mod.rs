@@ -98,7 +98,14 @@ impl<'a> Schemasync<'a> {
         );
         trace!("Database name: {}", config.schemasync.database.database);
 
-        let db = Surreal::new::<Http>(&config.schemasync.database.url).await?;
+        let db = Surreal::new::<Http>(&config.schemasync.database.url)
+            .await
+            .map_err(|e| {
+                EvenframeError::database(format!(
+                    "There was a problem creating the HTTP surrealdb client: {e}"
+                ))
+            })
+            .unwrap();
         debug!("Created SurrealDB connection");
 
         let username = std::env::var("SURREALDB_USER")
@@ -111,12 +118,18 @@ impl<'a> Schemasync<'a> {
             username: &username,
             password: &password,
         })
-        .await?;
+        .await
+        .map_err(|e| {
+            EvenframeError::database(format!("There was a problem signing in as root: {e}"))
+        })?;
         debug!("Successfully signed in to SurrealDB");
 
         db.use_ns(&config.schemasync.database.namespace)
             .use_db(&config.schemasync.database.database)
-            .await?;
+            .await
+            .map_err(|e| {
+                EvenframeError::database(format!("There was a problem using to the namespace: {e}"))
+            })?;
         info!(
             "Connected to database namespace '{}' and database '{}'",
             config.schemasync.database.namespace, config.schemasync.database.database
@@ -272,7 +285,11 @@ impl<'a> Schemasync<'a> {
             evenframe_log!(&define_stmts, "define_statements.surql", true);
 
             // Execute and check define statements
-            let _ = new_schema.query(&define_stmts).await?;
+            let _ = new_schema.query(&define_stmts).await.map_err(|e| {
+                EvenframeError::database(format!(
+                    "There was a problem executing the define statements on the new_schema embedded db: {e}"
+                ))
+            });
             let define_result = execute_and_validate(db, &define_stmts, "define", "all").await;
             match define_result {
                 Ok(_) => evenframe_log!(

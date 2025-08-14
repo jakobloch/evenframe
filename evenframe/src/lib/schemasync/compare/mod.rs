@@ -13,7 +13,7 @@ use crate::{
         TableConfig,
     },
     types::{FieldType, StructConfig, StructField, TaggedUnion, VariantData},
-    Result,
+    EvenframeError, Result,
 };
 pub use import::SchemaImporter;
 use import::{AccessDefinition, FieldDefinition, ObjectType, SchemaDefinition, TableDefinition};
@@ -304,7 +304,7 @@ impl<'a> Merger<'a> {
                             for field in &table_config.struct_config.fields {
                                 if !map.contains_key(&field.field_name) {
                                     // This is a new field, generate value
-                                    let new_value = self.generate_field_value(field, table_config);
+                                    let new_value = Self::generate_field_value(field, table_config);
                                     map.insert(field.field_name.clone(), new_value);
                                 }
                             }
@@ -318,7 +318,7 @@ impl<'a> Merger<'a> {
                                     .find(|f| &f.field_name == field_name)
                                 {
                                     // Generate new value for this field
-                                    let new_value = self.generate_field_value(field, table_config);
+                                    let new_value = Self::generate_field_value(field, table_config);
                                     map.insert(field_name.clone(), new_value);
                                 }
                             }
@@ -367,19 +367,14 @@ impl<'a> Merger<'a> {
                             target_count
                         );
 
-                        // Preserve only up to target count when explicitly requested
-                        let preserve_count = target_count;
-
-                        for i in 0..preserve_count {
-                            let mut record = existing_records[i].clone();
-
+                        for mut record in existing_records {
                             // Only add new fields that don't exist
                             if let Value::Object(ref mut map) = record {
                                 for field in &table_config.struct_config.fields {
                                     if !map.contains_key(&field.field_name) {
                                         // This is a new field, generate value
                                         let new_value =
-                                            self.generate_field_value(field, table_config);
+                                            Self::generate_field_value(field, table_config);
                                         map.insert(field.field_name.clone(), new_value);
                                     }
                                 }
@@ -389,16 +384,14 @@ impl<'a> Merger<'a> {
                         }
                     } else {
                         // Normal case: preserve all existing records
-                        for i in 0..existing_count {
-                            let mut record = existing_records[i].clone();
-
+                        for mut record in existing_records {
                             // Only add new fields that don't exist
                             if let Value::Object(ref mut map) = record {
                                 for field in &table_config.struct_config.fields {
                                     if !map.contains_key(&field.field_name) {
                                         // This is a new field, generate value
                                         let new_value =
-                                            self.generate_field_value(field, table_config);
+                                            Self::generate_field_value(field, table_config);
                                         map.insert(field.field_name.clone(), new_value);
                                     }
                                 }
@@ -442,7 +435,7 @@ impl<'a> Merger<'a> {
 
             // Generate values for each field
             for field in &table_config.struct_config.fields {
-                let value = self.generate_field_value(field, table_config);
+                let value = Self::generate_field_value(field, table_config);
                 record.insert(field.field_name.clone(), value);
             }
 
@@ -454,7 +447,6 @@ impl<'a> Merger<'a> {
 
     /// Generate a value for a specific field
     fn generate_field_value(
-        &self,
         field: &crate::types::StructField,
         _table_config: &TableConfig,
     ) -> serde_json::Value {
@@ -506,7 +498,7 @@ impl<'a> Merger<'a> {
             }
             FieldType::Timezone => {
                 // Generate random IANA timezone string
-                let timezones = vec![
+                let timezones = [
                     "UTC",
                     "America/New_York",
                     "America/Los_Angeles",
@@ -530,7 +522,7 @@ impl<'a> Merger<'a> {
                         validators: Vec::new(),
                         always_regenerate: false,
                     };
-                    self.generate_field_value(&inner_field, _table_config)
+                    Self::generate_field_value(&inner_field, _table_config)
                 } else {
                     json!(null)
                 }
@@ -1700,7 +1692,12 @@ pub async fn export_schemas(
         .records(false)
         .params(false)
         .users(false)
-        .await?;
+        .await
+        .map_err(|e| {
+            EvenframeError::database(format!(
+                "There was a problem exporting the 'remote_schema' embedded database's schema: {e}"
+            ))
+        })?;
     let mut remote_schema_string = String::new();
     std::io::Read::read_to_string(
         &mut std::fs::File::open("remote_schema.surql")?,
@@ -1719,7 +1716,12 @@ pub async fn export_schemas(
         .records(false)
         .params(false)
         .users(false)
-        .await?;
+        .await
+        .map_err(|e| {
+            EvenframeError::database(format!(
+                "There was a problem exporting the 'new_schema' embedded database's schema: {e}"
+            ))
+        })?;
     let mut new_schema_string = String::new();
     std::io::Read::read_to_string(
         &mut std::fs::File::open("new_schema.surql")?,
@@ -1733,7 +1735,11 @@ pub async fn export_schemas(
 
 pub async fn setup_backup_and_schemas(db: &Surreal<Client>) -> Result<(Surreal<Db>, Surreal<Db>)> {
     tracing::trace!("Creating database backup");
-    db.export("backup.surql").await?;
+    db.export("backup.surql").await.map_err(|e| {
+        EvenframeError::database(format!(
+            "There was a problem exporting the remote database to 'backup.surql': {e}"
+        ))
+    })?;
     let remote_schema = Surreal::new::<Mem>(())
         .await
         .expect("Something went wrong starting the remote_schema in-memory db");
@@ -1743,17 +1749,38 @@ pub async fn setup_backup_and_schemas(db: &Surreal<Client>) -> Result<(Surreal<D
         .expect("Something went wrong reading the file to string");
 
     tracing::trace!("Importing backup to remote in-memory schema");
-    remote_schema.use_ns("remote").use_db("backup").await?;
     remote_schema
-        .query(&backup)
+        .use_ns("remote")
+        .use_db("backup")
         .await
-        .expect("Something went wrong importing the remote schema to the in-memory db");
+        .map_err(|e| {
+            EvenframeError::database(format!(
+                "There was a problem using the namespace or db for 'remote_schema': {e}"
+            ))
+        })?;
 
-    let new_schema = Surreal::new::<Mem>(())
-        .await
-        .expect("Something went wrong starting the new_schema in-memory db");
+    remote_schema.query(&backup).await.map_err(|e| {
+        EvenframeError::database(format!(
+            "Something went wrong importing the remote schema to the in-memory db: {e}"
+        ))
+    })?;
+
+    let new_schema = Surreal::new::<Mem>(()).await.map_err(|e| {
+        EvenframeError::database(format!(
+            "Something went wrong starting the new_schema in-memory db: {e}"
+        ))
+    })?;
+
     tracing::trace!("Setting up new in-memory schema");
-    new_schema.use_ns("new").use_db("memory").await?;
+    new_schema
+        .use_ns("new")
+        .use_db("memory")
+        .await
+        .map_err(|e| {
+            EvenframeError::database(format!(
+                "There was a problem exporting the 'remote_schema' embedded database's schema: {e}"
+            ))
+        })?;
 
     tracing::trace!("In-memory schemas ready");
     Ok((remote_schema, new_schema))
