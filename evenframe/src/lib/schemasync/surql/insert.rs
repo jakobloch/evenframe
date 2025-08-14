@@ -1,4 +1,5 @@
 use crate::evenframe_log;
+use crate::mockmake::field_value::FieldValueGenerator;
 use crate::mockmake::Mockmaker;
 use crate::types::FieldType;
 use crate::{coordinate::TableInsertsState, schemasync::table::TableConfig};
@@ -227,12 +228,25 @@ impl Mockmaker {
                                 continue;
                             }
                         }
-                        let field_val = self.generate_field_value_with_format(
-                            table_field,
-                            table_config,
-                            Some(&table_name.to_string()),
-                            Some(i),
-                        );
+
+                        let field_val = FieldValueGenerator::builder()
+                            .coordinated_values(&coordinated_values[i])
+                            .field(&table_field)
+                            .id_index(&i)
+                            .mockmaker(self)
+                            .table_config(table_config)
+                            .build()
+                            .run();
+
+                        // let field_val = self.generate_field_value_with_coordination(
+                        //     table_config,
+                        //     table_field.field_name,
+                        //     Some(&table_name.to_string()),
+                        //     table_field.field_type,
+                        //     &table_field.format,
+                        //     Some(i),
+                        //     &coordinated_values,
+                        // );
                         evenframe_log!(
                             format!(
                                 "Generated value for field '{}': {}",

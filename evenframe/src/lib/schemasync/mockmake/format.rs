@@ -1,4 +1,4 @@
-use super::maker::Maker;
+use super::regex_val_gen::RegexValGen;
 use chrono::{Datelike, Duration, Utc};
 use quote::{quote, ToTokens};
 use regex::Regex;
@@ -132,7 +132,7 @@ impl Format {
         let regex: Regex = self.clone().into();
         let pattern = regex.as_str();
 
-        let mut maker = Maker::new();
+        let mut maker = RegexValGen::new();
 
         let result = maker
             .generate(pattern)

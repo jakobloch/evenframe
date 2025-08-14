@@ -1,4 +1,8 @@
-use crate::{coordinate::TableInsertsState, mockmake::Mockmaker, schemasync::table::TableConfig};
+use crate::{
+    coordinate::TableInsertsState,
+    mockmake::{field_value::FieldValueGenerator, Mockmaker},
+    schemasync::table::TableConfig,
+};
 use convert_case::{Case, Casing};
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, info};
@@ -123,14 +127,22 @@ impl Mockmaker {
                         } else {
                             &HashMap::new()
                         };
+                        FieldValueGenerator::builder()
+                            .coordinated_values(field_coordinated_values)
+                            .field(&table_field)
+                            .id_index(&i)
+                            .mockmaker(self)
+                            .table_config(table_config)
+                            .build()
+                            .run()
 
-                        self.generate_field_value_with_format_and_coordination(
-                            table_field,
-                            table_config,
-                            Some(&table_name.to_string()),
-                            field_coordinated_values,
-                            Some(i),
-                        )
+                        // self.generate_field_value_with_format_and_coordination(
+                        //     table_field,
+                        //     table_config,
+                        //     Some(&table_name.to_string()),
+                        //     field_coordinated_values,
+                        //     Some(i),
+                        // )
                     };
 
                     // Check if this field needs null preservation

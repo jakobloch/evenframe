@@ -6,11 +6,9 @@ pub mod remove;
 pub mod upsert;
 
 use crate::{
-    mockmake::Mockmaker,
     schemasync::table::TableConfig,
-    types::{FieldType, StructConfig, StructField},
+    types::{FieldType, StructField},
 };
-use rand::Rng;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -57,33 +55,6 @@ fn needs_null_preservation(field: &StructField, original_table: Option<&TableCon
     }
 
     false
-}
-
-impl Mockmaker {
-    pub fn generate_server_only_inline(
-        &self,
-        gen_details: &TableConfig,
-        struct_config: &StructConfig,
-    ) -> String {
-        let mut assignments = Vec::new();
-        for table_field in &struct_config.fields {
-            let val = self.generate_field_value_with_format(
-                table_field,
-                gen_details,
-                None, // table_name
-                None, // id_index
-            );
-            assignments.push(format!("{}: {val}", table_field.field_name));
-        }
-        // Surreal accepts JSON-like objects with unquoted keys:
-        format!("{{ {} }}", assignments.join(", "))
-    }
-}
-
-pub fn random_string(len: usize) -> String {
-    use rand::distr::Alphanumeric;
-    let mut rng = rand::rng();
-    (0..len).map(|_| rng.sample(Alphanumeric) as char).collect()
 }
 
 /// Generate a CREATE or UPDATE query for SurrealDB using a given schema definition and object

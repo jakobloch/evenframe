@@ -25,6 +25,7 @@ use surrealdb::engine::local::{Db, Mem};
 use surrealdb::{engine::remote::http::Client, Surreal};
 use tracing;
 
+#[derive(Debug)]
 pub struct Comparator {
     db: Surreal<Client>,
     schemasync_config: crate::schemasync::config::SchemasyncConfig,
@@ -476,7 +477,7 @@ impl<'a> Merger<'a> {
 
         // Generate based on field type
         match &field.field_type {
-            FieldType::String => json!(crate::schemasync::random_string(8)),
+            FieldType::String => json!(crate::schemasync::Mockmaker::random_string(8)),
             FieldType::Bool => json!(rand::random::<bool>()),
             FieldType::U8
             | FieldType::U16

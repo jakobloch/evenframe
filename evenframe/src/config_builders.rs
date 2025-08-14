@@ -275,31 +275,6 @@ fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
     })
 }
 
-/// Resolve a field path that may contain dot notation
-/// e.g., "recurrence_rule.recurrence_begins" validates that recurrence_rule is an Option<RecurrenceRule>
-/// and that RecurrenceRule has a field recurrence_begins
-fn resolve_field_path(path: &str, _struct_configs: &HashMap<String, StructConfig>) -> String {
-    // For simple fields without dots, just return as-is
-    if !path.contains('.') {
-        return path.to_string();
-    }
-
-    // Split the path into segments
-    let segments: Vec<&str> = path.split('.').collect();
-    if segments.len() != 2 {
-        // For now, only support one level of nesting
-        debug!("Complex nested path '{}' not fully validated", path);
-        return path.to_string();
-    }
-
-    // The field name is the first segment (e.g., "recurrence_rule")
-    // The nested field is the second segment (e.g., "recurrence_begins")
-    // We would validate this if we had access to the parent struct's fields
-    // For now, trust that the user provided a valid path
-
-    path.to_string()
-}
-
 pub fn merge_tables_and_objects(
     tables: &HashMap<String, TableConfig>,
     objects: &HashMap<String, StructConfig>,

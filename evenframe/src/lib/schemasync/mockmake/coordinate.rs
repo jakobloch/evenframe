@@ -105,7 +105,7 @@ impl Mockmaker {
                                         crate::types::FieldType::DateTime => {
                                             chrono::Utc::now().to_rfc3339()
                                         }
-                                        _ => crate::schemasync::random_string(8),
+                                        _ => crate::schemasync::Mockmaker::random_string(8),
                                     }
                                 }
                             } else {

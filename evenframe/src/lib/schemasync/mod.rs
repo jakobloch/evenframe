@@ -19,7 +19,7 @@ use tracing::{debug, error, info, trace};
 pub use edge::{Direction, EdgeConfig, Subquery};
 pub use mockmake::{coordinate, format};
 pub use permissions::PermissionsConfig;
-pub use surql::{define::DefineConfig, generate_query, random_string, QueryType};
+pub use surql::{define::DefineConfig, generate_query, QueryType};
 use surrealdb::{
     engine::{
         local::Db,

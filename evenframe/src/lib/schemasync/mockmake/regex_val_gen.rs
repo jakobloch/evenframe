@@ -1,13 +1,13 @@
 //! Regex pattern generator that creates random strings matching regex patterns.
 //!
-//! This module provides a `Maker` that can parse simple regex patterns
+//! This module provides a `RegexValGen` that can parse simple regex patterns
 //! and generate random strings that match those patterns.
 //!
 //! # Example
 //! ```ignore
-//! use maker::Maker;
+//! use maker::RegexValGen;
 //!
-//! let mut generator = Maker::new();
+//! let mut generator = RegexValGen::new();
 //! let result = generator.generate(r"[a-z]{3}\d{2}").unwrap();
 //! // Might generate: "abc12"
 //! ```
@@ -104,14 +104,14 @@ pub enum RegexComponent {
 
 /// A regex pattern generator that creates random strings matching regex patterns
 #[derive(Default)]
-pub struct Maker {
+pub struct RegexValGen {
     rng: rand::rngs::ThreadRng,
 }
 
-impl Maker {
-    /// Creates a new Maker instance
+impl RegexValGen {
+    /// Creates a new RegexValGen instance
     pub fn new() -> Self {
-        tracing::trace!("Creating new Maker instance");
+        tracing::trace!("Creating new RegexValGen instance");
         Self { rng: rand::rng() }
     }
 
@@ -820,14 +820,14 @@ mod tests {
 
     #[test]
     fn test_literal_pattern() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("hello").unwrap();
         assert_eq!(result, "hello");
     }
 
     #[test]
     fn test_digit_class() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate(r"\d").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_digit()));
         assert_eq!(result.len(), 1);
@@ -835,7 +835,7 @@ mod tests {
 
     #[test]
     fn test_char_range() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("[a-z]").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_lowercase()));
         assert_eq!(result.len(), 1);
@@ -843,14 +843,14 @@ mod tests {
 
     #[test]
     fn test_invalid_char_range() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("[z-a]");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_quantifier_exact() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate(r"\d{5}").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_digit()));
         assert_eq!(result.len(), 5);
@@ -858,7 +858,7 @@ mod tests {
 
     #[test]
     fn test_quantifier_range() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("[a-z]{2,4}").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_lowercase()));
         assert!(result.len() >= 2 && result.len() <= 4);
@@ -866,42 +866,42 @@ mod tests {
 
     #[test]
     fn test_invalid_quantifier() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("a{5,3}");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_optional() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("ab?c").unwrap();
         assert!(result == "abc" || result == "ac");
     }
 
     #[test]
     fn test_group() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("(abc)def").unwrap();
         assert_eq!(result, "abcdef");
     }
 
     #[test]
     fn test_alternation() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("(cat|dog)").unwrap();
         assert!(result == "cat" || result == "dog");
     }
 
     #[test]
     fn test_escaped_chars() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate(r"\+\*\?").unwrap();
         assert_eq!(result, "+*?");
     }
 
     #[test]
     fn test_complex_pattern() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate(r"[A-Z][a-z]{2,4}\d{2}").unwrap();
         let chars: Vec<char> = result.chars().collect();
         assert!(chars[0].is_ascii_uppercase());
@@ -913,7 +913,7 @@ mod tests {
 
     #[test]
     fn test_hex_class() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("[0-9a-fA-F]{8}").unwrap();
         assert_eq!(result.len(), 8);
         assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
@@ -921,7 +921,7 @@ mod tests {
 
     #[test]
     fn test_base64_class() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
         let result = gen.generate("[A-Za-z0-9+/]{4}").unwrap();
         assert_eq!(result.len(), 4);
         assert!(result
@@ -931,7 +931,7 @@ mod tests {
 
     #[test]
     fn test_ip_address_pattern() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
 
         // Test the full IP address pattern
         let ip_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
@@ -962,7 +962,7 @@ mod tests {
 
     #[test]
     fn test_numeric_range_patterns() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
 
         // Test patterns with numeric ranges
         let test_cases = vec![
@@ -997,7 +997,7 @@ mod tests {
 
     #[test]
     fn test_15_minute_intervals() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
 
         // Test 15-minute interval patterns
         let patterns = vec![
@@ -1029,7 +1029,7 @@ mod tests {
 
     #[test]
     fn test_duration_pattern() {
-        let mut gen = Maker::new();
+        let mut gen = RegexValGen::new();
 
         // Test simpler duration components first
         let simple_patterns = vec![
