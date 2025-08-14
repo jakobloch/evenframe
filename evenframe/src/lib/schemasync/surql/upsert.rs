@@ -129,7 +129,7 @@ impl Mockmaker {
                         };
                         FieldValueGenerator::builder()
                             .coordinated_values(field_coordinated_values)
-                            .field(&table_field)
+                            .field(table_field)
                             .id_index(&i)
                             .mockmaker(self)
                             .table_config(table_config)

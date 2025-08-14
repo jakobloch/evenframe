@@ -76,23 +76,21 @@ impl<'a> FieldValueGenerator<'a> {
                 let tz = &TZ_VARIANTS[rng.random_range(0..TZ_VARIANTS.len())];
                 format!("'{}'", tz.name())
             }
-            FieldType::EvenframeRecordId => {
-                return self.handle_record_id(
-                    &self.field.field_name,
-                    &self.table_config.struct_config.name,
-                    &mut rng,
-                )
-            }
+            FieldType::EvenframeRecordId => self.handle_record_id(
+                &self.field.field_name,
+                &self.table_config.struct_config.name,
+                &mut rng,
+            ),
             // For an Option, randomly decide whether to generate a value or use NULL.
-            FieldType::Option(inner_type) => self.handle_option(&inner_type, &mut rng),
+            FieldType::Option(inner_type) => self.handle_option(inner_type, &mut rng),
             // For a vector, generate a dummy array with a couple of elements.
-            FieldType::Vec(inner_type) => self.handle_vec(&inner_type),
+            FieldType::Vec(inner_type) => self.handle_vec(inner_type),
             // For a tuple, recursively generate values for each component.
-            FieldType::Tuple(types) => self.handle_tuple(&types),
+            FieldType::Tuple(types) => self.handle_tuple(types),
             // For a struct (named fields), create a JSON-like object.
-            FieldType::Struct(fields) => self.handle_struct(&fields),
-            FieldType::HashMap(key, value) => self.handle_hash_map(&key, &value),
-            FieldType::BTreeMap(key, value) => self.handle_b_tree_map(&key, &value),
+            FieldType::Struct(fields) => self.handle_struct(fields),
+            FieldType::HashMap(key, value) => self.handle_hash_map(key, value),
+            FieldType::BTreeMap(key, value) => self.handle_b_tree_map(key, value),
             FieldType::RecordLink(inner_type) => self.generate_field_value(inner_type),
             // For other types, try to see if the type is actually a reference to another table, a server-only schema, or an enum.
             FieldType::Other(ref type_name) => self.handle_other(type_name, &mut rng),
@@ -104,21 +102,19 @@ impl<'a> FieldValueGenerator<'a> {
 
         // Check if format generates numeric or boolean values that shouldn't be quoted
         match format {
+            // These formats generate numeric values, don't quote
             Format::Percentage
             | Format::Latitude
             | Format::Longitude
             | Format::CurrencyAmount
-            | Format::AppointmentDurationNs => {
-                // These formats generate numeric values, don't quote
-                return generated;
-            }
+            | Format::AppointmentDurationNs => generated,
+
             Format::DateTime | Format::AppointmentDateTime | Format::DateWithinDays(_) => {
-                return format!("d'{}'", generated);
+                format!("d'{}'", generated)
             }
-            _ => {
-                // Most formats generate strings, quote them
-                return format!("'{}'", generated);
-            }
+
+            // Most formats generate strings, quote them
+            _ => format!("'{}'", generated),
         }
     }
 
@@ -199,9 +195,9 @@ impl<'a> FieldValueGenerator<'a> {
 
     fn handle_option(&self, inner_type: &FieldType, rng: &mut ThreadRng) -> String {
         if rng.random_bool(0.5) {
-            return "null".to_string();
+            "null".to_string()
         } else {
-            return self.generate_field_value(inner_type);
+            self.generate_field_value(inner_type)
         }
     }
 
@@ -214,7 +210,7 @@ impl<'a> FieldValueGenerator<'a> {
         format!("[{}]", items.join(", "))
     }
 
-    fn handle_tuple(&self, types: &Vec<FieldType>) -> String {
+    fn handle_tuple(&self, types: &[FieldType]) -> String {
         let values: Vec<String> = types
             .iter()
             .map(|inner_type| self.generate_field_value(inner_type))
@@ -222,7 +218,7 @@ impl<'a> FieldValueGenerator<'a> {
         format!("({})", values.join(", "))
     }
 
-    fn handle_struct(&self, fields: &Vec<(String, FieldType)>) -> String {
+    fn handle_struct(&self, fields: &[(String, FieldType)]) -> String {
         // Build nested coordination context
         let mut nested_coordinated_values = HashMap::new();
         let field_prefix = format!("{}.", self.field.field_name);

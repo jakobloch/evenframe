@@ -231,7 +231,7 @@ impl Mockmaker {
 
                         let field_val = FieldValueGenerator::builder()
                             .coordinated_values(&coordinated_values[i])
-                            .field(&table_field)
+                            .field(table_field)
                             .id_index(&i)
                             .mockmaker(self)
                             .table_config(table_config)
