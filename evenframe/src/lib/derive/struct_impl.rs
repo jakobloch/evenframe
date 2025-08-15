@@ -281,6 +281,8 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         // Generate tokens for parsed attributes (shared between implementations)
         let struct_name = ident.to_string();
 
+        let table_name = ident.to_string();
+
         let permissions_config_tokens = if let Some(ref config) = permissions_config {
             quote! { Some(#config) }
         } else {
@@ -311,8 +313,9 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 impl EvenframePersistableStruct for #ident {
                     fn table_config() -> Option<TableConfig> {
                         Some(TableConfig {
+                            table_name: #table_name.to_case(Case::Snake),
                             struct_config: ::evenframe::types::StructConfig {
-                                name: #struct_name.to_case(Case::Snake),
+                                struct_name: #struct_name.to_owned(),
                                 fields: vec![ #(#table_field_tokens),* ],
                                 validators: #table_validators_tokens,
                             },
