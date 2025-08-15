@@ -63,7 +63,7 @@ impl CoordinationId {
                 == self
                     .field_name
                     .split('.')
-                    .last()
+                    .next_back()
                     .unwrap_or(&self.field_name)
             {
                 return struct_field.clone();
@@ -150,17 +150,19 @@ impl Mockmaker {
                                 .map(|coord_id| coord_id.get_field(self))
                                 .collect();
                             let field_refs: Vec<&StructField> = fields.iter().collect();
-                            
+
                             // Generate sequential values using the dedicated function
-                            let values = Self::generate_sequential_values(&field_refs, index, increment);
-                            
+                            let values =
+                                Self::generate_sequential_values(&field_refs, index, increment);
+
                             // Store the generated values
                             for coordination_id in &coordination_pair.coordinated_fields {
-                                let field_name = coordination_id.field_name
+                                let field_name = coordination_id
+                                    .field_name
                                     .split('.')
-                                    .last()
+                                    .next_back()
                                     .unwrap_or(&coordination_id.field_name);
-                                
+
                                 if let Some(value) = values.get(field_name) {
                                     self.coordinated_values
                                         .insert(coordination_id.clone(), value.clone());
@@ -178,17 +180,18 @@ impl Mockmaker {
                                 .map(|coord_id| coord_id.get_field(self))
                                 .collect();
                             let field_refs: Vec<&StructField> = fields.iter().collect();
-                            
+
                             // Generate sum values using the dedicated function
                             let values = Self::generate_sum_values(&field_refs, index, *total);
-                            
+
                             // Store the generated values
                             for coordination_id in &coordination_pair.coordinated_fields {
-                                let field_name = coordination_id.field_name
+                                let field_name = coordination_id
+                                    .field_name
                                     .split('.')
-                                    .last()
+                                    .next_back()
                                     .unwrap_or(&coordination_id.field_name);
-                                
+
                                 if let Some(value) = values.get(field_name) {
                                     self.coordinated_values
                                         .insert(coordination_id.clone(), value.clone());
@@ -204,13 +207,14 @@ impl Mockmaker {
                             let mut source_fields = Vec::new();
                             let mut source_coord_ids = Vec::new();
                             let mut target_coord_id = None;
-                            
+
                             for coordination_id in &coordination_pair.coordinated_fields {
-                                let field_name = coordination_id.field_name
+                                let field_name = coordination_id
+                                    .field_name
                                     .split('.')
-                                    .last()
+                                    .next_back()
                                     .unwrap_or(&coordination_id.field_name);
-                                
+
                                 if source_field_names.contains(&field_name.to_string()) {
                                     source_fields.push(coordination_id.get_field(self));
                                     source_coord_ids.push(coordination_id.clone());
@@ -218,10 +222,12 @@ impl Mockmaker {
                                     target_coord_id = Some(coordination_id.clone());
                                 }
                             }
-                            
+
                             // Generate source values first
                             let mut source_values_map = HashMap::new();
-                            for (coord_id, field) in source_coord_ids.iter().zip(source_fields.iter()) {
+                            for (coord_id, field) in
+                                source_coord_ids.iter().zip(source_fields.iter())
+                            {
                                 let table_config = self
                                     .tables
                                     .get(&coord_id.table_name)
@@ -233,26 +239,26 @@ impl Mockmaker {
                                     .table_config(table_config)
                                     .build()
                                     .run();
-                                
+
                                 let field_name = field.field_name.clone();
                                 source_values_map.insert(field_name, value.clone());
                                 self.coordinated_values.insert(coord_id.clone(), value);
                             }
-                            
+
                             // Generate derived value using the dedicated function
-                            let source_field_refs: Vec<&StructField> = source_fields.iter().collect();
+                            let source_field_refs: Vec<&StructField> =
+                                source_fields.iter().collect();
                             let derived_values = Self::generate_derive_values(
                                 &source_field_refs,
                                 target_field_name,
                                 derivation,
-                                &source_values_map
+                                &source_values_map,
                             );
-                            
+
                             // Store the derived value
                             if let Some(target_id) = target_coord_id {
                                 if let Some(value) = derived_values.get(target_field_name) {
-                                    self.coordinated_values
-                                        .insert(target_id, value.clone());
+                                    self.coordinated_values.insert(target_id, value.clone());
                                 }
                             }
                         }
@@ -264,20 +270,25 @@ impl Mockmaker {
                                 .map(|coord_id| coord_id.get_field(self))
                                 .collect();
                             let field_refs: Vec<&StructField> = fields.iter().collect();
-                            
+
                             // Generate coherent values using the dedicated function
-                            let values = Self::generate_coherent_values(&field_refs, coherent_dataset, index);
-                            
+                            let values = Self::generate_coherent_values(
+                                &field_refs,
+                                coherent_dataset,
+                                index,
+                            );
+
                             // Store the generated values
                             // For coherent datasets, we need to match the field name from the dataset
                             // to the actual field name which might include a path
                             for coordination_id in &coordination_pair.coordinated_fields {
                                 // Try to match by the last part of the field name
-                                let field_key = coordination_id.field_name
+                                let field_key = coordination_id
+                                    .field_name
                                     .split('.')
-                                    .last()
+                                    .next_back()
                                     .unwrap_or(&coordination_id.field_name);
-                                
+
                                 // Try exact match first
                                 if let Some(value) = values.get(field_key) {
                                     self.coordinated_values
@@ -285,7 +296,9 @@ impl Mockmaker {
                                 } else {
                                     // Try to find a matching key in the values map
                                     for (key, value) in &values {
-                                        if coordination_id.field_name.ends_with(key) || key == field_key {
+                                        if coordination_id.field_name.ends_with(key)
+                                            || key == field_key
+                                        {
                                             self.coordinated_values
                                                 .insert(coordination_id.clone(), value.clone());
                                             break;
@@ -764,7 +777,7 @@ impl Coordination {
                         }
                         _ => {
                             return Err(EvenframeError::Validation(
-                                format!("Field '{}' in path '{}' is not a struct type and cannot have nested fields", 
+                                format!("Field '{}' in path '{}' is not a struct type and cannot have nested fields",
                                     part, coord_id.field_name)
                             ));
                         }
@@ -794,14 +807,14 @@ impl Coordination {
                 for (coord_id, field) in &fields[1..] {
                     if !field_types_compatible(first_type, &field.field_type) {
                         return Err(EvenframeError::Validation(
-                            format!("InitializeEqual: Field '{}' has incompatible type {:?}, expected type compatible with {:?}", 
+                            format!("InitializeEqual: Field '{}' has incompatible type {:?}, expected type compatible with {:?}",
                                 coord_id.field_name, field.field_type, first_type)
                         ));
                     }
 
                     if first_format != &field.format {
                         return Err(EvenframeError::Validation(
-                            format!("InitializeEqual: Field '{}' has format {:?}, but expected format {:?} to match other fields", 
+                            format!("InitializeEqual: Field '{}' has format {:?}, but expected format {:?} to match other fields",
                                 coord_id.field_name, field.format, first_format)
                         ));
                     }
@@ -819,7 +832,7 @@ impl Coordination {
                             FieldType::Option(inner) if matches!(**inner, FieldType::DateTime) => {}
                             _ => {
                                 return Err(EvenframeError::Validation(
-                                        format!("InitializeSequential with time increment: Field '{}' must be DateTime type, got {:?}", 
+                                        format!("InitializeSequential with time increment: Field '{}' must be DateTime type, got {:?}",
                                             coord_id.field_name, field.field_type)
                                     ));
                             }
@@ -827,7 +840,7 @@ impl Coordination {
                         CoordinateIncrement::Numeric(_) => {
                             if !is_numeric_type(&field.field_type) {
                                 return Err(EvenframeError::Validation(
-                                    format!("InitializeSequential with numeric increment: Field '{}' must be numeric type, got {:?}", 
+                                    format!("InitializeSequential with numeric increment: Field '{}' must be numeric type, got {:?}",
                                         coord_id.field_name, field.field_type)
                                 ));
                             }
@@ -846,7 +859,7 @@ impl Coordination {
                         let first_format = &fields[0].1.format;
                         if &field.format != first_format {
                             return Err(EvenframeError::Validation(
-                                format!("InitializeSequential: Field '{}' has format {:?}, but expected format {:?} to match other fields", 
+                                format!("InitializeSequential: Field '{}' has format {:?}, but expected format {:?} to match other fields",
                                     coord_id.field_name, field.format, first_format)
                             ));
                         }
@@ -859,7 +872,7 @@ impl Coordination {
                 for (coord_id, field) in &fields {
                     if !is_numeric_type(&field.field_type) {
                         return Err(EvenframeError::Validation(
-                            format!("InitializeSum: Field '{}' must be numeric type to participate in sum, got {:?}", 
+                            format!("InitializeSum: Field '{}' must be numeric type to participate in sum, got {:?}",
                                 coord_id.field_name, field.field_type)
                         ));
                     }
@@ -895,7 +908,7 @@ impl Coordination {
 
                             if !is_string_like(&source_field.1.field_type) {
                                 return Err(EvenframeError::Validation(
-                                    format!("InitializeDerive with Concatenate: Source field '{}' should be string-like, got {:?}", 
+                                    format!("InitializeDerive with Concatenate: Source field '{}' should be string-like, got {:?}",
                                         source_name, source_field.1.field_type)
                                 ));
                             }
@@ -940,7 +953,7 @@ impl Coordination {
 
                                     if !is_string_like(&source_field.1.field_type) {
                                         return Err(EvenframeError::Validation(
-                                            format!("Extract Domain/Username requires string field, got {:?}", 
+                                            format!("Extract Domain/Username requires string field, got {:?}",
                                                 source_field.1.field_type)
                                         ));
                                     }

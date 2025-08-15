@@ -6,7 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::HashMap;
 use syn::{parenthesized, LitStr};
-use tracing::{debug, info, trace};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct DefineConfig {
@@ -311,12 +311,27 @@ pub fn generate_define_statements(
                 && table_field.field_name != "id")
         {
             if table_field.define_config.is_some() {
-                output.push_str(&table_field.generate_define_statement(
+                match table_field.generate_define_statement(
                     enums.clone(),
                     server_only.clone(),
                     query_details.clone(),
                     &table_name.to_string(),
-                ));
+                ) {
+                    Ok(statement) => output.push_str(&statement),
+                    Err(e) => {
+                        error!(
+                            table_name = %table_name,
+                            field_name = %table_field.field_name,
+                            error = %e,
+                            "Failed to generate define statement for field"
+                        );
+                        // Continue with a fallback definition
+                        output.push_str(&format!(
+                            "DEFINE FIELD OVERWRITE {} ON TABLE {} TYPE any PERMISSIONS FULL;\n",
+                            table_field.field_name, table_name
+                        ));
+                    }
+                }
             } else {
                 output.push_str(&format!(
                     "DEFINE FIELD OVERWRITE {} ON TABLE {} TYPE any PERMISSIONS FULL;\n",

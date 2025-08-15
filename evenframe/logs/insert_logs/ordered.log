@@ -7,11 +7,11 @@ Using pre-generated ID from id_map: ordered:1
 Processing field 'id'
 Generated value for field 'id': r'ordered:1'
 Processing field 'in'
-Generated value for field 'in': r'account:4'
+Generated value for field 'in': r'account:5'
 Processing field 'out'
-Generated value for field 'out': r'order:15'
+Generated value for field 'out': r'order:6'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.979444+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.546469+00:00'
 Prepared 5 field assignments and 2 update assignments for record 0
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -22,9 +22,9 @@ Generated value for field 'id': r'ordered:2'
 Processing field 'in'
 Generated value for field 'in': r'account:7'
 Processing field 'out'
-Generated value for field 'out': r'order:7'
+Generated value for field 'out': r'order:2'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.980436+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.548318+00:00'
 Prepared 5 field assignments and 2 update assignments for record 1
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -33,11 +33,11 @@ Using pre-generated ID from id_map: ordered:3
 Processing field 'id'
 Generated value for field 'id': r'ordered:3'
 Processing field 'in'
-Generated value for field 'in': r'account:2'
+Generated value for field 'in': r'account:10'
 Processing field 'out'
-Generated value for field 'out': r'order:19'
+Generated value for field 'out': r'order:3'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.981296+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.550063+00:00'
 Prepared 5 field assignments and 2 update assignments for record 2
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -46,11 +46,11 @@ Using pre-generated ID from id_map: ordered:4
 Processing field 'id'
 Generated value for field 'id': r'ordered:4'
 Processing field 'in'
-Generated value for field 'in': r'account:13'
+Generated value for field 'in': r'account:8'
 Processing field 'out'
-Generated value for field 'out': r'order:3'
+Generated value for field 'out': r'order:8'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.982178+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.551870+00:00'
 Prepared 5 field assignments and 2 update assignments for record 3
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -59,11 +59,11 @@ Using pre-generated ID from id_map: ordered:5
 Processing field 'id'
 Generated value for field 'id': r'ordered:5'
 Processing field 'in'
-Generated value for field 'in': r'account:2'
+Generated value for field 'in': r'account:9'
 Processing field 'out'
-Generated value for field 'out': r'order:9'
+Generated value for field 'out': r'order:3'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.983051+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.553546+00:00'
 Prepared 5 field assignments and 2 update assignments for record 4
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -72,11 +72,11 @@ Using pre-generated ID from id_map: ordered:6
 Processing field 'id'
 Generated value for field 'id': r'ordered:6'
 Processing field 'in'
-Generated value for field 'in': r'account:5'
+Generated value for field 'in': r'account:10'
 Processing field 'out'
-Generated value for field 'out': r'order:9'
+Generated value for field 'out': r'order:4'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.983889+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.555140+00:00'
 Prepared 5 field assignments and 2 update assignments for record 5
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -85,11 +85,11 @@ Using pre-generated ID from id_map: ordered:7
 Processing field 'id'
 Generated value for field 'id': r'ordered:7'
 Processing field 'in'
-Generated value for field 'in': r'account:9'
+Generated value for field 'in': r'account:7'
 Processing field 'out'
-Generated value for field 'out': r'order:18'
+Generated value for field 'out': r'order:12'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.984800+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.556782+00:00'
 Prepared 5 field assignments and 2 update assignments for record 6
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -98,11 +98,11 @@ Using pre-generated ID from id_map: ordered:8
 Processing field 'id'
 Generated value for field 'id': r'ordered:8'
 Processing field 'in'
-Generated value for field 'in': r'account:9'
+Generated value for field 'in': r'account:3'
 Processing field 'out'
-Generated value for field 'out': r'order:8'
+Generated value for field 'out': r'order:15'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.985868+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.558451+00:00'
 Prepared 5 field assignments and 2 update assignments for record 7
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -111,11 +111,11 @@ Using pre-generated ID from id_map: ordered:9
 Processing field 'id'
 Generated value for field 'id': r'ordered:9'
 Processing field 'in'
-Generated value for field 'in': r'account:7'
+Generated value for field 'in': r'account:13'
 Processing field 'out'
-Generated value for field 'out': r'order:7'
+Generated value for field 'out': r'order:20'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.986873+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.560092+00:00'
 Prepared 5 field assignments and 2 update assignments for record 8
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -124,11 +124,11 @@ Using pre-generated ID from id_map: ordered:10
 Processing field 'id'
 Generated value for field 'id': r'ordered:10'
 Processing field 'in'
-Generated value for field 'in': r'account:1'
+Generated value for field 'in': r'account:8'
 Processing field 'out'
-Generated value for field 'out': r'order:20'
+Generated value for field 'out': r'order:16'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.987689+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.561843+00:00'
 Prepared 5 field assignments and 2 update assignments for record 9
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -137,11 +137,11 @@ Using pre-generated ID from id_map: ordered:11
 Processing field 'id'
 Generated value for field 'id': r'ordered:11'
 Processing field 'in'
-Generated value for field 'in': r'account:1'
+Generated value for field 'in': r'account:5'
 Processing field 'out'
-Generated value for field 'out': r'order:3'
+Generated value for field 'out': r'order:16'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.988483+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.563575+00:00'
 Prepared 5 field assignments and 2 update assignments for record 10
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -150,11 +150,11 @@ Using pre-generated ID from id_map: ordered:12
 Processing field 'id'
 Generated value for field 'id': r'ordered:12'
 Processing field 'in'
-Generated value for field 'in': r'account:11'
+Generated value for field 'in': r'account:8'
 Processing field 'out'
 Generated value for field 'out': r'order:12'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.989256+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.565349+00:00'
 Prepared 5 field assignments and 2 update assignments for record 11
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
@@ -163,12 +163,12 @@ Using pre-generated ID from id_map: ordered:13
 Processing field 'id'
 Generated value for field 'id': r'ordered:13'
 Processing field 'in'
-Generated value for field 'in': r'account:7'
+Generated value for field 'in': r'account:2'
 Processing field 'out'
-Generated value for field 'out': r'order:20'
+Generated value for field 'out': r'order:15'
 Processing field 'date'
-Generated value for field 'date': d'2025-08-15T00:08:57.990024+00:00'
+Generated value for field 'date': d'2025-08-15T22:35:52.566938+00:00'
 Prepared 5 field assignments and 2 update assignments for record 12
 Generating RELATION INSERT statement
 Adding ON DUPLICATE KEY UPDATE clause with 2 updates
-Successfully generated 13 INSERT statements for table 'ordered' (total length: 2694 bytes)
+Successfully generated 13 INSERT statements for table 'ordered' (total length: 2696 bytes)

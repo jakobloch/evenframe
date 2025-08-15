@@ -8,7 +8,7 @@ OPTION IMPORT;
 -- ACCESSES
 -- ------------------------------
 
-DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY 'gVGOsWnxWfLH3kNTlwiOsZ8KuA0TnRgopUfZeDFn0zSHszA37Owe1d6MybOuQEaa0FHeA4J8OJkmR79YMd33M1Cb0e5RWbPw0l8a5VhADoVpBVqScUE0xJOTOPn0eIVx' WITH ISSUER KEY 'gVGOsWnxWfLH3kNTlwiOsZ8KuA0TnRgopUfZeDFn0zSHszA37Owe1d6MybOuQEaa0FHeA4J8OJkmR79YMd33M1Cb0e5RWbPw0l8a5VhADoVpBVqScUE0xJOTOPn0eIVx' DURATION FOR TOKEN 15m, FOR SESSION 6h;
+DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $email, password = crypto::argon2::generate($password)) SIGNIN (SELECT * FROM user WHERE email = $email AND crypto::argon2::compare(password, $password)) WITH JWT ALGORITHM HS512 KEY '6YGIBLcmRzZrluoIINPJ9Es91Ml8eZMsDHJvCBp5acS3Hmw8Yq7cI2ZGWBenH3Y2nA5Qmry8zRBUGa3wOoh0rK0ns2HBJBfVHfV60yfgPVoNTI6f0eQHcRe7BpwMUICl' WITH ISSUER KEY '6YGIBLcmRzZrluoIINPJ9Es91Ml8eZMsDHJvCBp5acS3Hmw8Yq7cI2ZGWBenH3Y2nA5Qmry8zRBUGa3wOoh0rK0ns2HBJBfVHfV60yfgPVoNTI6f0eQHcRe7BpwMUICl' DURATION FOR TOKEN 15m, FOR SESSION 6h;
 
 -- ------------------------------
 -- TABLE: account
@@ -16,7 +16,7 @@ DEFINE ACCESS user ON DATABASE TYPE RECORD SIGNUP (CREATE user SET email = $emai
 
 DEFINE TABLE account TYPE NORMAL SCHEMAFULL CHANGEFEED 3d PERMISSIONS FOR select, create, update, delete WHERE $auth.permissions.data.any('Account') = true;
 
-DEFINE FIELD account_name ON account TYPE { company_name: string } | { first_name: string, last_name: string } DEFAULT { company_name: '' } PERMISSIONS FULL;
+DEFINE FIELD account_name ON account TYPE any PERMISSIONS FULL;
 DEFINE FIELD account_type ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD colors ON account TYPE { active: string, hover: string, main: string } DEFAULT { active: '', hover: '', main: '' } PERMISSIONS FULL;
 DEFINE FIELD custom_fields ON account FLEXIBLE TYPE object DEFAULT {  } PERMISSIONS FULL;
@@ -31,7 +31,7 @@ DEFINE FIELD needs_review ON account TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD payment_terms ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD phones ON account TYPE array<{ can_call: bool, can_text: bool, main: bool, number: string, phone_type: string }> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD phones[*] ON account TYPE { can_call: bool, can_text: bool, main: bool, number: string, phone_type: string } PERMISSIONS FULL;
-DEFINE FIELD sector ON account TYPE 'Residential' | 'Commercial' DEFAULT 'Residential' PERMISSIONS FULL;
+DEFINE FIELD sector ON account TYPE 'Commercial' | 'Residential' DEFAULT 'Residential' PERMISSIONS FULL;
 DEFINE FIELD site ON account TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD subtype ON account TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD tags ON account TYPE array<string> DEFAULT [] PERMISSIONS FULL;
@@ -56,8 +56,8 @@ DEFINE FIELD employees[*] ON appointment TYPE record<employee> PERMISSIONS FULL;
 DEFINE FIELD location ON appointment TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD multi_day ON appointment TYPE bool DEFAULT false PERMISSIONS FULL;
 DEFINE FIELD offset_ms ON appointment TYPE int DEFAULT 0 PERMISSIONS FULL;
-DEFINE FIELD recurrence_rule ON appointment TYPE null | object DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD status ON appointment TYPE 'Scheduled' | 'OnDeck' | 'Waiting' DEFAULT 'Scheduled' PERMISSIONS FULL;
+DEFINE FIELD recurrence_rule ON appointment TYPE any PERMISSIONS FULL;
+DEFINE FIELD status ON appointment TYPE 'Waiting' | 'OnDeck' | 'Scheduled' DEFAULT 'Scheduled' PERMISSIONS FULL;
 DEFINE FIELD timezone ON appointment TYPE string DEFAULT 'UTC' PERMISSIONS FULL;
 DEFINE FIELD title ON appointment TYPE string DEFAULT '' PERMISSIONS FULL;
 
@@ -121,7 +121,7 @@ DEFINE FIELD phones[*] ON employee TYPE { can_call: bool, can_text: bool, main: 
 DEFINE FIELD rate_per_hour ON employee TYPE int DEFAULT 0 PERMISSIONS FULL;
 DEFINE FIELD role ON employee TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD route ON employee TYPE record<route> DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD settings ON employee TYPE { appointment_notifications: null | { all_schedule_change_notifications: string, personal_schedule_change_notifications: string }, commissions: null | { sales_rep: string, technician: string }, home_page: null | 'SalesHomeDashboard' | 'SalesHomeProducts' | 'SalesHomeServices' | 'SalesHomePackages' | 'SalesHomeTaxRates' | 'SalesLeadsOverview' | 'SalesLeadsActivities' | 'SalesLeadsCampaigns' | 'SalesLeadsDripCampaigns' | 'SalesLeadsOpportunities' | 'SalesLeadsPromotions' | 'SalesAccountsOverview' | 'SalesAccountsActivities' | 'SalesAccountsBilling' | 'SalesAccountsContracts' | 'SalesOrdersOverview' | 'SalesOrdersActivities' | 'SalesOrdersPayments' | 'SalesOrdersCommissions' | 'SalesSchedulingSchedule' | 'SalesSchedulingAppointments' | 'SalesSchedulingRecurring' | 'SalesSchedulingRoutes' | 'SalesSchedulingReminders' | 'UserHome' } DEFAULT { appointment_notifications: NULL, commissions: NULL, home_page: NULL } PERMISSIONS FULL;
+DEFINE FIELD settings ON employee TYPE { appointment_notifications: null | { all_schedule_change_notifications: string, personal_schedule_change_notifications: string }, commissions: null | { sales_rep: string, technician: string }, home_page: null | 'UserHome' | 'SalesSchedulingReminders' | 'SalesSchedulingRoutes' | 'SalesSchedulingRecurring' | 'SalesSchedulingAppointments' | 'SalesSchedulingSchedule' | 'SalesOrdersCommissions' | 'SalesOrdersPayments' | 'SalesOrdersActivities' | 'SalesOrdersOverview' | 'SalesAccountsContracts' | 'SalesAccountsBilling' | 'SalesAccountsActivities' | 'SalesAccountsOverview' | 'SalesLeadsPromotions' | 'SalesLeadsOpportunities' | 'SalesLeadsDripCampaigns' | 'SalesLeadsCampaigns' | 'SalesLeadsActivities' | 'SalesLeadsOverview' | 'SalesHomeTaxRates' | 'SalesHomePackages' | 'SalesHomeServices' | 'SalesHomeProducts' | 'SalesHomeDashboard' } DEFAULT { appointment_notifications: NULL, commissions: NULL, home_page: NULL } PERMISSIONS FULL;
 DEFINE FIELD title ON employee TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD username ON employee TYPE string DEFAULT '' PERMISSIONS FULL;
 
@@ -153,16 +153,16 @@ DEFINE FIELD last_name ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD lead_source ON lead TYPE null | string DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD memo ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD needs_review ON lead TYPE bool DEFAULT false PERMISSIONS FULL;
-DEFINE FIELD next_step ON lead TYPE 'InitialContact' | 'Qualified' | 'Estimate' | 'Negotiation' DEFAULT 'InitialContact' PERMISSIONS FULL;
+DEFINE FIELD next_step ON lead TYPE 'Negotiation' | 'Estimate' | 'Qualified' | 'InitialContact' DEFAULT 'InitialContact' PERMISSIONS FULL;
 DEFINE FIELD number ON lead TYPE null | int DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD payment_terms ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD phones ON lead TYPE array<{ can_call: bool, can_text: bool, main: bool, number: string, phone_type: string }> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD phones[*] ON lead TYPE { can_call: bool, can_text: bool, main: bool, number: string, phone_type: string } PERMISSIONS FULL;
-DEFINE FIELD priority ON lead TYPE 'High' | 'Medium' | 'Low' DEFAULT 'High' PERMISSIONS FULL;
+DEFINE FIELD priority ON lead TYPE 'Low' | 'Medium' | 'High' DEFAULT 'High' PERMISSIONS FULL;
 DEFINE FIELD probability ON lead TYPE float DEFAULT 0f PERMISSIONS FULL;
-DEFINE FIELD sector ON lead TYPE 'Residential' | 'Commercial' DEFAULT 'Residential' PERMISSIONS FULL;
+DEFINE FIELD sector ON lead TYPE 'Commercial' | 'Residential' DEFAULT 'Residential' PERMISSIONS FULL;
 DEFINE FIELD site ON lead TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD stage ON lead TYPE 'Open' | 'InitialContact' | 'Qualified' | 'Estimate' | 'Negotiation' DEFAULT 'Open' PERMISSIONS FULL;
+DEFINE FIELD stage ON lead TYPE 'Negotiation' | 'Estimate' | 'Qualified' | 'InitialContact' | 'Open' DEFAULT 'Open' PERMISSIONS FULL;
 DEFINE FIELD status ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD subtype ON lead TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD tags ON lead TYPE array<string> DEFAULT [] PERMISSIONS FULL;
@@ -181,8 +181,8 @@ DEFINE FIELD account ON order TYPE record<account> DEFAULT NULL PERMISSIONS FULL
 DEFINE FIELD action_item ON order TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD appointment ON order TYPE record<appointment> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD balance ON order TYPE decimal DEFAULT 0.00dec PERMISSIONS FULL;
-DEFINE FIELD billed_items ON order TYPE array<{ item: record<product> | record<service>, quantity: int, taxed: bool, upsale: bool }> DEFAULT [] PERMISSIONS FULL;
-DEFINE FIELD billed_items[*] ON order TYPE { item: record<product> | record<service>, quantity: int, taxed: bool, upsale: bool } PERMISSIONS FULL;
+DEFINE FIELD billed_items ON order TYPE array<{ item: record<service> | record<product>, quantity: int, taxed: bool, upsale: bool }> DEFAULT [] PERMISSIONS FULL;
+DEFINE FIELD billed_items[*] ON order TYPE { item: record<service> | record<product>, quantity: int, taxed: bool, upsale: bool } PERMISSIONS FULL;
 DEFINE FIELD commissions ON order TYPE array<decimal> DEFAULT [] PERMISSIONS FULL;
 DEFINE FIELD commissions[*] ON order TYPE decimal PERMISSIONS FULL;
 DEFINE FIELD date_created ON order TYPE datetime DEFAULT d'2024-01-01T00:00:00Z' PERMISSIONS FULL;
@@ -206,7 +206,7 @@ DEFINE FIELD promotion[*] ON order TYPE record<promotion> PERMISSIONS FULL;
 DEFINE FIELD reference ON order TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD sales_rep ON order TYPE record<employee> DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD site ON order TYPE record<site> DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD stage ON order TYPE 'Estimate' | 'Active' | 'Invoice' DEFAULT 'Estimate' PERMISSIONS FULL;
+DEFINE FIELD stage ON order TYPE 'Invoice' | 'Active' | 'Estimate' DEFAULT 'Estimate' PERMISSIONS FULL;
 DEFINE FIELD subgroup ON order TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD tip ON order TYPE decimal DEFAULT 0.00dec PERMISSIONS FULL;
 DEFINE FIELD total ON order DEFAULT 0.00dec READONLY VALUE <future> { fn::calc_order_total(billed_items.item.defaults.price, billed_items.quantity, discount) } PERMISSIONS FULL;
@@ -377,9 +377,9 @@ DEFINE FIELD first_name ON user TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD last_name ON user TYPE string DEFAULT '' PERMISSIONS FULL;
 DEFINE FIELD metadata ON user TYPE null | { created_at: datetime, is_active: bool, last_login: null | datetime, roles: array<string> } DEFAULT NULL PERMISSIONS FULL;
 DEFINE FIELD password ON user TYPE null | string DEFAULT NULL PERMISSIONS FULL;
-DEFINE FIELD permissions ON user TYPE { applications: array<'Sales' | 'Accounting' | 'Errand' | 'HumanResources' | 'Logistics' | 'Marketing' | 'Website'>, data: array<'Account' | 'Appointment' | 'Lead' | 'TaxRate' | 'Site' | 'Employee' | 'Route' | 'Company' | 'Product' | 'Service' | 'User' | 'Order' | 'Payment' | 'Package' | 'Promotion' | 'Represents' | 'Ordered'>, pages: array<'SalesHomeDashboard' | 'SalesHomeProducts' | 'SalesHomeServices' | 'SalesHomePackages' | 'SalesHomeTaxRates' | 'SalesLeadsOverview' | 'SalesLeadsActivities' | 'SalesLeadsCampaigns' | 'SalesLeadsDripCampaigns' | 'SalesLeadsOpportunities' | 'SalesLeadsPromotions' | 'SalesAccountsOverview' | 'SalesAccountsActivities' | 'SalesAccountsBilling' | 'SalesAccountsContracts' | 'SalesOrdersOverview' | 'SalesOrdersActivities' | 'SalesOrdersPayments' | 'SalesOrdersCommissions' | 'SalesSchedulingSchedule' | 'SalesSchedulingAppointments' | 'SalesSchedulingRecurring' | 'SalesSchedulingRoutes' | 'SalesSchedulingReminders' | 'UserHome'> } DEFAULT { applications: [], data: ['Account', 'Appointment', 'Lead', 'TaxRate', 'Site', 'Employee', 'Route', 'Company', 'Product', 'Service', 'User', 'Order', 'Payment', 'Package', 'Promotion', 'Represents', 'Ordered'], pages: [] } PERMISSIONS FULL;
-DEFINE FIELD role ON user TYPE 'Administrator' | 'SalesRepresentative' | 'Technician' | 'HumanResources' | 'InformationTechnology' DEFAULT 'Technician' PERMISSIONS FULL;
-DEFINE FIELD settings ON user TYPE { appointment_notifications: null | { all_schedule_change_notifications: string, personal_schedule_change_notifications: string }, commissions: null | { sales_rep: string, technician: string }, home_page: null | 'SalesHomeDashboard' | 'SalesHomeProducts' | 'SalesHomeServices' | 'SalesHomePackages' | 'SalesHomeTaxRates' | 'SalesLeadsOverview' | 'SalesLeadsActivities' | 'SalesLeadsCampaigns' | 'SalesLeadsDripCampaigns' | 'SalesLeadsOpportunities' | 'SalesLeadsPromotions' | 'SalesAccountsOverview' | 'SalesAccountsActivities' | 'SalesAccountsBilling' | 'SalesAccountsContracts' | 'SalesOrdersOverview' | 'SalesOrdersActivities' | 'SalesOrdersPayments' | 'SalesOrdersCommissions' | 'SalesSchedulingSchedule' | 'SalesSchedulingAppointments' | 'SalesSchedulingRecurring' | 'SalesSchedulingRoutes' | 'SalesSchedulingReminders' | 'UserHome' } DEFAULT { appointment_notifications: NULL, commissions: NULL, home_page: NULL } PERMISSIONS FULL;
+DEFINE FIELD permissions ON user TYPE { applications: array<'Website' | 'Marketing' | 'Logistics' | 'HumanResources' | 'Errand' | 'Accounting' | 'Sales'>, data: array<'Ordered' | 'Represents' | 'Promotion' | 'Package' | 'Payment' | 'Order' | 'User' | 'Service' | 'Product' | 'Company' | 'Route' | 'Employee' | 'Site' | 'TaxRate' | 'Lead' | 'Appointment' | 'Account'>, pages: array<'UserHome' | 'SalesSchedulingReminders' | 'SalesSchedulingRoutes' | 'SalesSchedulingRecurring' | 'SalesSchedulingAppointments' | 'SalesSchedulingSchedule' | 'SalesOrdersCommissions' | 'SalesOrdersPayments' | 'SalesOrdersActivities' | 'SalesOrdersOverview' | 'SalesAccountsContracts' | 'SalesAccountsBilling' | 'SalesAccountsActivities' | 'SalesAccountsOverview' | 'SalesLeadsPromotions' | 'SalesLeadsOpportunities' | 'SalesLeadsDripCampaigns' | 'SalesLeadsCampaigns' | 'SalesLeadsActivities' | 'SalesLeadsOverview' | 'SalesHomeTaxRates' | 'SalesHomePackages' | 'SalesHomeServices' | 'SalesHomeProducts' | 'SalesHomeDashboard'> } DEFAULT { applications: [], data: ['Account', 'Appointment', 'Lead', 'TaxRate', 'Site', 'Employee', 'Route', 'Company', 'Product', 'Service', 'User', 'Order', 'Payment', 'Package', 'Promotion', 'Represents', 'Ordered'], pages: [] } PERMISSIONS FULL;
+DEFINE FIELD role ON user TYPE 'InformationTechnology' | 'HumanResources' | 'Technician' | 'SalesRepresentative' | 'Administrator' DEFAULT 'Technician' PERMISSIONS FULL;
+DEFINE FIELD settings ON user TYPE { appointment_notifications: null | { all_schedule_change_notifications: string, personal_schedule_change_notifications: string }, commissions: null | { sales_rep: string, technician: string }, home_page: null | 'UserHome' | 'SalesSchedulingReminders' | 'SalesSchedulingRoutes' | 'SalesSchedulingRecurring' | 'SalesSchedulingAppointments' | 'SalesSchedulingSchedule' | 'SalesOrdersCommissions' | 'SalesOrdersPayments' | 'SalesOrdersActivities' | 'SalesOrdersOverview' | 'SalesAccountsContracts' | 'SalesAccountsBilling' | 'SalesAccountsActivities' | 'SalesAccountsOverview' | 'SalesLeadsPromotions' | 'SalesLeadsOpportunities' | 'SalesLeadsDripCampaigns' | 'SalesLeadsCampaigns' | 'SalesLeadsActivities' | 'SalesLeadsOverview' | 'SalesHomeTaxRates' | 'SalesHomePackages' | 'SalesHomeServices' | 'SalesHomeProducts' | 'SalesHomeDashboard' } DEFAULT { appointment_notifications: NULL, commissions: NULL, home_page: NULL } PERMISSIONS FULL;
 
 
 

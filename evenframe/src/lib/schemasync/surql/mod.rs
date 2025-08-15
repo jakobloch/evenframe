@@ -1,4 +1,5 @@
 pub mod access;
+pub mod assert;
 pub mod define;
 pub mod execute;
 pub mod insert;

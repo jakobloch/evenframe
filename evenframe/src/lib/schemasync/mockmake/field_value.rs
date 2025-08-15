@@ -115,7 +115,7 @@ impl<'a> FieldValueGenerator<'a> {
                                 value_stack.push(self.handle_record_id(
                                     &ctx.field.field_name,
                                     &ctx.table_config.table_name,
-                                    &ctx.table_config,
+                                    ctx.table_config,
                                     &mut rng,
                                 ))
                             }
@@ -419,9 +419,9 @@ impl<'a> FieldValueGenerator<'a> {
             let from_table = &table_config.relation.as_ref().unwrap().from;
             if let Some(ids) = self.mockmaker.id_map.get(from_table) {
                 if !ids.is_empty() {
-                    return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
+                    format!("r'{}'", ids[rng.random_range(0..ids.len())].clone())
                 } else {
-                    return format!("r'{}:1'", from_table.to_lowercase());
+                    format!("r'{}:1'", from_table.to_lowercase())
                 }
             } else {
                 panic!(
@@ -436,7 +436,7 @@ impl<'a> FieldValueGenerator<'a> {
             let to_table = &table_config.relation.as_ref().unwrap().to;
             if let Some(ids) = self.mockmaker.id_map.get(to_table) {
                 if !ids.is_empty() {
-                    return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
+                    format!("r'{}'", ids[rng.random_range(0..ids.len())].clone())
                 } else {
                     panic!(
                         "{}",
@@ -455,16 +455,14 @@ impl<'a> FieldValueGenerator<'a> {
                     )
                 )
             }
-        } else {
-            if let Some(ids) = self.mockmaker.id_map.get(table_name) {
-                if *self.id_index < ids.len() {
-                    return format!("r'{}'", ids[*self.id_index].clone());
-                } else {
-                    panic!("Out of bounds index for {table_name}, {field_name}")
-                }
+        } else if let Some(ids) = self.mockmaker.id_map.get(table_name) {
+            if *self.id_index < ids.len() {
+                format!("r'{}'", ids[*self.id_index].clone())
             } else {
-                return format!("r'{}:{}'", table_name, &self.id_index);
+                panic!("Out of bounds index for {table_name}, {field_name}")
             }
+        } else {
+            format!("r'{}:{}'", table_name, &self.id_index)
         }
     }
 }

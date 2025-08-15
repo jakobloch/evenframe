@@ -88,8 +88,13 @@ pub fn build_all_configs() -> (
                     if let Some(evenframe_type) =
                         file_types.iter().find(|&t| item_struct.ident == t.name)
                     {
-                        debug!("Found Evenframe struct: {}", item_struct.ident);
+                        debug!("Found Evenframe struct: {:?}", item_struct.ident);
                         if let Some(struct_config) = parse_struct_config(&item_struct) {
+                            trace!(
+                                "Inserting struct config {:?}: {:#?}",
+                                &struct_config.struct_name,
+                                &struct_config
+                            );
                             struct_configs
                                 .insert(struct_config.struct_name.clone(), struct_config.clone());
 
@@ -116,6 +121,11 @@ pub fn build_all_configs() -> (
                                         .flatten(),
                                     mock_generation_config,
                                 };
+                                trace!(
+                                    "Inserting table config {:?}: {:#?}",
+                                    &table_config.table_name,
+                                    &struct_config
+                                );
                                 table_configs.insert(table_name, table_config);
                             }
                         }
@@ -126,6 +136,11 @@ pub fn build_all_configs() -> (
                     if file_types.iter().any(|t| item_enum.ident == t.name) {
                         debug!("Found Evenframe enum: {}", item_enum.ident);
                         if let Some(tagged_union) = parse_enum_config(&item_enum) {
+                            trace!(
+                                "Inserting enum config {:?}: {:#?}",
+                                &tagged_union.enum_name,
+                                &tagged_union
+                            );
                             enum_configs
                                 .insert(tagged_union.enum_name.clone(), tagged_union.clone());
 

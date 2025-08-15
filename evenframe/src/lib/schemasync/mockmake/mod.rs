@@ -424,7 +424,7 @@ impl Mockmaker {
                     // Add this table-coordination pair to the map
                     coordination_map
                         .entry(coordination_key)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push((table_name.clone(), coordination.clone()));
                 }
             }
@@ -452,7 +452,7 @@ impl Mockmaker {
 
                 coordination_by_type
                     .entry(type_key.to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((table_name.clone(), coordination.clone()));
 
                 group_tables.insert(table_name);
@@ -610,7 +610,8 @@ impl Mockmaker {
                                 // Log detailed error for user to fix
                                 tracing::error!(
                                     "Skipping invalid coordination for tables {:?}: {}",
-                                    group_tables, e
+                                    group_tables,
+                                    e
                                 );
                                 evenframe_log!(
                                     format!("ERROR: Invalid coordination skipped\nTables: {:?}\nCoordination: {:?}\nError: {}\n",
