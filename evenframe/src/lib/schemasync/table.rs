@@ -10,6 +10,7 @@ use tracing::{debug, error, trace};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableConfig {
+    pub table_name: String,
     pub struct_config: StructConfig,
     pub relation: Option<EdgeConfig>,
     pub permissions: Option<PermissionsConfig>,

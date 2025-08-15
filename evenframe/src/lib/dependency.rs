@@ -36,16 +36,16 @@ pub fn analyse_recursion(
 ) -> RecursionInfo {
     let known: HashSet<_> = structs
         .values()
-        .map(|sc| sc.name.to_case(Case::Pascal))
+        .map(|struct_config| struct_config.struct_name.to_case(Case::Pascal))
         .chain(enums.values().map(|e| e.enum_name.to_case(Case::Pascal)))
         .collect();
 
     let mut deps: HashMap<String, HashSet<String>> = HashMap::new();
 
-    for sc in structs.values() {
-        let from = sc.name.to_case(Case::Pascal);
+    for struct_config in structs.values() {
+        let from = struct_config.struct_name.to_case(Case::Pascal);
         let entry = deps.entry(from.clone()).or_default();
-        for f in &sc.fields {
+        for f in &struct_config.fields {
             collect_refs(&f.field_type, &known, entry);
         }
     }
@@ -57,8 +57,8 @@ pub fn analyse_recursion(
         for v in &e.variants {
             if let Some(variant_data) = &v.data {
                 let variant_data_field_type = match variant_data {
-                    VariantData::InlineStruct(inline_struct) => {
-                        &FieldType::Other(inline_struct.name.clone())
+                    VariantData::InlineStruct(enum_struct) => {
+                        &FieldType::Other(enum_struct.struct_name.clone())
                     }
                     VariantData::DataStructureRef(field_type) => field_type,
                 };
@@ -115,19 +115,19 @@ pub fn deps_of(
     // Build a quick "known-types" set so we don't count primitives.
     let known: HashSet<_> = structs
         .values()
-        .map(|sc| sc.name.to_case(Case::Pascal))
+        .map(|struct_config| struct_config.struct_name.to_case(Case::Pascal))
         .chain(enums.values().map(|e| e.enum_name.to_case(Case::Pascal)))
         .collect();
 
     let mut acc = HashSet::new();
 
     // If `name` is a struct, walk its fields
-    if let Some(sc) = structs
+    if let Some(struct_config) = structs
         .values()
-        .find(|sc| sc.name.to_case(Case::Pascal) == name)
+        .find(|struct_config| struct_config.struct_name.to_case(Case::Pascal) == name)
     {
-        tracing::trace!(struct_name = %sc.name, field_count = sc.fields.len(), "Walking struct fields for dependencies");
-        for f in &sc.fields {
+        tracing::trace!(struct_name = %struct_config.struct_name, field_count = struct_config.fields.len(), "Walking struct fields for dependencies");
+        for f in &struct_config.fields {
             collect_refs(&f.field_type, &known, &mut acc);
         }
     }
@@ -141,8 +141,8 @@ pub fn deps_of(
         for v in &e.variants {
             if let Some(variant_data) = &v.data {
                 let variant_data_field_type = match variant_data {
-                    VariantData::InlineStruct(inline_struct) => {
-                        &FieldType::Other(inline_struct.name.clone())
+                    VariantData::InlineStruct(enum_struct) => {
+                        &FieldType::Other(enum_struct.struct_name.clone())
                     }
                     VariantData::DataStructureRef(field_type) => field_type,
                 };
@@ -374,9 +374,9 @@ pub fn collect_field_type_dependencies(
                 for variant in &enum_def.variants {
                     if let Some(variant_data) = &variant.data {
                         match variant_data {
-                            VariantData::InlineStruct(inline_struct) => {
+                            VariantData::InlineStruct(enum_struct) => {
                                 // Recursively analyze inline struct
-                                if let Some(obj) = objects.get(&inline_struct.name) {
+                                if let Some(obj) = objects.get(&enum_struct.struct_name) {
                                     for field in &obj.fields {
                                         collect_field_type_dependencies(
                                             &field.field_type,

@@ -94,7 +94,7 @@ pub fn field_type_to_arktype(
         FieldType::Other(type_name) => {
             // Try to find a matching struct
             for struct_config in structs.values() {
-                if struct_config.name == *type_name {
+                if struct_config.struct_name == *type_name {
                     return format!("'{}'", type_name).to_case(Case::Pascal);
                 }
             }
@@ -113,8 +113,8 @@ pub fn field_type_to_arktype(
                     .map(|variant| {
                         if let Some(variant_data) = &variant.data {
                             let variant_data_field_type = match variant_data {
-                                VariantData::InlineStruct(inline_struct) => {
-                                    &FieldType::Other(inline_struct.name.clone())
+                                VariantData::InlineStruct(enum_struct) => {
+                                    &FieldType::Other(enum_struct.struct_name.clone())
                                 }
                                 VariantData::DataStructureRef(field_type) => field_type,
                             };
@@ -166,8 +166,8 @@ pub fn generate_arktype_type_string(
             // Convert the variant into either a data type or a literal union piece
             let item_str = if let Some(variant_data) = &variant.data {
                 let variant_data_field_type = match variant_data {
-                    VariantData::InlineStruct(inline_struct) => {
-                        &FieldType::Other(inline_struct.name.clone())
+                    VariantData::InlineStruct(enum_struct) => {
+                        &FieldType::Other(enum_struct.struct_name.clone())
                     }
                     VariantData::DataStructureRef(field_type) => field_type,
                 };
@@ -200,8 +200,8 @@ pub fn generate_arktype_type_string(
     // Then, process all structs
     tracing::debug!("Processing structs for Arktype");
     for struct_config in structs.values() {
-        tracing::trace!(struct_name = %struct_config.name, "Processing struct");
-        let type_name = struct_config.name.to_case(Case::Pascal);
+        tracing::trace!(struct_name = %struct_config.struct_name, "Processing struct");
+        let type_name = struct_config.struct_name.to_case(Case::Pascal);
         scope_output.push_str(&format!("{}: {{\n", type_name));
         defaults_output.push_str(&format!(
             "export const default{}: {} = {{\n",

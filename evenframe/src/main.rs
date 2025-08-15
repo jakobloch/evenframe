@@ -14,10 +14,10 @@ async fn main() -> Result<()> {
     // Initialize tracing with environment variable control
     // Set RUST_LOG=debug for debug output, RUST_LOG=info for info only
     tracing_subscriber::fmt::init();
-    
+
     info!("Starting Evenframe code generation");
     debug!("Loading configuration...");
-    
+
     // Load configuration
     let config = match EvenframeConfig::new() {
         Ok(cfg) => {
@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
     let generate_dummy_values = config.schemasync.should_generate_mocks;
     let generate_arktype_types = config.typesync.should_generate_arktype_types;
     let generate_effect_schemas = config.typesync.should_generate_effect_types;
-    
+
     debug!(
         "Configuration flags - mocks: {}, arktype: {}, effect: {}",
         generate_dummy_values, generate_arktype_types, generate_effect_schemas
@@ -53,10 +53,13 @@ async fn main() -> Result<()> {
         info!("Generating arktype types...");
         let structs = config_builders::merge_tables_and_objects(&tables, &objects);
         debug!("Merged {} structs for arktype generation", structs.len());
-        
+
         let arktype_content = generate_arktype_type_string(&structs, &enums, false);
-        debug!("Generated arktype content: {} characters", arktype_content.len());
-        
+        debug!(
+            "Generated arktype content: {} characters",
+            arktype_content.len()
+        );
+
         match std::fs::write(
             "../../frontend/src/lib/core/types/arktype.ts",
             format!(
@@ -80,16 +83,16 @@ async fn main() -> Result<()> {
         info!("Generating Effect schemas...");
         let structs = config_builders::merge_tables_and_objects(&tables, &objects);
         debug!("Merged {} structs for Effect generation", structs.len());
-        
+
         let effect_content = generate_effect_schema_string(&structs, &enums, false);
-        debug!("Generated Effect content: {} characters", effect_content.len());
-        
+        debug!(
+            "Generated Effect content: {} characters",
+            effect_content.len()
+        );
+
         match std::fs::write(
             "../../frontend/src/lib/core/types/bindings.ts",
-            format!(
-                "import {{ Schema }} from \"effect\";\n\n{}",
-                effect_content,
-            ),
+            format!("import {{ Schema }} from \"effect\";\n\n{}", effect_content,),
         ) {
             Ok(_) => info!("Effect schemas written successfully to bindings.ts"),
             Err(e) => {
@@ -115,7 +118,7 @@ async fn main() -> Result<()> {
             objects.len(),
             enums.len()
         );
-        
+
         info!("Running Schemasync...");
         match schemasync.run().await {
             Ok(_) => info!("Schemasync completed successfully"),

@@ -29,9 +29,9 @@ pub fn generate_effect_schema_string(
     let mut out_encoded = String::new();
     /* every struct gets an interface */
     tracing::debug!("Generating encoded interfaces for structs");
-    for sc in structs.values() {
-        tracing::trace!(struct_name = %sc.name, "Generating encoded interface");
-        out_encoded.push_str(&encoded_interface_for_struct(sc));
+    for struct_config in structs.values() {
+        tracing::trace!(struct_name = %struct_config.struct_name, "Generating encoded interface");
+        out_encoded.push_str(&encoded_interface_for_struct(struct_config));
     }
 
     /* every union/enum gets a type alias */
@@ -116,29 +116,29 @@ pub fn generate_effect_schema_string(
                     "export type {}Type = typeof {}.Type;\n",
                     name, name
                 ));
-            } else if let Some(sc) = structs
+            } else if let Some(struct_config) = structs
                 .values()
-                .find(|sc| sc.name.to_case(Case::Pascal) == name)
+                .find(|struct_config| struct_config.struct_name.to_case(Case::Pascal) == name)
             {
                 // ---- struct --------------------------------------------------
                 out_classes.push_str(&format!(
                     "export class {} extends Schema.Class<{}>(\"{}\")( {{\n",
                     name, name, name
                 ));
-                for (idx, f) in sc.fields.iter().enumerate() {
+                for (idx, f) in struct_config.fields.iter().enumerate() {
                     let schema = to_schema(&f.field_type, &name, &processed);
                     let schema_with_validators = apply_validators_to_schema(schema, &f.validators);
                     out_classes.push_str(&format!(
                         "  {}: {}{}",
                         f.field_name.to_case(Case::Camel),
                         schema_with_validators,
-                        if idx + 1 == sc.fields.len() {
+                        if idx + 1 == struct_config.fields.len() {
                             '\n'
                         } else {
                             ','
                         }
                     ));
-                    if idx + 1 != sc.fields.len() {
+                    if idx + 1 != struct_config.fields.len() {
                         out_classes.push('\n');
                     }
                 }
@@ -167,7 +167,7 @@ pub fn generate_effect_schema_string(
 
 // ----- for classes ---------------------------------------------------------
 fn encoded_interface_for_struct(struct_config: &StructConfig) -> String {
-    let name = struct_config.name.to_case(Case::Pascal);
+    let name = struct_config.struct_name.to_case(Case::Pascal);
     let body = struct_config
         .fields
         .iter()
@@ -274,7 +274,7 @@ fn field_type_to_effect_schema(
                 // forward edge *inside* recursive SCC → suspend
                 if structs
                     .values()
-                    .any(|sc| sc.name.to_case(Case::Pascal) == pascal)
+                    .any(|struct_config| struct_config.struct_name.to_case(Case::Pascal) == pascal)
                 {
                     format!(
                         "Schema.suspend((): Schema.Schema<{0}, {0}Encoded> => {0}).annotations({{ identifier: `{1}` }})",

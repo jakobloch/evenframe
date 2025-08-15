@@ -1,10 +1,9 @@
 use crate::evenframe_log;
 use crate::mockmake::field_value::FieldValueGenerator;
 use crate::mockmake::Mockmaker;
+use crate::schemasync::table::TableConfig;
 use crate::types::FieldType;
-use crate::{coordinate::TableInsertsState, schemasync::table::TableConfig};
 use convert_case::{Case, Casing};
-use std::collections::HashSet;
 use tracing::{debug, info};
 
 impl Mockmaker {
@@ -33,25 +32,6 @@ impl Mockmaker {
             true
         );
 
-        // Step 1: Parse Coordination Rules
-        evenframe_log!(
-            format!("Parsing coordination rules for table {}", table_name),
-            log_name,
-            true
-        );
-        let gen_context = TableInsertsState::new(config, &self.schemasync_config.mock_gen_config);
-        evenframe_log!(
-            format!(
-                "Coordination context created with {} coordination pairs",
-                gen_context
-                    .coordination_group
-                    .field_coordination_pairs
-                    .len()
-            ),
-            log_name,
-            true
-        );
-
         let n = config
             .mock_generation_config
             .as_ref()
@@ -60,27 +40,6 @@ impl Mockmaker {
 
         evenframe_log!(
             format!("Will generate {} records for table {}", n, table_name),
-            log_name,
-            true
-        );
-
-        // Step 2: Generate coordinated values for all records
-        evenframe_log!(
-            format!("Generating coordinated values for {} records", n),
-            log_name,
-            true
-        );
-        let coordinated_values = self.generate_coordinated_values(
-            table_name,
-            table_config,
-            gen_context.coordination_group,
-        );
-
-        evenframe_log!(
-            format!(
-                "Generated {} coordinated value sets",
-                coordinated_values.len()
-            ),
             log_name,
             true
         );
@@ -99,7 +58,6 @@ impl Mockmaker {
             );
             let mut field_assignments = Vec::new();
             let mut update_assignments = Vec::new();
-            let mut processed_fields: HashSet<String> = HashSet::new();
 
             // Determine the record ID
             let record_id = if let Some(ids) = self.id_map.get(table_name) {
@@ -132,153 +90,75 @@ impl Mockmaker {
             // Add the ID field
             field_assignments.push(format!("id: r'{}'", record_id));
 
-            // First, add coordinated values if any exist for this record
-            if i < coordinated_values.len() {
+            for table_field in &table_config.struct_config.fields {
                 evenframe_log!(
-                    format!(
-                        "Processing {} coordinated values for record {}",
-                        coordinated_values[i].len(),
-                        i
-                    ),
+                    format!("Processing field '{}'", table_field.field_name),
                     log_name,
                     true
                 );
-                for (field_name, value) in &coordinated_values[i] {
+                if table_field.edge_config.is_none()
+                    || (table_field.define_config.is_some()
+                        && !table_field.define_config.as_ref().unwrap().should_skip)
+                {
+                    // Skip readonly fields
+                    if let Some(ref define_config) = table_field.define_config {
+                        if let Some(true) = define_config.readonly {
+                            evenframe_log!(
+                                format!("Skipping readonly field '{}'", table_field.field_name),
+                                log_name,
+                                true
+                            );
+                            continue;
+                        }
+                    }
+
+                    let field_val = FieldValueGenerator::builder()
+                        .field(table_field)
+                        .id_index(&i)
+                        .mockmaker(self)
+                        .table_config(table_config)
+                        .build()
+                        .run();
+
+                    // let field_val = self.generate_field_value_with_coordination(
+                    //     table_config,
+                    //     table_field.field_name,
+                    //     Some(&table_name.to_string()),
+                    //     table_field.field_type,
+                    //     &table_field.format,
+                    //     Some(i),
+                    //     &coordinated_values,
+                    // );
                     evenframe_log!(
                         format!(
-                            "Adding coordinated field '{}' with value '{}'",
-                            field_name, value
+                            "Generated value for field '{}': {}",
+                            table_field.field_name, field_val
                         ),
                         log_name,
                         true
                     );
-                    processed_fields.insert(field_name.clone());
-                    // Quote string values properly
-                    let quoted_value = if value.parse::<f64>().is_ok()
-                        || value == "true"
-                        || value == "false"
-                        || value == "null"
-                    {
-                        value.clone()
-                    } else {
-                        format!("'{}'", value)
-                    };
-                    field_assignments.push(format!("{}: {}", field_name, quoted_value));
+                    field_assignments.push(format!("{}: {field_val}", table_field.field_name));
 
                     // For relations, we don't update in/out fields
                     if !(table_config.relation.is_some()
-                        && (field_name == "in" || field_name == "out"))
+                        && (table_field.field_name == "in" || table_field.field_name == "out"))
                     {
-                        // Check if this field is nullable by looking at the original table definition
-                        let is_nullable = if let Some(original_field) = table_config
-                            .struct_config
-                            .fields
-                            .iter()
-                            .find(|f| f.field_name == *field_name)
-                        {
-                            matches!(&original_field.field_type, FieldType::Option(_))
-                        } else {
-                            false
-                        };
+                        // Check if field is nullable
+                        let is_nullable = matches!(&table_field.field_type, FieldType::Option(_));
 
                         if is_nullable {
                             // For nullable fields, preserve NULL values on update
                             update_assignments.push(format!(
                                 "{} = (IF {} != NULL THEN $input.{} ELSE NULL END)",
-                                field_name, field_name, field_name
+                                table_field.field_name,
+                                table_field.field_name,
+                                table_field.field_name
                             ));
                         } else {
-                            update_assignments
-                                .push(format!("{} = $input.{}", field_name, field_name));
-                        }
-                    }
-                }
-            }
-
-            // Then, process remaining fields that weren't coordinated
-            evenframe_log!(
-                format!(
-                    "Processing {} non-coordinated fields",
-                    table_config.struct_config.fields.len() - processed_fields.len() - 1
-                ), // -1 for id field
-                log_name,
-                true
-            );
-            for table_field in &table_config.struct_config.fields {
-                if !processed_fields.contains(&table_field.field_name)
-                    && table_field.field_name != "id"
-                {
-                    evenframe_log!(
-                        format!("Processing field '{}'", table_field.field_name),
-                        log_name,
-                        true
-                    );
-                    if table_field.edge_config.is_none()
-                        || (table_field.define_config.is_some()
-                            && !table_field.define_config.as_ref().unwrap().should_skip)
-                    {
-                        // Skip readonly fields
-                        if let Some(ref define_config) = table_field.define_config {
-                            if let Some(true) = define_config.readonly {
-                                evenframe_log!(
-                                    format!("Skipping readonly field '{}'", table_field.field_name),
-                                    log_name,
-                                    true
-                                );
-                                continue;
-                            }
-                        }
-
-                        let field_val = FieldValueGenerator::builder()
-                            .coordinated_values(&coordinated_values[i])
-                            .field(table_field)
-                            .id_index(&i)
-                            .mockmaker(self)
-                            .table_config(table_config)
-                            .build()
-                            .run();
-
-                        // let field_val = self.generate_field_value_with_coordination(
-                        //     table_config,
-                        //     table_field.field_name,
-                        //     Some(&table_name.to_string()),
-                        //     table_field.field_type,
-                        //     &table_field.format,
-                        //     Some(i),
-                        //     &coordinated_values,
-                        // );
-                        evenframe_log!(
-                            format!(
-                                "Generated value for field '{}': {}",
-                                table_field.field_name, field_val
-                            ),
-                            log_name,
-                            true
-                        );
-                        field_assignments.push(format!("{}: {field_val}", table_field.field_name));
-
-                        // For relations, we don't update in/out fields
-                        if !(table_config.relation.is_some()
-                            && (table_field.field_name == "in" || table_field.field_name == "out"))
-                        {
-                            // Check if field is nullable
-                            let is_nullable =
-                                matches!(&table_field.field_type, FieldType::Option(_));
-
-                            if is_nullable {
-                                // For nullable fields, preserve NULL values on update
-                                update_assignments.push(format!(
-                                    "{} = (IF {} != NULL THEN $input.{} ELSE NULL END)",
-                                    table_field.field_name,
-                                    table_field.field_name,
-                                    table_field.field_name
-                                ));
-                            } else {
-                                update_assignments.push(format!(
-                                    "{} = $input.{}",
-                                    table_field.field_name, table_field.field_name
-                                ));
-                            }
+                            update_assignments.push(format!(
+                                "{} = $input.{}",
+                                table_field.field_name, table_field.field_name
+                            ));
                         }
                     }
                 }

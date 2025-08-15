@@ -1,9 +1,10 @@
 use crate::{coordinate::CoordinationGroup, schemasync::compare::PreservationMode};
+use bon::Builder;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 
 /// Configuration for Schemasync operations (database synchronization)
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Builder)]
 pub struct SchemasyncConfig {
     /// Database connection configuration
     pub database: DatabaseConfig,
@@ -39,7 +40,7 @@ pub enum AccessType {
     Jwt,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Builder)]
 pub struct SchemasyncMockGenConfig {
     /// overriden by table level  configs
     pub default_record_count: usize,
@@ -50,8 +51,9 @@ pub struct SchemasyncMockGenConfig {
     /// overriden by table level and field level configs
     pub default_batch_size: usize,
 
+    #[builder(default)]
     /// global table field coordination, Vec<(HashSet<TableName>, Vec<Coordination>)>
-    pub global_coordination_groups: Vec<CoordinationGroup>,
+    pub coordination_groups: Vec<CoordinationGroup>,
 
     pub full_refresh_mode: bool,
 }
@@ -71,48 +73,14 @@ impl DatabaseConfig {
             }],
             timeout: 60,
         };
-        trace!("Test database config - URL: {}, namespace: {}, database: {}, timeout: {}s", 
-               config.url, config.namespace, config.database, config.timeout);
+        trace!(
+            "Test database config - URL: {}, namespace: {}, database: {}, timeout: {}s",
+            config.url,
+            config.namespace,
+            config.database,
+            config.timeout
+        );
         trace!("Test access configs: {} entries", config.accesses.len());
-        config
-    }
-}
-
-impl SchemasyncMockGenConfig {
-    /// Creates a mock configuration suitable for testing
-    pub fn for_testing() -> Self {
-        debug!("Creating mock generation configuration for testing environment");
-        let config = Self {
-            default_record_count: 5,
-            default_preservation_mode: PreservationMode::Smart,
-            default_batch_size: 1000,
-            global_coordination_groups: Vec::new(),
-            full_refresh_mode: false,
-        };
-        trace!("Test mock config - record count: {}, preservation: {:?}, batch size: {}, full refresh: {}", 
-               config.default_record_count, config.default_preservation_mode, 
-               config.default_batch_size, config.full_refresh_mode);
-        trace!("Test coordination groups: {} entries", config.global_coordination_groups.len());
-        config
-    }
-}
-
-impl SchemasyncConfig {
-    /// Creates a configuration suitable for testing
-    /// This should only be used in test environments
-    pub fn for_testing() -> Self {
-        info!("Creating complete Schemasync configuration for testing environment");
-        let config = Self {
-            database: DatabaseConfig::for_testing(),
-            should_generate_mocks: true,
-            mock_gen_config: SchemasyncMockGenConfig::for_testing(),
-            performance: PerformanceConfig::default(),
-        };
-        debug!("Test schemasync config created - mock generation: {}", config.should_generate_mocks);
-        trace!("Performance config - memory limit: {}, cache duration: {}s, progressive loading: {}", 
-               config.performance.embedded_db_memory_limit, 
-               config.performance.cache_duration_seconds,
-               config.performance.use_progressive_loading);
         config
     }
 }
@@ -156,8 +124,12 @@ impl Default for PerformanceConfig {
             cache_duration_seconds: 300,
             use_progressive_loading: true,
         };
-        trace!("Default performance config - memory: {}, cache: {}s, progressive: {}", 
-               config.embedded_db_memory_limit, config.cache_duration_seconds, config.use_progressive_loading);
+        trace!(
+            "Default performance config - memory: {}, cache: {}s, progressive: {}",
+            config.embedded_db_memory_limit,
+            config.cache_duration_seconds,
+            config.use_progressive_loading
+        );
         config
     }
 }

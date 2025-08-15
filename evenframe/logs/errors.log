@@ -1,0 +1,195 @@
+ERRORS executing UPSERT for table employee: 32 errors found
+Statement 0: UnknownError - Found NULL for field `route`, with record `employee:1`, but expected a record<route>
+Failed statement: UPSERT employee:1 MERGE {  }
+Statement 1: UnknownError - Found NULL for field `route`, with record `employee:2`, but expected a record<route>
+Failed statement: 
+UPSERT employee:2 MERGE {  }
+Statement 2: UnknownError - Found NULL for field `route`, with record `employee:3`, but expected a record<route>
+Failed statement: 
+UPSERT employee:3 MERGE {  }
+Statement 3: UnknownError - Found NULL for field `route`, with record `employee:4`, but expected a record<route>
+Failed statement: 
+UPSERT employee:4 MERGE {  }
+Statement 4: UnknownError - Found NULL for field `route`, with record `employee:5`, but expected a record<route>
+Failed statement: 
+UPSERT employee:5 MERGE {  }
+Statement 5: UnknownError - Found NULL for field `route`, with record `employee:6`, but expected a record<route>
+Failed statement: 
+UPSERT employee:6 MERGE {  }
+Statement 6: UnknownError - Found NULL for field `route`, with record `employee:7`, but expected a record<route>
+Failed statement: 
+UPSERT employee:7 MERGE {  }
+Statement 7: UnknownError - Found NULL for field `route`, with record `employee:8`, but expected a record<route>
+Failed statement: 
+UPSERT employee:8 MERGE {  }
+Statement 8: UnknownError - Found NULL for field `route`, with record `employee:9`, but expected a record<route>
+Failed statement: 
+UPSERT employee:9 MERGE {  }
+Statement 9: UnknownError - Found NULL for field `route`, with record `employee:10`, but expected a record<route>
+Failed statement: 
+UPSERT employee:10 MERGE {  }
+Statement 10: UnknownError - Found NULL for field `route`, with record `employee:11`, but expected a record<route>
+Failed statement: 
+UPSERT employee:11 MERGE {  }
+Statement 11: UnknownError - Found NULL for field `route`, with record `employee:12`, but expected a record<route>
+Failed statement: 
+UPSERT employee:12 MERGE {  }
+Statement 12: UnknownError - Found NULL for field `route`, with record `employee:13`, but expected a record<route>
+Failed statement: 
+UPSERT employee:13 MERGE {  }
+Statement 13: UnknownError - Found NULL for field `route`, with record `employee:14`, but expected a record<route>
+Failed statement: 
+UPSERT employee:14 MERGE {  }
+Statement 14: UnknownError - Found NULL for field `route`, with record `employee:15`, but expected a record<route>
+Failed statement: 
+UPSERT employee:15 MERGE {  }
+Statement 15: UnknownError - Found NULL for field `route`, with record `employee:16`, but expected a record<route>
+Failed statement: 
+UPSERT employee:16 MERGE {  }
+Statement 16: UnknownError - Found NULL for field `route`, with record `employee:17`, but expected a record<route>
+Failed statement: 
+UPSERT employee:17 MERGE {  }
+Statement 17: UnknownError - Found NULL for field `route`, with record `employee:18`, but expected a record<route>
+Failed statement: 
+UPSERT employee:18 MERGE {  }
+Statement 18: UnknownError - Found NULL for field `route`, with record `employee:19`, but expected a record<route>
+Failed statement: 
+UPSERT employee:19 MERGE {  }
+Statement 19: UnknownError - Found NULL for field `route`, with record `employee:20`, but expected a record<route>
+Failed statement: 
+UPSERT employee:20 MERGE {  }
+Statement 20: UnknownError - Found NULL for field `route`, with record `employee:21`, but expected a record<route>
+Failed statement: 
+UPSERT employee:21 MERGE {  }
+Statement 21: UnknownError - Found NULL for field `route`, with record `employee:22`, but expected a record<route>
+Failed statement: 
+UPSERT employee:22 MERGE {  }
+Statement 22: UnknownError - Found NULL for field `route`, with record `employee:23`, but expected a record<route>
+Failed statement: 
+UPSERT employee:23 MERGE {  }
+Statement 23: UnknownError - Found NULL for field `route`, with record `employee:24`, but expected a record<route>
+Failed statement: 
+UPSERT employee:24 MERGE {  }
+Statement 24: UnknownError - Found NULL for field `route`, with record `employee:25`, but expected a record<route>
+Failed statement: 
+UPSERT employee:25 MERGE {  }
+Statement 25: UnknownError - Found NULL for field `route`, with record `employee:26`, but expected a record<route>
+Failed statement: 
+UPSERT employee:26 MERGE {  }
+Statement 26: UnknownError - Found NULL for field `route`, with record `employee:27`, but expected a record<route>
+Failed statement: 
+UPSERT employee:27 MERGE {  }
+Statement 27: UnknownError - Found NULL for field `route`, with record `employee:28`, but expected a record<route>
+Failed statement: 
+UPSERT employee:28 MERGE {  }
+Statement 28: UnknownError - Found NULL for field `route`, with record `employee:29`, but expected a record<route>
+Failed statement: 
+UPSERT employee:29 MERGE {  }
+Statement 29: UnknownError - Found NULL for field `route`, with record `employee:30`, but expected a record<route>
+Failed statement: 
+UPSERT employee:30 MERGE {  }
+Statement 30: UnknownError - Found NULL for field `route`, with record `employee:31`, but expected a record<route>
+Failed statement: 
+UPSERT employee:31 MERGE {  }
+Statement 31: UnknownError - Found NULL for field `route`, with record `employee:32`, but expected a record<route>
+Failed statement: 
+UPSERT employee:32 MERGE {  }
+ERRORS executing UPSERT for table employee: 32 errors found
+Statement 0: UnknownError - Found NULL for field `route`, with record `employee:1`, but expected a record<route>
+Failed statement: UPSERT employee:1 MERGE {  }
+Statement 1: UnknownError - Found NULL for field `route`, with record `employee:2`, but expected a record<route>
+Failed statement: 
+UPSERT employee:2 MERGE {  }
+Statement 2: UnknownError - Found NULL for field `route`, with record `employee:3`, but expected a record<route>
+Failed statement: 
+UPSERT employee:3 MERGE {  }
+Statement 3: UnknownError - Found NULL for field `route`, with record `employee:4`, but expected a record<route>
+Failed statement: 
+UPSERT employee:4 MERGE {  }
+Statement 4: UnknownError - Found NULL for field `route`, with record `employee:5`, but expected a record<route>
+Failed statement: 
+UPSERT employee:5 MERGE {  }
+Statement 5: UnknownError - Found NULL for field `route`, with record `employee:6`, but expected a record<route>
+Failed statement: 
+UPSERT employee:6 MERGE {  }
+Statement 6: UnknownError - Found NULL for field `route`, with record `employee:7`, but expected a record<route>
+Failed statement: 
+UPSERT employee:7 MERGE {  }
+Statement 7: UnknownError - Found NULL for field `route`, with record `employee:8`, but expected a record<route>
+Failed statement: 
+UPSERT employee:8 MERGE {  }
+Statement 8: UnknownError - Found NULL for field `route`, with record `employee:9`, but expected a record<route>
+Failed statement: 
+UPSERT employee:9 MERGE {  }
+Statement 9: UnknownError - Found NULL for field `route`, with record `employee:10`, but expected a record<route>
+Failed statement: 
+UPSERT employee:10 MERGE {  }
+Statement 10: UnknownError - Found NULL for field `route`, with record `employee:11`, but expected a record<route>
+Failed statement: 
+UPSERT employee:11 MERGE {  }
+Statement 11: UnknownError - Found NULL for field `route`, with record `employee:12`, but expected a record<route>
+Failed statement: 
+UPSERT employee:12 MERGE {  }
+Statement 12: UnknownError - Found NULL for field `route`, with record `employee:13`, but expected a record<route>
+Failed statement: 
+UPSERT employee:13 MERGE {  }
+Statement 13: UnknownError - Found NULL for field `route`, with record `employee:14`, but expected a record<route>
+Failed statement: 
+UPSERT employee:14 MERGE {  }
+Statement 14: UnknownError - Found NULL for field `route`, with record `employee:15`, but expected a record<route>
+Failed statement: 
+UPSERT employee:15 MERGE {  }
+Statement 15: UnknownError - Found NULL for field `route`, with record `employee:16`, but expected a record<route>
+Failed statement: 
+UPSERT employee:16 MERGE {  }
+Statement 16: UnknownError - Found NULL for field `route`, with record `employee:17`, but expected a record<route>
+Failed statement: 
+UPSERT employee:17 MERGE {  }
+Statement 17: UnknownError - Found NULL for field `route`, with record `employee:18`, but expected a record<route>
+Failed statement: 
+UPSERT employee:18 MERGE {  }
+Statement 18: UnknownError - Found NULL for field `route`, with record `employee:19`, but expected a record<route>
+Failed statement: 
+UPSERT employee:19 MERGE {  }
+Statement 19: UnknownError - Found NULL for field `route`, with record `employee:20`, but expected a record<route>
+Failed statement: 
+UPSERT employee:20 MERGE {  }
+Statement 20: UnknownError - Found NULL for field `route`, with record `employee:21`, but expected a record<route>
+Failed statement: 
+UPSERT employee:21 MERGE {  }
+Statement 21: UnknownError - Found NULL for field `route`, with record `employee:22`, but expected a record<route>
+Failed statement: 
+UPSERT employee:22 MERGE {  }
+Statement 22: UnknownError - Found NULL for field `route`, with record `employee:23`, but expected a record<route>
+Failed statement: 
+UPSERT employee:23 MERGE {  }
+Statement 23: UnknownError - Found NULL for field `route`, with record `employee:24`, but expected a record<route>
+Failed statement: 
+UPSERT employee:24 MERGE {  }
+Statement 24: UnknownError - Found NULL for field `route`, with record `employee:25`, but expected a record<route>
+Failed statement: 
+UPSERT employee:25 MERGE {  }
+Statement 25: UnknownError - Found NULL for field `route`, with record `employee:26`, but expected a record<route>
+Failed statement: 
+UPSERT employee:26 MERGE {  }
+Statement 26: UnknownError - Found NULL for field `route`, with record `employee:27`, but expected a record<route>
+Failed statement: 
+UPSERT employee:27 MERGE {  }
+Statement 27: UnknownError - Found NULL for field `route`, with record `employee:28`, but expected a record<route>
+Failed statement: 
+UPSERT employee:28 MERGE {  }
+Statement 28: UnknownError - Found NULL for field `route`, with record `employee:29`, but expected a record<route>
+Failed statement: 
+UPSERT employee:29 MERGE {  }
+Statement 29: UnknownError - Found NULL for field `route`, with record `employee:30`, but expected a record<route>
+Failed statement: 
+UPSERT employee:30 MERGE {  }
+Statement 30: UnknownError - Found NULL for field `route`, with record `employee:31`, but expected a record<route>
+Failed statement: 
+UPSERT employee:31 MERGE {  }
+Statement 31: UnknownError - Found NULL for field `route`, with record `employee:32`, but expected a record<route>
+Failed statement: 
+UPSERT employee:32 MERGE {  }
+ERRORS executing UPSERT for table company: 1 errors found
+Statement 0: UnknownError - Found { city: 'kT5jYfQh', county: 'AqXZULzI', description: '6Z1bA5Xc', id: company:1, is_active: true, name: 'eFDwNw30', state: 'h9qOcNuo', tax_agency: 'jBWCLVdj', tax_components: { "6IMnRWku": 84.43f }, zip: 32 } for field `default_tax`, with record `company:1`, but expected a record<tax_rate>
+Failed statement: UPSERT company:1 MERGE { id: r'company:1', legal_name: 'd2Z9ewS7', phones: [{ main: false, phone_type: 'Hjj8nRq6', number: 'ewoIylxH', can_text: false, can_call: true }, { main: true, phone_type: 'ZwctqTXD', number: '92XZpO1R', can_text: true, can_call: false }, { main: false, phone_type: 'SIu5OSTj', number: 'ZQqW03qP', can_text: true, can_call: true }], fax: 'DF9m5h1I', email: 'PcJMYemd', website: 'SfzXRiTg', tax_id: '8Hr6MiCw', reference_number: 92, postal_code_lookup: 'G7hezGwf', time_zone: 'DOYYJhYL', default_tax: { id: r'company:1', name: 'eFDwNw30', tax_agency: 'jBWCLVdj', zip: 32, city: 'kT5jYfQh', county: 'AqXZULzI', state: 'h9qOcNuo', is_active: true, description: '6Z1bA5Xc', tax_components: { '6IMnRWku': 84.43f } }, default_tax_location: 'M7mdmGlJ', default_area_code: 9, default_account_type: 'XgGqntac', lookup_formatting: 'OWVuLDs9', account_name_format: 'R9c3d96H', merchant_service_provider: (IF merchant_service_provider != NULL THEN null ELSE NULL END), date_display_style: 'H9RhQEU1', has_auto_commission: true, has_auto_daylight_savings: false, has_auto_fms_tracking: false, has_notifications: false, has_required_lead_source: true, has_required_email: true, has_sort_service_items_alphabetically: false, has_attach_order_to_appointment_emails: false, schedule_interval: 91 }

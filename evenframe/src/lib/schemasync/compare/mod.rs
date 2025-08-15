@@ -1620,8 +1620,8 @@ fn collect_referenced_objects(
                 for variant in &enum_def.variants {
                     if let Some(variant_data) = &variant.data {
                         match variant_data {
-                            VariantData::InlineStruct(inline_struct) => {
-                                objects_to_process.push(inline_struct.name.clone())
+                            VariantData::InlineStruct(enum_struct) => {
+                                objects_to_process.push(enum_struct.struct_name.clone())
                             }
                             VariantData::DataStructureRef(referenced_field_type) => {
                                 if let FieldType::Other(data) = referenced_field_type {

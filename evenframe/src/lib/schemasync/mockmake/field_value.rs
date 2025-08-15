@@ -1,14 +1,35 @@
 use crate::{
+    coordinate::CoordinationId,
     format::Format,
     mockmake::Mockmaker,
     schemasync::TableConfig,
-    types::{FieldType, StructConfig, StructField, TaggedUnion, VariantData},
+    types::{FieldType, StructField, VariantData},
 };
 use bon::Builder;
 use chrono_tz::TZ_VARIANTS;
 use convert_case::{Case, Casing};
 use rand::{rngs::ThreadRng, seq::IndexedRandom, Rng};
-use std::collections::HashMap;
+use std::collections::HashSet;
+use tracing;
+
+// The context struct is now simple again, with a direct reference.
+#[derive(Clone)]
+struct Frame<'a> {
+    field: &'a StructField,
+    table_config: &'a TableConfig,
+    field_type: &'a FieldType,
+    field_path: String,             // Track the full path for nested fields
+    visited_types: HashSet<String>, // Track visited types to avoid infinite recursion
+}
+
+enum WorkItem<'a> {
+    Generate(Frame<'a>),
+    AssembleVec { count: usize },
+    AssembleTuple { count: usize },
+    AssembleStruct { field_names: Vec<String> },
+    AssembleMap { count: usize },
+    AssembleEnum,
+}
 
 #[derive(Debug, Builder)]
 pub struct FieldValueGenerator<'a> {
@@ -16,342 +37,434 @@ pub struct FieldValueGenerator<'a> {
     table_config: &'a TableConfig,
     field: &'a StructField,
     id_index: &'a usize,
-    coordinated_values: &'a HashMap<String, String>,
 }
 
 impl<'a> FieldValueGenerator<'a> {
+    // Was having stack overflow so created an iterative version
     pub fn run(&self) -> String {
-        if let Some(format) = &self.field.format {
-            return self.handle_format(format);
-        }
-        self.generate_field_value(&self.field.field_type)
-    }
-
-    pub fn generate_field_value(&self, field_type: &FieldType) -> String {
-        tracing::trace!(
-            field_name = %self.field.field_name,
-            field_type = ?self.field.field_type,
-            "Generating field value"
-        );
+        let mut work_stack: Vec<WorkItem<'a>> = Vec::new();
+        let mut value_stack: Vec<String> = Vec::new();
         let mut rng = rand::rng();
-        match field_type {
-            FieldType::String => format!("'{}'", Mockmaker::random_string(8)),
 
-            FieldType::Char => {
-                let c = rng.random_range(32u8..=126u8) as char;
-                format!("'{}'", c)
-            }
-            FieldType::Bool => format!("{}", rng.random_bool(0.5)),
-            FieldType::Unit => "NONE".to_string(),
-            FieldType::Decimal => format!("{:.3}dec", rng.random_range(0.0..100.0)),
-            FieldType::F32 | FieldType::F64 | FieldType::OrderedFloat(_) => {
-                format!("{:.2}f", rng.random_range(0.0..100.0))
-            }
-            // Combine signed integer types
-            FieldType::I8
-            | FieldType::I16
-            | FieldType::I32
-            | FieldType::I64
-            | FieldType::I128
-            | FieldType::Isize => {
-                format!("{}", rng.random_range(0..100))
-            }
-            // Combine unsigned integer types
-            FieldType::U8
-            | FieldType::U16
-            | FieldType::U32
-            | FieldType::U64
-            | FieldType::U128
-            | FieldType::Usize => format!("{}", rng.random_range(0..100)),
+        let initial_context = Frame {
+            field: self.field,
+            table_config: self.table_config,
+            field_type: &self.field.field_type,
+            field_path: self.field.field_name.clone(),
+            visited_types: HashSet::new(),
+        };
+        work_stack.push(WorkItem::Generate(initial_context));
 
-            FieldType::DateTime => format!("d'{}'", chrono::Utc::now().to_rfc3339()),
+        while let Some(work_item) = work_stack.pop() {
+            match work_item {
+                WorkItem::Generate(ctx) => {
+                    if let Some(coordinated_value) = self.mockmaker.coordinated_values.get(
+                        &CoordinationId::builder()
+                            .field_name(ctx.field_path.clone())
+                            .table_name(self.table_config.table_name.to_string())
+                            .build(),
+                    ) {
+                        value_stack.push(coordinated_value.to_string());
+                    } else if let Some(format) = &ctx.field.format {
+                        value_stack.push(self.handle_format(format));
+                    } else {
+                        match ctx.field_type {
+                            FieldType::String => {
+                                value_stack.push(format!("'{}'", Mockmaker::random_string(8)))
+                            }
+                            FieldType::Char => value_stack
+                                .push(format!("'{}'", rng.random_range(32u8..=126u8) as char)),
+                            FieldType::Bool => {
+                                value_stack.push(format!("{}", rng.random_bool(0.5)))
+                            }
+                            FieldType::Unit => value_stack.push("NONE".to_string()),
+                            FieldType::Decimal => {
+                                value_stack.push(format!("{:.3}dec", rng.random_range(0.0..100.0)))
+                            }
+                            FieldType::F32 | FieldType::F64 | FieldType::OrderedFloat(_) => {
+                                value_stack.push(format!("{:.2}f", rng.random_range(0.0..100.0)))
+                            }
+                            FieldType::I8
+                            | FieldType::I16
+                            | FieldType::I32
+                            | FieldType::I64
+                            | FieldType::I128
+                            | FieldType::Isize => {
+                                value_stack.push(format!("{}", rng.random_range(0..100)))
+                            }
+                            FieldType::U8
+                            | FieldType::U16
+                            | FieldType::U32
+                            | FieldType::U64
+                            | FieldType::U128
+                            | FieldType::Usize => {
+                                value_stack.push(format!("{}", rng.random_range(0..100)))
+                            }
+                            FieldType::DateTime => {
+                                value_stack.push(format!("d'{}'", chrono::Utc::now().to_rfc3339()))
+                            }
+                            FieldType::Duration => value_stack.push(format!(
+                                "duration::from::nanos({})",
+                                rng.random_range(0..86_400_000_000_000i64)
+                            )),
+                            FieldType::Timezone => {
+                                let tz = &TZ_VARIANTS[rng.random_range(0..TZ_VARIANTS.len())];
+                                value_stack.push(format!("'{}'", tz.name()));
+                            }
+                            FieldType::EvenframeRecordId => {
+                                value_stack.push(self.handle_record_id(
+                                    &ctx.field.field_name,
+                                    &ctx.table_config.table_name,
+                                    &ctx.table_config,
+                                    &mut rng,
+                                ))
+                            }
+                            FieldType::Option(inner_type) => {
+                                if rng.random_bool(0.5) {
+                                    value_stack.push("null".to_string());
+                                } else {
+                                    work_stack.push(WorkItem::Generate(Frame {
+                                        field_type: inner_type,
+                                        ..ctx.clone()
+                                    }));
+                                }
+                            }
+                            FieldType::Vec(inner_type) => {
+                                let count = rng.random_range(2..10);
+                                work_stack.push(WorkItem::AssembleVec { count });
+                                for _ in 0..count {
+                                    work_stack.push(WorkItem::Generate(Frame {
+                                        field_type: inner_type,
+                                        ..ctx.clone()
+                                    }));
+                                }
+                            }
+                            FieldType::Tuple(types) => {
+                                work_stack.push(WorkItem::AssembleTuple { count: types.len() });
+                                for inner_type in types.iter().rev() {
+                                    work_stack.push(WorkItem::Generate(Frame {
+                                        field_type: inner_type,
+                                        ..ctx.clone()
+                                    }));
+                                }
+                            }
+                            FieldType::Struct(fields) => {
+                                let field_names: Vec<String> =
+                                    fields.iter().map(|(name, _)| name.clone()).collect();
+                                work_stack.push(WorkItem::AssembleStruct { field_names });
 
-            FieldType::Duration => {
-                // Generate random duration in nanoseconds (0 to 1 day in nanos)
-                let nanos = rng.random_range(0..86_400_000_000_000i64); // 0 to 24 hours
-                format!("duration::from::nanos({})", nanos)
+                                for (nested_field_name, ftype) in fields.iter().rev() {
+                                    work_stack.push(WorkItem::Generate(Frame {
+                                        field_type: ftype,
+                                        field_path: format!(
+                                            "{}.{}",
+                                            ctx.field_path.clone(),
+                                            nested_field_name
+                                        ),
+                                        ..ctx.clone()
+                                    }));
+                                }
+                            }
+                            FieldType::HashMap(key_ft, value_ft)
+                            | FieldType::BTreeMap(key_ft, value_ft) => {
+                                let count = rng.random_range(0..3);
+                                work_stack.push(WorkItem::AssembleMap { count });
+                                for _ in 0..count {
+                                    work_stack.push(WorkItem::Generate(Frame {
+                                        field_type: value_ft,
+                                        ..ctx.clone()
+                                    }));
+                                    work_stack.push(WorkItem::Generate(Frame {
+                                        field_type: key_ft,
+                                        ..ctx.clone()
+                                    }));
+                                }
+                            }
+                            FieldType::RecordLink(inner_type) => {
+                                // RecordLink should ALWAYS reference a table and generate a record ID
+                                match inner_type.as_ref() {
+                                    FieldType::Other(type_name) => {
+                                        if let Some(table_config) = self
+                                            .mockmaker
+                                            .tables
+                                            .get(&type_name.to_case(Case::Snake))
+                                        {
+                                            // Generate a record ID for this table
+                                            if let Some(possible_ids) =
+                                                self.mockmaker.id_map.get(&table_config.table_name)
+                                            {
+                                                if !possible_ids.is_empty() {
+                                                    let id = format!(
+                                                        "r'{}'",
+                                                        possible_ids[rng
+                                                            .random_range(0..possible_ids.len())]
+                                                    );
+                                                    value_stack.push(id);
+                                                } else {
+                                                    panic!("No IDs generated for table {} in RecordLink", &table_config.table_name);
+                                                }
+                                            } else {
+                                                panic!(
+                                                    "No ID map entry for table {} in RecordLink",
+                                                    &table_config.table_name
+                                                );
+                                            }
+                                        } else {
+                                            panic!(
+                                                "RecordLink references non-table type '{}' in field {}. RecordLink should only reference tables.",
+                                                type_name, ctx.field.field_name
+                                            );
+                                        }
+                                    }
+                                    _ => {
+                                        panic!(
+                                            "RecordLink contains non-Other type {:?} in field {}. RecordLink should only contain Other(table_name).",
+                                            inner_type, ctx.field.field_name
+                                        );
+                                    }
+                                }
+                            }
+                            FieldType::Other(ref type_name) => {
+                                // Check if we've already visited this type to avoid infinite recursion
+                                if ctx.visited_types.contains(type_name) {
+                                    tracing::debug!(
+                                        type_name = %type_name,
+                                        field_path = %ctx.field_path,
+                                        "Detected circular reference, generating null"
+                                    );
+                                    value_stack.push("null".to_string());
+                                    continue;
+                                }
+
+                                let snake_case_name = type_name.to_case(Case::Snake);
+                                if let Some((table_name, _)) = self
+                                    .mockmaker
+                                    .tables
+                                    .iter()
+                                    .find(|(_, tc)| &tc.table_name == type_name)
+                                {
+                                    let value = if let Some(possible_ids) =
+                                        self.mockmaker.id_map.get(table_name)
+                                    {
+                                        format!(
+                                            "r'{}'",
+                                            possible_ids[rng.random_range(0..possible_ids.len())]
+                                        )
+                                    } else {
+                                        panic!(
+                                            "There were no id's for the table {}, field {}",
+                                            table_name, ctx.field.field_name
+                                        );
+                                    };
+                                    value_stack.push(value);
+                                } else if let Some(struct_config) = self
+                                    .mockmaker
+                                    .objects
+                                    .get(type_name)
+                                    .or_else(|| self.mockmaker.objects.get(&snake_case_name))
+                                {
+                                    let field_names: Vec<String> = struct_config
+                                        .fields
+                                        .iter()
+                                        .map(|f| f.field_name.clone())
+                                        .collect();
+                                    work_stack.push(WorkItem::AssembleStruct { field_names });
+
+                                    // Add current type to visited types for nested fields
+                                    let mut new_visited = ctx.visited_types.clone();
+                                    new_visited.insert(type_name.clone());
+
+                                    for struct_field in struct_config.fields.iter().rev() {
+                                        let new_ctx = Frame {
+                                            field: struct_field,
+                                            field_type: &struct_field.field_type,
+                                            field_path: format!(
+                                                "{}.{}",
+                                                ctx.field_path.clone(),
+                                                struct_field.field_name
+                                            ),
+                                            table_config: ctx.table_config,
+                                            visited_types: new_visited.clone(),
+                                        };
+                                        work_stack.push(WorkItem::Generate(new_ctx));
+                                    }
+                                } else if let Some(tagged_union) =
+                                    self.mockmaker.enums.get(type_name)
+                                {
+                                    let variant = tagged_union
+                                        .variants
+                                        .choose(&mut rng)
+                                        .expect("Failed to select a random enum variant");
+                                    if let Some(ref variant_data) = variant.data {
+                                        // This logic is now restructured.
+                                        match variant_data {
+                                            VariantData::InlineStruct(enum_struct) => {
+                                                let struct_config = self.mockmaker.objects.get(&enum_struct.struct_name).expect("Inline enum struct should have corresponding object definition");
+                                                let field_names: Vec<String> = struct_config
+                                                    .fields
+                                                    .iter()
+                                                    .map(|f| f.field_name.clone())
+                                                    .collect();
+                                                // Since the value of an enum with data replaces the enum, we just push the struct work items.
+                                                work_stack
+                                                    .push(WorkItem::AssembleStruct { field_names });
+
+                                                // Add current enum type to visited types
+                                                let mut new_visited = ctx.visited_types.clone();
+                                                new_visited.insert(type_name.clone());
+
+                                                for struct_field in
+                                                    struct_config.fields.iter().rev()
+                                                {
+                                                    let new_ctx = Frame {
+                                                        field: struct_field,
+                                                        field_type: &struct_field.field_type,
+                                                        field_path: format!(
+                                                            "{}.{}",
+                                                            ctx.field_path.clone(),
+                                                            struct_field.field_name
+                                                        ),
+                                                        table_config: ctx.table_config,
+                                                        visited_types: new_visited.clone(),
+                                                    };
+                                                    work_stack.push(WorkItem::Generate(new_ctx));
+                                                }
+                                            }
+                                            VariantData::DataStructureRef(field_type) => {
+                                                work_stack.push(WorkItem::AssembleEnum);
+                                                work_stack.push(WorkItem::Generate(Frame {
+                                                    field_type,
+                                                    ..ctx.clone()
+                                                }));
+                                            }
+                                        }
+                                    } else {
+                                        value_stack.push(format!("'{}'", variant.name));
+                                    }
+                                } else {
+                                    panic!(
+                                        "This type could not be parsed: table {}, field {}",
+                                        ctx.table_config.table_name, ctx.field.field_name
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                WorkItem::AssembleVec { count } => {
+                    let items: Vec<_> = value_stack.drain(value_stack.len() - count..).collect();
+                    value_stack.push(format!("[{}]", items.join(", ")));
+                }
+                WorkItem::AssembleTuple { count } => {
+                    let items: Vec<_> = value_stack.drain(value_stack.len() - count..).collect();
+                    value_stack.push(format!("({})", items.join(", ")));
+                }
+                WorkItem::AssembleStruct { field_names } => {
+                    let count = field_names.len();
+                    let values: Vec<_> = value_stack.drain(value_stack.len() - count..).collect();
+                    let assignments: Vec<String> = field_names
+                        .into_iter()
+                        .zip(values.into_iter())
+                        .map(|(name, value)| format!("{}: {}", name, value))
+                        .collect();
+                    value_stack.push(format!("{{ {} }}", assignments.join(", ")));
+                }
+                WorkItem::AssembleMap { count } => {
+                    let mut entries = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        let value = value_stack.pop().unwrap();
+                        let key = value_stack.pop().unwrap();
+                        entries.push(format!("{}: {}", key, value));
+                    }
+                    entries.reverse();
+                    value_stack.push(format!("{{ {} }}", entries.join(", ")));
+                }
+                WorkItem::AssembleEnum { .. } => {
+                    // No action needed; the generated value just stays on the stack.
+                }
             }
-            FieldType::Timezone => {
-                // Generate random IANA timezone string from chrono_tz
-                let tz = &TZ_VARIANTS[rng.random_range(0..TZ_VARIANTS.len())];
-                format!("'{}'", tz.name())
-            }
-            FieldType::EvenframeRecordId => self.handle_record_id(
-                &self.field.field_name,
-                &self.table_config.struct_config.name,
-                &mut rng,
-            ),
-            // For an Option, randomly decide whether to generate a value or use NULL.
-            FieldType::Option(inner_type) => self.handle_option(inner_type, &mut rng),
-            // For a vector, generate a dummy array with a couple of elements.
-            FieldType::Vec(inner_type) => self.handle_vec(inner_type),
-            // For a tuple, recursively generate values for each component.
-            FieldType::Tuple(types) => self.handle_tuple(types),
-            // For a struct (named fields), create a JSON-like object.
-            FieldType::Struct(fields) => self.handle_struct(fields),
-            FieldType::HashMap(key, value) => self.handle_hash_map(key, value),
-            FieldType::BTreeMap(key, value) => self.handle_b_tree_map(key, value),
-            FieldType::RecordLink(inner_type) => self.generate_field_value(inner_type),
-            // For other types, try to see if the type is actually a reference to another table, a server-only schema, or an enum.
-            FieldType::Other(ref type_name) => self.handle_other(type_name, &mut rng),
         }
+
+        assert_eq!(
+            value_stack.len(),
+            1,
+            "Generation ended with not exactly one value on the stack."
+        );
+        value_stack.pop().unwrap()
     }
 
     pub fn handle_format(&self, format: &Format) -> String {
         let generated = format.generate_formatted_value();
-
-        // Check if format generates numeric or boolean values that shouldn't be quoted
         match format {
-            // These formats generate numeric values, don't quote
             Format::Percentage
             | Format::Latitude
             | Format::Longitude
             | Format::CurrencyAmount
             | Format::AppointmentDurationNs => generated,
-
             Format::DateTime | Format::AppointmentDateTime | Format::DateWithinDays(_) => {
                 format!("d'{}'", generated)
             }
-
-            // Most formats generate strings, quote them
             _ => format!("'{}'", generated),
         }
     }
 
     fn handle_record_id(
         &self,
-        field_name: &String,
-        table_name: &String,
+        field_name: &str,
+        table_name: &str,
+        table_config: &TableConfig,
         rng: &mut ThreadRng,
     ) -> String {
-        {
-            if self.table_config.relation.is_none() && field_name == "id" {
-                match self.mockmaker.id_map.get(table_name) {
-                    Some(ids) => return format!("r'{}'", ids[*self.id_index].clone()),
-                    None => panic!(
-                        "{}",
-                        format!(
-                            "There were no id's for the table {}, field {}",
-                            table_name, field_name
-                        )
-                    ),
-                };
-            } else if field_name == "in" {
-                // safe unwrap, we check if relation is some at the beginning of the function
-                let from_table = &self.table_config.relation.as_ref().unwrap().from;
-
-                let ids = self.mockmaker.id_map.get(from_table).unwrap_or_else(|| {
-                    panic!(
-                        "{}",
-                        format!(
-                            "There were no id's for the table {}, field {}",
-                            table_name, field_name
-                        )
-                    )
-                });
-
-                if ids.is_empty() {
-                    panic!(
-                        "{}",
-                        format!(
-                            "There were no id's for the table {}, field {}",
-                            table_name, field_name
-                        )
-                    )
-                }
-                return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
-            } else if field_name == "out" {
-                // safe unwrap, we check if relation is some at the beginning of the function
-                let to_table = &self.table_config.relation.as_ref().unwrap().to;
-                let ids = self
-                    .mockmaker
-                    .id_map
-                    .get(&to_table.clone())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "{}",
-                            format!(
-                                "There were no id's for the table {}, field {}",
-                                table_name, field_name
-                            )
-                        )
-                    });
-
-                if ids.is_empty() {
-                    panic!(
-                        "{}",
-                        format!(
-                            "There were no id's for the table {}, field {}",
-                            table_name, field_name
-                        )
-                    )
-                }
-                return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
-            }
-
-            panic!("EvenframeRecordId used for field other than in, out, or id. Should use RecordLink type")
-        }
-    }
-
-    fn handle_option(&self, inner_type: &FieldType, rng: &mut ThreadRng) -> String {
-        if rng.random_bool(0.5) {
-            "null".to_string()
-        } else {
-            self.generate_field_value(inner_type)
-        }
-    }
-
-    fn handle_vec(&self, inner_type: &FieldType) -> String {
-        let count = rand::rng().random_range(2..10);
-
-        let items: Vec<String> = (0..count)
-            .map(|_| self.generate_field_value(inner_type))
-            .collect();
-        format!("[{}]", items.join(", "))
-    }
-
-    fn handle_tuple(&self, types: &[FieldType]) -> String {
-        let values: Vec<String> = types
-            .iter()
-            .map(|inner_type| self.generate_field_value(inner_type))
-            .collect();
-        format!("({})", values.join(", "))
-    }
-
-    fn handle_struct(&self, fields: &[(String, FieldType)]) -> String {
-        // Build nested coordination context
-        let mut nested_coordinated_values = HashMap::new();
-        let field_prefix = format!("{}.", self.field.field_name);
-
-        // Extract coordinated values for nested fields
-        for (coord_field, coord_value) in self.coordinated_values {
-            if coord_field.starts_with(&field_prefix) {
-                let nested_field = &coord_field[field_prefix.len()..];
-                nested_coordinated_values.insert(nested_field.to_string(), coord_value.clone());
-            }
-        }
-
-        let field_values: Vec<String> = fields
-            .iter()
-            .map(|(fname, ftype)| {
-                // Check if we have a coordinated value for this nested field
-                let value = if let Some(coord_value) = nested_coordinated_values.get(fname) {
-                    // Use the coordinated value
-                    match ftype {
-                        FieldType::DateTime => format!("d'{}'", coord_value),
-                        FieldType::String => format!("'{}'", coord_value),
-                        _ => coord_value.clone(),
-                    }
+        if table_config.relation.is_some() && field_name == "in" {
+            let from_table = &table_config.relation.as_ref().unwrap().from;
+            if let Some(ids) = self.mockmaker.id_map.get(from_table) {
+                if !ids.is_empty() {
+                    return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
                 } else {
-                    self.generate_field_value(ftype)
-                };
-                format!("{}: {}", fname, value)
-            })
-            .collect();
-        format!("{{ {} }}", field_values.join(", "))
-    }
-
-    fn handle_hash_map(&self, key_ft: &FieldType, value_ft: &FieldType) -> String {
-        let count = rand::rng().random_range(0..3);
-        let entries: Vec<String> = (0..count)
-            .map(|_| {
-                let key_string = self.generate_field_value(key_ft);
-                let value_string = self.generate_field_value(value_ft);
-                format!("{}: {}", key_string, value_string)
-            })
-            .collect();
-        format!("{{ {} }}", entries.join(", "))
-    }
-
-    fn handle_b_tree_map(&self, key_ft: &FieldType, value_ft: &FieldType) -> String {
-        let count = rand::rng().random_range(0..3);
-        let entries: Vec<String> = (0..count)
-            .map(|_| {
-                let key_string = self.generate_field_value(key_ft);
-                let value_string = self.generate_field_value(value_ft);
-                format!("{}: {}", key_string, value_string)
-            })
-            .collect();
-        format!("{{ {} }}", entries.join(", "))
-    }
-
-    fn handle_other(&self, type_name: &String, rng: &mut ThreadRng) -> String {
-        let snake_case_name = type_name.to_case(Case::Snake);
-        // First try to find by matching struct name
-        if let Some((table_name, _)) = self.mockmaker.tables.iter().find(|(_, q)| {
-            &q.struct_config.name == type_name || q.struct_config.name == snake_case_name
-        }) {
-            self.handle_table(table_name, rng)
-        } else if let Some(struct_config) = self
-            .mockmaker
-            .objects
-            .get(type_name)
-            .or_else(|| self.mockmaker.objects.get(&snake_case_name))
-        {
-            self.handle_object(struct_config)
-        } else if let Some(tagged_union) = self.mockmaker.enums.get(type_name) {
-            self.handle_enum(tagged_union, rng)
-        } else {
-            panic!(
-                "{}",
-                format!(
-                    "This type could not be parsed table {}, field {}",
-                    self.table_config.struct_config.name, self.field.field_name
-                )
-            )
-        }
-    }
-
-    fn handle_table(&self, table_name: &String, rng: &mut ThreadRng) -> String {
-        if let Some(possible_ids) = self.mockmaker.id_map.get(table_name) {
-            let idx = rng.random_range(0..possible_ids.len());
-            format!("r'{}'", possible_ids[idx])
-        } else {
-            // Fallback if no ids were generated for this table
-            panic!(
-                "{}",
-                format!(
-                    "There were no id's for the table {}, field {}",
-                    table_name, self.field.field_name
-                )
-            )
-        }
-    }
-
-    fn handle_enum(&self, tagged_union: &TaggedUnion, rng: &mut ThreadRng) -> String {
-        let variant = tagged_union
-            .variants
-            .choose(rng)
-            .expect("Something went wrong selecting a random enum variant, returned None");
-        if let Some(ref variant_data) = variant.data {
-            // Generate dummy value for the enum variant's data, if available.
-            let variant_data_field_type = match variant_data {
-                VariantData::InlineStruct(inline_struct) => {
-                    &FieldType::Other(inline_struct.name.clone())
+                    return format!("r'{}:1'", from_table.to_lowercase());
                 }
-                VariantData::DataStructureRef(field_type) => field_type,
-            };
-            self.generate_field_value(variant_data_field_type)
+            } else {
+                panic!(
+                    "{}",
+                    format!(
+                        "There were no id's for the table {}, field {}",
+                        table_name, field_name
+                    )
+                )
+            }
+        } else if table_config.relation.is_some() && field_name == "out" {
+            let to_table = &table_config.relation.as_ref().unwrap().to;
+            if let Some(ids) = self.mockmaker.id_map.get(to_table) {
+                if !ids.is_empty() {
+                    return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
+                } else {
+                    panic!(
+                        "{}",
+                        format!(
+                            "There were no id's for the table {}, field {}",
+                            table_name, field_name
+                        )
+                    )
+                }
+            } else {
+                panic!(
+                    "{}",
+                    format!(
+                        "There were no id's for the table {}, field {}",
+                        table_name, field_name
+                    )
+                )
+            }
         } else {
-            format!("'{}'", variant.name)
+            if let Some(ids) = self.mockmaker.id_map.get(table_name) {
+                if *self.id_index < ids.len() {
+                    return format!("r'{}'", ids[*self.id_index].clone());
+                } else {
+                    panic!("Out of bounds index for {table_name}, {field_name}")
+                }
+            } else {
+                return format!("r'{}:{}'", table_name, &self.id_index);
+            }
         }
-    }
-
-    fn handle_object(&self, struct_config: &StructConfig) -> String {
-        let mut assignments = Vec::new();
-        for struct_field in &struct_config.fields {
-            let val = Self::builder()
-                .coordinated_values(self.coordinated_values)
-                .field(struct_field)
-                .id_index(self.id_index)
-                .mockmaker(self.mockmaker)
-                .table_config(self.table_config)
-                .build()
-                .run();
-
-            assignments.push(format!("{}: {val}", struct_field.field_name));
-        }
-        // Surreal accepts JSON-like objects with unquoted keys:
-        format!("{{ {} }}", assignments.join(", "))
     }
 }

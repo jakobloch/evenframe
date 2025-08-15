@@ -89,15 +89,16 @@ pub fn build_all_configs() -> (
                         file_types.iter().find(|&t| item_struct.ident == t.name)
                     {
                         debug!("Found Evenframe struct: {}", item_struct.ident);
-                        if let Some(config) = parse_struct_config(&item_struct) {
-                            struct_configs.insert(config.name.clone(), config.clone());
+                        if let Some(struct_config) = parse_struct_config(&item_struct) {
+                            struct_configs
+                                .insert(struct_config.struct_name.clone(), struct_config.clone());
 
                             if evenframe_type.has_id_field {
-                                // Build table config immediately (like before)
-                                let name = config.name.to_case(Case::Snake);
+                                // Build table struct_config immediately (like before)
+                                let table_name = struct_config.struct_name.to_case(Case::Snake);
                                 debug!(
-                                    "Building table config for: {} (snake_case: {})",
-                                    config.name, name
+                                    "Building table struct_config for: {} (snake_case: {})",
+                                    struct_config.struct_name, &table_name
                                 );
 
                                 // Parse mock data attribute which now returns MockGenerationConfig directly
@@ -105,7 +106,8 @@ pub fn build_all_configs() -> (
                                     parse_mock_data_attribute(&item_struct.attrs).ok().flatten();
 
                                 let table_config = TableConfig {
-                                    struct_config: config.clone(),
+                                    table_name: table_name.clone(),
+                                    struct_config: struct_config.clone(),
                                     relation: parse_relation_attribute(&item_struct.attrs)
                                         .ok()
                                         .flatten(),
@@ -114,7 +116,7 @@ pub fn build_all_configs() -> (
                                         .flatten(),
                                     mock_generation_config,
                                 };
-                                table_configs.insert(name, table_config);
+                                table_configs.insert(table_name, table_config);
                             }
                         }
                     }
@@ -129,11 +131,13 @@ pub fn build_all_configs() -> (
 
                             // Also extract inline structs from enum variants
                             for variant in &tagged_union.variants {
-                                if let Some(VariantData::InlineStruct(ref inline_struct)) =
+                                if let Some(VariantData::InlineStruct(ref enum_struct)) =
                                     variant.data
                                 {
-                                    struct_configs
-                                        .insert(inline_struct.name.clone(), inline_struct.clone());
+                                    struct_configs.insert(
+                                        enum_struct.struct_name.clone(),
+                                        enum_struct.clone(),
+                                    );
                                 }
                             }
                         }
@@ -155,15 +159,15 @@ pub fn build_all_configs() -> (
 }
 
 fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
-    let name = item_struct.ident.to_string();
-    trace!("Parsing struct config for: {}", name);
+    let struct_name = item_struct.ident.to_string();
+    trace!("Parsing struct config for: {}", struct_name);
     let mut fields = Vec::new();
 
     if let Fields::Named(ref fields_named) = item_struct.fields {
         debug!(
             "Processing {} fields for struct {}",
             fields_named.named.len(),
-            name
+            struct_name
         );
         for field in &fields_named.named {
             let field_name = field.ident.as_ref()?.to_string();
@@ -199,7 +203,7 @@ fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
         .unwrap_or_default();
 
     Some(StructConfig {
-        name, // Keep original name, don't convert to snake_case
+        struct_name, // Keep original name, don't convert to snake_case
         fields,
         validators: table_validators
             .into_iter()
@@ -256,7 +260,7 @@ fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
                 }
 
                 Some(VariantData::InlineStruct(StructConfig {
-                    name: variant_name.clone(),
+                    struct_name: variant_name.clone(),
                     fields: struct_fields,
                     validators: vec![],
                 }))

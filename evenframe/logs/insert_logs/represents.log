@@ -1,0 +1,174 @@
+
+Starting insert statement generation for table 'represents'
+Will generate 13 records for table represents
+Beginning individual INSERT statement generation
+Generating INSERT statement for record 1/13
+Using pre-generated ID from id_map: represents:1
+Processing field 'in'
+Generated value for field 'in': r'employee:30'
+Processing field 'out'
+Generated value for field 'out': r'account:10'
+Processing field 'id'
+Generated value for field 'id': r'represents:1'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.016770+00:00'
+Prepared 5 field assignments and 2 update assignments for record 0
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 2/13
+Using pre-generated ID from id_map: represents:2
+Processing field 'in'
+Generated value for field 'in': r'employee:20'
+Processing field 'out'
+Generated value for field 'out': r'account:11'
+Processing field 'id'
+Generated value for field 'id': r'represents:2'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.017780+00:00'
+Prepared 5 field assignments and 2 update assignments for record 1
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 3/13
+Using pre-generated ID from id_map: represents:3
+Processing field 'in'
+Generated value for field 'in': r'employee:1'
+Processing field 'out'
+Generated value for field 'out': r'account:6'
+Processing field 'id'
+Generated value for field 'id': r'represents:3'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.018741+00:00'
+Prepared 5 field assignments and 2 update assignments for record 2
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 4/13
+Using pre-generated ID from id_map: represents:4
+Processing field 'in'
+Generated value for field 'in': r'employee:3'
+Processing field 'out'
+Generated value for field 'out': r'account:5'
+Processing field 'id'
+Generated value for field 'id': r'represents:4'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.019757+00:00'
+Prepared 5 field assignments and 2 update assignments for record 3
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 5/13
+Using pre-generated ID from id_map: represents:5
+Processing field 'in'
+Generated value for field 'in': r'employee:12'
+Processing field 'out'
+Generated value for field 'out': r'account:11'
+Processing field 'id'
+Generated value for field 'id': r'represents:5'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.020725+00:00'
+Prepared 5 field assignments and 2 update assignments for record 4
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 6/13
+Using pre-generated ID from id_map: represents:6
+Processing field 'in'
+Generated value for field 'in': r'employee:29'
+Processing field 'out'
+Generated value for field 'out': r'account:10'
+Processing field 'id'
+Generated value for field 'id': r'represents:6'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.021715+00:00'
+Prepared 5 field assignments and 2 update assignments for record 5
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 7/13
+Using pre-generated ID from id_map: represents:7
+Processing field 'in'
+Generated value for field 'in': r'employee:12'
+Processing field 'out'
+Generated value for field 'out': r'account:13'
+Processing field 'id'
+Generated value for field 'id': r'represents:7'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.022684+00:00'
+Prepared 5 field assignments and 2 update assignments for record 6
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 8/13
+Using pre-generated ID from id_map: represents:8
+Processing field 'in'
+Generated value for field 'in': r'employee:30'
+Processing field 'out'
+Generated value for field 'out': r'account:2'
+Processing field 'id'
+Generated value for field 'id': r'represents:8'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.023671+00:00'
+Prepared 5 field assignments and 2 update assignments for record 7
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 9/13
+Using pre-generated ID from id_map: represents:9
+Processing field 'in'
+Generated value for field 'in': r'employee:6'
+Processing field 'out'
+Generated value for field 'out': r'account:2'
+Processing field 'id'
+Generated value for field 'id': r'represents:9'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.024596+00:00'
+Prepared 5 field assignments and 2 update assignments for record 8
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 10/13
+Using pre-generated ID from id_map: represents:10
+Processing field 'in'
+Generated value for field 'in': r'employee:24'
+Processing field 'out'
+Generated value for field 'out': r'account:12'
+Processing field 'id'
+Generated value for field 'id': r'represents:10'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.025594+00:00'
+Prepared 5 field assignments and 2 update assignments for record 9
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 11/13
+Using pre-generated ID from id_map: represents:11
+Processing field 'in'
+Generated value for field 'in': r'employee:13'
+Processing field 'out'
+Generated value for field 'out': r'account:2'
+Processing field 'id'
+Generated value for field 'id': r'represents:11'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.026472+00:00'
+Prepared 5 field assignments and 2 update assignments for record 10
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 12/13
+Using pre-generated ID from id_map: represents:12
+Processing field 'in'
+Generated value for field 'in': r'employee:7'
+Processing field 'out'
+Generated value for field 'out': r'account:13'
+Processing field 'id'
+Generated value for field 'id': r'represents:12'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.027638+00:00'
+Prepared 5 field assignments and 2 update assignments for record 11
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Generating INSERT statement for record 13/13
+Using pre-generated ID from id_map: represents:13
+Processing field 'in'
+Generated value for field 'in': r'employee:30'
+Processing field 'out'
+Generated value for field 'out': r'account:7'
+Processing field 'id'
+Generated value for field 'id': r'represents:13'
+Processing field 'date_started'
+Generated value for field 'date_started': d'2025-08-15T00:08:58.028640+00:00'
+Prepared 5 field assignments and 2 update assignments for record 12
+Generating RELATION INSERT statement
+Adding ON DUPLICATE KEY UPDATE clause with 2 updates
+Successfully generated 13 INSERT statements for table 'represents' (total length: 3170 bytes)

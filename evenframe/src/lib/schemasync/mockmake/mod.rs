@@ -1,11 +1,14 @@
 pub mod coordinate;
 pub mod field_value;
+pub mod field_value_recursive;
 pub mod format;
 pub mod regex_val_gen;
 
 use crate::{
     compare::{filter_changed_tables_and_objects, Comparator},
-    coordinate::{CoordinateIncrement, DerivationType, ExtractType, TransformType},
+    coordinate::{
+        CoherentDataset, Coordination, CoordinationGroup, CoordinationId, CoordinationPair,
+    },
     dependency::sort_tables_by_dependencies,
     evenframe_log,
     mockmake::format::Format,
@@ -17,14 +20,14 @@ use crate::{
     wrappers::EvenframeRecordId,
 };
 use bon::Builder;
-use chrono::{DateTime, Duration, NaiveDate, Utc};
 use convert_case::{Case, Casing};
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use surrealdb::engine::local::Db;
 use surrealdb::engine::remote::http::Client;
 use surrealdb::Surreal;
 use tracing;
+use uuid::Uuid;
 
 #[derive(Debug, Builder)]
 pub struct Mockmaker {
@@ -40,6 +43,7 @@ pub struct Mockmaker {
     pub(super) record_diffs: HashMap<String, i32>,
     filtered_tables: HashMap<String, TableConfig>,
     filtered_objects: HashMap<String, StructConfig>,
+    pub coordinated_values: HashMap<CoordinationId, String>,
 }
 
 impl Mockmaker {
@@ -61,6 +65,7 @@ impl Mockmaker {
             record_diffs: HashMap::new(),
             filtered_tables: HashMap::new(),
             filtered_objects: HashMap::new(),
+            coordinated_values: HashMap::new(),
         }
     }
 
@@ -86,7 +91,10 @@ impl Mockmaker {
         tracing::debug!("Step 5: Filtering changed tables and objects");
         self.filter_changes().await?;
 
-        tracing::debug!("Step 6: Generating mock data");
+        tracing::debug!("Step 6: Generating coordinated values");
+        self.generate_coordinated_values();
+
+        tracing::debug!("Step 7: Generating mock data");
         self.generate_mock_data().await?;
 
         tracing::info!("Mockmaker pipeline completed successfully");
@@ -337,372 +345,293 @@ impl Mockmaker {
         self.comparator.as_ref()?.get_new_schema()
     }
 
-    /// Generate sequential values for fields
-    pub fn generate_sequential_values(
-        fields: &[&StructField],
-        _index: usize,
-        increment: &CoordinateIncrement,
-    ) -> HashMap<String, String> {
-        tracing::trace!(field_count = fields.len(), "Generating sequential values");
-        let mut values = HashMap::new();
-
-        // Generate base value
-        let first_field = &fields[0];
-
-        match &first_field.format {
-            Some(Format::DateTime) => {
-                // Generate base datetime
-                let base: DateTime<Utc> = Utc::now();
-                values.insert(first_field.field_name.clone(), base.to_rfc3339());
-
-                // Generate subsequent values
-                for (i, field) in fields.iter().skip(1).enumerate() {
-                    let incremented = match increment {
-                        CoordinateIncrement::Days(d) => {
-                            base + Duration::days(*d as i64 * (i + 1) as i64)
-                        }
-                        CoordinateIncrement::Hours(h) => {
-                            base + Duration::hours(*h as i64 * (i + 1) as i64)
-                        }
-                        CoordinateIncrement::Minutes(m) => {
-                            base + Duration::minutes(*m as i64 * (i + 1) as i64)
-                        }
-                        _ => base, // Fallback to base if increment type doesn't match
-                    };
-                    values.insert(field.field_name.clone(), incremented.to_rfc3339());
-                }
-            }
-            Some(Format::Date) => {
-                // Generate base date
-                let base = NaiveDate::from_ymd_opt(2024, 1, 1)
-                    .or_else(|| NaiveDate::from_ymd_opt(2024, 1, 2))
-                    .or_else(|| NaiveDate::from_ymd_opt(2023, 12, 31))
-                    .expect("At least one of these dates should be valid");
-                values.insert(first_field.field_name.clone(), base.to_string());
-
-                // Generate subsequent values
-                for (i, field) in fields.iter().skip(1).enumerate() {
-                    let incremented = match increment {
-                        CoordinateIncrement::Days(d) => {
-                            base + Duration::days(*d as i64 * (i + 1) as i64)
-                        }
-                        _ => base, // For dates, only day increment makes sense
-                    };
-                    values.insert(field.field_name.clone(), incremented.to_string());
-                }
-            }
-            Some(Format::DateWithinDays(_)) => {
-                // Generate base datetime for DateWithinDays format
-                let base: DateTime<Utc> = Utc::now();
-                values.insert(first_field.field_name.clone(), base.to_rfc3339());
-
-                // Generate subsequent values
-                for (i, field) in fields.iter().skip(1).enumerate() {
-                    let incremented = match increment {
-                        CoordinateIncrement::Days(d) => {
-                            base + Duration::days(*d as i64 * (i + 1) as i64)
-                        }
-                        CoordinateIncrement::Hours(h) => {
-                            base + Duration::hours(*h as i64 * (i + 1) as i64)
-                        }
-                        CoordinateIncrement::Minutes(m) => {
-                            base + Duration::minutes(*m as i64 * (i + 1) as i64)
-                        }
-                        _ => base, // Fallback to base if increment type doesn't match
-                    };
-                    values.insert(field.field_name.clone(), incremented.to_rfc3339());
-                }
-            }
-            _ => {
-                // Numeric sequential
-                let mut rng = rand::rng();
-                let base: f64 = rng.random_range(0.0..100.0);
-
-                for (i, field) in fields.iter().enumerate() {
-                    let value = match increment {
-                        CoordinateIncrement::Numeric(n) => base + (n * i as f64),
-                        _ => base + i as f64,
-                    };
-                    values.insert(field.field_name.clone(), value.to_string());
-                }
-            }
-        }
-
-        values
-    }
-
-    /// Generate values that sum to a total
-    fn generate_sum_values(
-        fields: &[&StructField],
-        _index: usize,
-        total: f64,
-    ) -> HashMap<String, String> {
-        tracing::trace!(
-            field_count = fields.len(),
-            total = total,
-            "Generating sum values"
-        );
-        let mut values = HashMap::new();
-        let mut rng = rand::rng();
-
-        if fields.is_empty() {
-            return values;
-        }
-
-        // Generate random percentages that sum to total
-        let mut remaining = total;
-        let mut generated_values = Vec::new();
-
-        for i in 0..fields.len() - 1 {
-            let max_value = remaining / (fields.len() - i) as f64 * 1.5; // Allow some variance
-            let value = rng.random_range(0.0..max_value.min(remaining));
-            generated_values.push(value);
-            remaining -= value;
-        }
-
-        // Last value gets the remainder to ensure exact sum
-        generated_values.push(remaining);
-
-        // Assign values to fields, but handle rounding carefully for percentages
-        let is_percentage = fields
-            .iter()
-            .any(|f| matches!(f.format, Some(Format::Percentage)));
-
-        if is_percentage {
-            // For percentages, we need to ensure the formatted values still sum to exactly 100
-            let mut formatted_values = Vec::new();
-            let mut formatted_sum = 0.0;
-
-            // Format all but the last value
-            for value in generated_values {
-                let formatted = format!("{:.1}", value);
-                let parsed = formatted.parse::<f64>().unwrap_or(value);
-                formatted_sum += parsed;
-                formatted_values.push(formatted);
-            }
-
-            // Calculate what the last value should be to maintain exact sum
-            let last_value = total - formatted_sum;
-            formatted_values.push(format!("{:.1}", last_value));
-
-            // Assign the formatted values
-            for (field, formatted_value) in fields.iter().zip(formatted_values.iter()) {
-                values.insert(field.field_name.clone(), formatted_value.clone());
-            }
-        } else {
-            // For non-percentage fields, use the original logic
-            for (field, value) in fields.iter().zip(generated_values.iter()) {
-                let formatted_value = match &field.format {
-                    Some(Format::CurrencyAmount) => format!("${:.2}", value),
-                    _ => format!("{:.2}", value),
-                };
-                values.insert(field.field_name.clone(), formatted_value);
-            }
-        }
-
-        values
-    }
-
-    /// Generate derived values from source fields
-    fn generate_derive_values(
-        source_fields: &[&StructField],
-        target_field: &str,
-        derivation: &DerivationType,
-        source_values: &HashMap<String, String>,
-    ) -> HashMap<String, String> {
-        tracing::trace!(target_field = %target_field, "Generating derived values");
-        let mut values = HashMap::new();
-
-        match derivation {
-            DerivationType::Concatenate(separator) => {
-                let concatenated = source_fields
-                    .iter()
-                    .filter_map(|field| source_values.get(&field.field_name))
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(separator);
-                values.insert(target_field.to_string(), concatenated);
-            }
-            DerivationType::Extract(extract_type) => {
-                if let Some(first_field) = source_fields.first() {
-                    if let Some(source_value) = source_values.get(&first_field.field_name) {
-                        let extracted = match extract_type {
-                            ExtractType::FirstWord => source_value
-                                .split_whitespace()
-                                .next()
-                                .unwrap_or("")
-                                .to_string(),
-                            ExtractType::LastWord => source_value
-                                .split_whitespace()
-                                .last()
-                                .unwrap_or("")
-                                .to_string(),
-                            ExtractType::Domain => {
-                                // Extract domain from email
-                                source_value.split('@').nth(1).unwrap_or("").to_string()
-                            }
-                            ExtractType::Username => {
-                                // Extract username from email
-                                source_value.split('@').next().unwrap_or("").to_string()
-                            }
-                            ExtractType::Initials => {
-                                // Extract initials from words
-                                source_value
-                                    .split_whitespace()
-                                    .filter_map(|word| word.chars().next())
-                                    .collect::<String>()
-                                    .to_uppercase()
-                            }
-                        };
-                        values.insert(target_field.to_string(), extracted);
-                    }
-                }
-            }
-            DerivationType::Transform(transform_type) => {
-                if let Some(first_field) = source_fields.first() {
-                    if let Some(source_value) = source_values.get(&first_field.field_name) {
-                        let transformed = match transform_type {
-                            TransformType::Uppercase => source_value.to_uppercase(),
-                            TransformType::Lowercase => source_value.to_lowercase(),
-                            TransformType::Capitalize => {
-                                let mut chars = source_value.chars();
-                                match chars.next() {
-                                    None => String::new(),
-                                    Some(first) => {
-                                        first.to_uppercase().collect::<String>() + chars.as_str()
-                                    }
-                                }
-                            }
-                            TransformType::Truncate(len) => {
-                                source_value.chars().take(*len).collect()
-                            }
-                            TransformType::Hash => {
-                                // Simple hash representation
-                                format!(
-                                    "{:x}",
-                                    source_value.len() * 31
-                                        + source_value.chars().map(|c| c as usize).sum::<usize>()
-                                )
-                            }
-                        };
-                        values.insert(target_field.to_string(), transformed);
-                    }
-                }
-            }
-        }
-
-        values
-    }
-
-    /// Generate coherent values from predefined datasets
-    fn generate_coherent_values(
-        _fields: &[&StructField],
-        dataset: &crate::coordinate::CoherentDataset,
-        index: usize,
-    ) -> HashMap<String, String> {
-        tracing::trace!(index = index, "Generating coherent values");
-        use crate::coordinate::*;
-
-        /// Coherent address data
-        const COHERENT_ADDRESSES: &[(&str, &str, &str, &str)] = &[
-            ("New York", "NY", "10001", "USA"),
-            ("Los Angeles", "CA", "90001", "USA"),
-            ("Chicago", "IL", "60601", "USA"),
-            ("Houston", "TX", "77001", "USA"),
-            ("Phoenix", "AZ", "85001", "USA"),
-            ("Philadelphia", "PA", "19101", "USA"),
-            ("San Antonio", "TX", "78201", "USA"),
-            ("San Diego", "CA", "92101", "USA"),
-            ("Dallas", "TX", "75201", "USA"),
-            ("San Jose", "CA", "95101", "USA"),
-        ];
-
-        /// Coherent geo location data
-        const CITY_COORDINATES: &[(&str, f64, f64, &str)] = &[
-            ("New York", 40.7128, -74.0060, "USA"),
-            ("Los Angeles", 34.0522, -118.2437, "USA"),
-            ("Chicago", 41.8781, -87.6298, "USA"),
-            ("Houston", 29.7604, -95.3698, "USA"),
-            ("Phoenix", 33.4484, -112.0740, "USA"),
-            ("Philadelphia", 39.9526, -75.1652, "USA"),
-            ("San Antonio", 29.4241, -98.4936, "USA"),
-            ("San Diego", 32.7157, -117.1611, "USA"),
-            ("Dallas", 32.7767, -96.7970, "USA"),
-            ("San Jose", 37.3382, -121.8863, "USA"),
-        ];
-
-        match dataset {
-            CoherentDataset::Address {
-                city,
-                state,
-                zip,
-                country,
-            } => {
-                let (city_val, state_val, zip_val, country_val) =
-                    COHERENT_ADDRESSES[index % COHERENT_ADDRESSES.len()];
-                let mut values = HashMap::new();
-                values.insert(city.clone(), city_val.to_string());
-                values.insert(state.clone(), state_val.to_string());
-                values.insert(zip.clone(), zip_val.to_string());
-                values.insert(country.clone(), country_val.to_string());
-                values
-            }
-            CoherentDataset::PersonName {
-                first_name,
-                last_name,
-                full_name,
-            } => {
-                // Use the extended person names from coordinate.rs
-                let names = crate::coordinate::EXTENDED_PERSON_NAMES;
-                let (first, last, _gender) = names[index % names.len()];
-                let mut values = HashMap::new();
-                values.insert(first_name.clone(), first.to_string());
-                values.insert(last_name.clone(), last.to_string());
-                values.insert(full_name.clone(), format!("{} {}", first, last));
-                values
-            }
-            CoherentDataset::GeoLocation {
-                latitude,
-                longitude,
-                city,
-                country,
-            } => {
-                let (city_val, lat, lng, country_val) =
-                    CITY_COORDINATES[index % CITY_COORDINATES.len()];
-                let mut values = HashMap::new();
-                values.insert(latitude.clone(), lat.to_string());
-                values.insert(longitude.clone(), lng.to_string());
-                values.insert(city.clone(), city_val.to_string());
-                values.insert(country.clone(), country_val.to_string());
-                values
-            }
-            CoherentDataset::DateRange {
-                start_date,
-                end_date,
-            } => {
-                // Generate coherent start/end dates
-                let base = NaiveDate::from_ymd_opt(2024, 1, 1)
-                    .or_else(|| NaiveDate::from_ymd_opt(2024, 1, 2))
-                    .or_else(|| NaiveDate::from_ymd_opt(2023, 12, 31))
-                    .expect("At least one of these dates should be valid");
-                let start_offset = (index * 7) as i64; // Weekly intervals
-                let duration_days = 14; // 2 week duration
-
-                let start = base + Duration::days(start_offset);
-                let end = start + Duration::days(duration_days);
-
-                let mut values = HashMap::new();
-                values.insert(start_date.clone(), start.to_string());
-                values.insert(end_date.clone(), end.to_string());
-                values
-            }
-        }
-    }
-
     pub fn random_string(len: usize) -> String {
         use rand::distr::Alphanumeric;
         let mut rng = rand::rng();
         (0..len).map(|_| rng.sample(Alphanumeric) as char).collect()
+    }
+
+    /// Builds coordination groups from the provided table configs
+    pub fn build_coordination_groups(&mut self) -> Vec<CoordinationGroup> {
+        let mut coordination_groups = Vec::new();
+        let mut coordination_map: HashMap<String, Vec<(String, Coordination)>> = HashMap::new();
+
+        // Extract coordination rules from each table's mock_generation_config
+        for (table_name, table_config) in &self.tables {
+            if let Some(ref mock_config) = table_config.mock_generation_config {
+                // Each table may have coordination_rules
+                for coordination in &mock_config.coordination_rules {
+                    // Extract field names from the coordination enum
+                    let field_names = match coordination {
+                        Coordination::InitializeEqual(fields) => fields.clone(),
+                        Coordination::InitializeSequential { field_names, .. } => {
+                            field_names.clone()
+                        }
+                        Coordination::InitializeSum { field_names, .. } => field_names.clone(),
+                        Coordination::InitializeDerive {
+                            source_field_names,
+                            target_field_name,
+                            ..
+                        } => {
+                            let mut all_fields = source_field_names.clone();
+                            all_fields.push(target_field_name.clone());
+                            all_fields
+                        }
+                        Coordination::InitializeCoherent(dataset) => match dataset {
+                            CoherentDataset::Address {
+                                city,
+                                state,
+                                zip,
+                                country,
+                            } => vec![city, state, zip, country]
+                                .into_iter()
+                                .filter(|s| !s.is_empty())
+                                .cloned()
+                                .collect(),
+                            CoherentDataset::PersonName {
+                                first_name,
+                                last_name,
+                                full_name,
+                            } => vec![first_name, last_name, full_name]
+                                .into_iter()
+                                .filter(|s| !s.is_empty())
+                                .cloned()
+                                .collect(),
+                            CoherentDataset::GeoLocation {
+                                latitude,
+                                longitude,
+                                city,
+                                country,
+                            } => vec![latitude, longitude, city, country]
+                                .into_iter()
+                                .filter(|s| !s.is_empty())
+                                .cloned()
+                                .collect(),
+                            CoherentDataset::DateRange {
+                                start_date,
+                                end_date,
+                            } => {
+                                vec![start_date.clone(), end_date.clone()]
+                            }
+                        },
+                    };
+
+                    // Create a unique key for this coordination pattern
+                    let mut sorted_fields = field_names.clone();
+                    sorted_fields.sort();
+                    let coordination_key = format!("{:?}", sorted_fields);
+
+                    // Add this table-coordination pair to the map
+                    coordination_map
+                        .entry(coordination_key)
+                        .or_insert_with(Vec::new)
+                        .push((table_name.clone(), coordination.clone()));
+                }
+            }
+        }
+
+        // Now group coordinations that span multiple tables or are within single tables
+        for (_coordination_key, table_coordinations) in coordination_map {
+            let mut group = CoordinationGroup::builder().id(Uuid::new_v4()).build();
+
+            let mut group_tables = HashSet::new();
+            let mut group_pairs = Vec::new();
+
+            // Group coordinations by their type and fields
+            let mut coordination_by_type: HashMap<String, Vec<(String, Coordination)>> =
+                HashMap::new();
+
+            for (table_name, coordination) in table_coordinations {
+                let type_key = match &coordination {
+                    Coordination::InitializeEqual(_) => "equal",
+                    Coordination::InitializeSequential { .. } => "sequential",
+                    Coordination::InitializeSum { .. } => "sum",
+                    Coordination::InitializeDerive { .. } => "derive",
+                    Coordination::InitializeCoherent(_) => "coherent",
+                };
+
+                coordination_by_type
+                    .entry(type_key.to_string())
+                    .or_insert_with(Vec::new)
+                    .push((table_name.clone(), coordination.clone()));
+
+                group_tables.insert(table_name);
+            }
+
+            // Create CoordinationPair for each unique coordination
+            for (_type_key, typed_coordinations) in coordination_by_type {
+                // Group coordinations with identical rules
+                let mut processed = HashSet::new();
+
+                for (_table_name, coordination) in &typed_coordinations {
+                    let coord_str = format!("{:?}", coordination);
+                    if processed.contains(&coord_str) {
+                        continue;
+                    }
+                    processed.insert(coord_str.clone());
+
+                    // Extract field names and create CoordinationId instances
+                    let field_names = match coordination {
+                        Coordination::InitializeEqual(fields) => fields.clone(),
+                        Coordination::InitializeSequential { field_names, .. } => {
+                            field_names.clone()
+                        }
+                        Coordination::InitializeSum { field_names, .. } => field_names.clone(),
+                        Coordination::InitializeDerive {
+                            source_field_names,
+                            target_field_name,
+                            ..
+                        } => {
+                            let mut all_fields = source_field_names.clone();
+                            all_fields.push(target_field_name.clone());
+                            all_fields
+                        }
+                        Coordination::InitializeCoherent(dataset) => match dataset {
+                            CoherentDataset::Address {
+                                city,
+                                state,
+                                zip,
+                                country,
+                            } => vec![city, state, zip, country]
+                                .into_iter()
+                                .filter(|s| !s.is_empty())
+                                .cloned()
+                                .collect(),
+                            CoherentDataset::PersonName {
+                                first_name,
+                                last_name,
+                                full_name,
+                            } => vec![first_name, last_name, full_name]
+                                .into_iter()
+                                .filter(|s| !s.is_empty())
+                                .cloned()
+                                .collect(),
+                            CoherentDataset::GeoLocation {
+                                latitude,
+                                longitude,
+                                city,
+                                country,
+                            } => vec![latitude, longitude, city, country]
+                                .into_iter()
+                                .filter(|s| !s.is_empty())
+                                .cloned()
+                                .collect(),
+                            CoherentDataset::DateRange {
+                                start_date,
+                                end_date,
+                            } => {
+                                vec![start_date.clone(), end_date.clone()]
+                            }
+                        },
+                    };
+
+                    // Create CoordinationId for each field in each table that has this coordination
+                    let mut coordinated_fields = Vec::new();
+                    for field_name in &field_names {
+                        // Check all tables with this coordination type to find which ones have these fields
+                        for (t_name, t_coord) in &typed_coordinations {
+                            // Only add if this table's coordination includes this field
+                            let t_fields = match t_coord {
+                                Coordination::InitializeEqual(f) => f.clone(),
+                                Coordination::InitializeSequential { field_names: f, .. } => {
+                                    f.clone()
+                                }
+                                Coordination::InitializeSum { field_names: f, .. } => f.clone(),
+                                Coordination::InitializeDerive {
+                                    source_field_names,
+                                    target_field_name,
+                                    ..
+                                } => {
+                                    let mut all = source_field_names.clone();
+                                    all.push(target_field_name.clone());
+                                    all
+                                }
+                                Coordination::InitializeCoherent(d) => match d {
+                                    CoherentDataset::Address {
+                                        city,
+                                        state,
+                                        zip,
+                                        country,
+                                    } => vec![city, state, zip, country]
+                                        .into_iter()
+                                        .filter(|s| !s.is_empty())
+                                        .cloned()
+                                        .collect(),
+                                    CoherentDataset::PersonName {
+                                        first_name,
+                                        last_name,
+                                        full_name,
+                                    } => vec![first_name, last_name, full_name]
+                                        .into_iter()
+                                        .filter(|s| !s.is_empty())
+                                        .cloned()
+                                        .collect(),
+                                    CoherentDataset::GeoLocation {
+                                        latitude,
+                                        longitude,
+                                        city,
+                                        country,
+                                    } => vec![latitude, longitude, city, country]
+                                        .into_iter()
+                                        .filter(|s| !s.is_empty())
+                                        .cloned()
+                                        .collect(),
+                                    CoherentDataset::DateRange {
+                                        start_date,
+                                        end_date,
+                                    } => {
+                                        vec![start_date.clone(), end_date.clone()]
+                                    }
+                                },
+                            };
+
+                            if t_fields.contains(field_name) {
+                                coordinated_fields.push(
+                                    CoordinationId::builder()
+                                        .table_name(t_name.clone())
+                                        .field_name(field_name.clone())
+                                        .build(),
+                                );
+                            }
+                        }
+                    }
+
+                    if !coordinated_fields.is_empty() {
+                        // Validate the coordination before creating the pair
+                        match coordination.validate(self, &coordinated_fields) {
+                            Ok(()) => {
+                                let pair = CoordinationPair::builder()
+                                    .coordinated_fields(coordinated_fields)
+                                    .coordination(coordination.clone())
+                                    .build();
+                                group_pairs.push(pair);
+                            }
+                            Err(e) => {
+                                // Log detailed error for user to fix
+                                tracing::error!(
+                                    "Skipping invalid coordination for tables {:?}: {}",
+                                    group_tables, e
+                                );
+                                evenframe_log!(
+                                    format!("ERROR: Invalid coordination skipped\nTables: {:?}\nCoordination: {:?}\nError: {}\n",
+                                        group_tables, coordination, e),
+                                    "coordination_validation_errors.log",
+                                    true
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !group_pairs.is_empty() {
+                group.tables = group_tables;
+                group.coordination_pairs = group_pairs;
+                coordination_groups.push(group);
+            }
+        }
+
+        coordination_groups
     }
 }
 

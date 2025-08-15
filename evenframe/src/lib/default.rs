@@ -152,8 +152,8 @@ pub fn field_type_to_default_value(
                     // If the variant has data, generate a default for it.
                     if let Some(variant_data) = &chosen_variant.data {
                         let variant_data_field_type = match variant_data {
-                            VariantData::InlineStruct(inline_struct) => {
-                                &FieldType::Other(inline_struct.name.clone())
+                            VariantData::InlineStruct(enum_struct) => {
+                                &FieldType::Other(enum_struct.struct_name.clone())
                             }
                             VariantData::DataStructureRef(field_type) => field_type,
                         };
@@ -170,10 +170,9 @@ pub fn field_type_to_default_value(
                 }
             }
 
-            if let Some(struct_config) = structs
-                .values()
-                .find(|sc| sc.name.to_case(Case::Pascal) == name.to_case(Case::Pascal))
-            {
+            if let Some(struct_config) = structs.values().find(|struct_config| {
+                struct_config.struct_name.to_case(Case::Pascal) == name.to_case(Case::Pascal)
+            }) {
                 debug!(
                     "Found struct {} with {} fields",
                     name,
@@ -368,8 +367,8 @@ pub fn field_type_to_surql_default(
                 let chosen_variant = &enum_schema.variants[0];
                 if let Some(variant_data) = &chosen_variant.data {
                     let variant_data_field_type = match variant_data {
-                        VariantData::InlineStruct(inline_struct) => {
-                            &FieldType::Other(inline_struct.name.clone())
+                        VariantData::InlineStruct(enum_struct) => {
+                            &FieldType::Other(enum_struct.struct_name.clone())
                         }
                         VariantData::DataStructureRef(field_type) => field_type,
                     };
@@ -388,10 +387,9 @@ pub fn field_type_to_surql_default(
                 }
             }
             // Check if it's a struct
-            else if let Some(struct_config) = app_structs
-                .values()
-                .find(|sc| sc.name.to_case(Case::Pascal) == name.to_case(Case::Pascal))
-            {
+            else if let Some(struct_config) = app_structs.values().find(|struct_config| {
+                struct_config.struct_name.to_case(Case::Pascal) == name.to_case(Case::Pascal)
+            }) {
                 debug!(
                     "Found app struct '{}' with {} fields",
                     name,
@@ -569,8 +567,8 @@ pub fn field_type_to_surreal_type(
                     .map(|v| {
                         if let Some(variant_data) = &v.data {
                             let variant_data_field_type = match variant_data {
-                                VariantData::InlineStruct(inline_struct) => {
-                                    &FieldType::Other(inline_struct.name.clone())
+                                VariantData::InlineStruct(enum_struct) => {
+                                    &FieldType::Other(enum_struct.struct_name.clone())
                                 }
                                 VariantData::DataStructureRef(field_type) => field_type,
                             };
