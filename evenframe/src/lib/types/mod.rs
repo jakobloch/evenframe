@@ -1,18 +1,18 @@
 mod field_type;
 
+pub use crate::types::field_type::FieldType;
 use crate::{
-    default::field_type_to_surql_default,
+    evenframe_log,
     format::Format,
-    schemasync::{table::generate_assert_from_validators, DefineConfig, EdgeConfig, TableConfig},
+    schemasync::{DefineConfig, EdgeConfig, TableConfig},
     validator::Validator,
     wrappers::EvenframeRecordId,
+    EvenframeError, Result,
 };
 use convert_case::{Case, Casing};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
-
-pub use crate::types::field_type::FieldType;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TaggedUnion {
@@ -31,7 +31,7 @@ impl<'de, T> Deserialize<'de> for RecordLink<T>
 where
     T: Deserialize<'de>,
 {
-    fn deserialize<D>(deserializer: D) -> Result<RecordLink<T>, D::Error>
+    fn deserialize<D>(deserializer: D) -> std::result::Result<RecordLink<T>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -91,319 +91,337 @@ impl StructField {
         app_structs: HashMap<String, StructConfig>,
         persistable_structs: HashMap<String, TableConfig>,
         table_name: &String,
-    ) -> String {
-        use std::collections::HashSet;
-        
-        // Wrapper function that initializes visited_types
-        fn field_type_to_surql_type(
-            field_name: &String,
-            table_name: &String,
-            field_type: &FieldType,
-            enums: &HashMap<String, TaggedUnion>,
-            app_structs: &HashMap<String, StructConfig>,
-            persistable_structs: &HashMap<String, TableConfig>,
-        ) -> (String, bool, Option<String>) {
-            let mut visited_types = HashSet::new();
-            field_type_to_surql_type_impl(
-                field_name,
-                table_name,
-                field_type,
-                enums,
-                app_structs,
-                persistable_structs,
-                &mut visited_types,
-            )
+    ) -> Result<String> {
+        evenframe_log!(
+            format!(
+                "Generating define statements for:\nEnums: {:#?}\nApp structs: {:#?}\nTables: {:#?}",
+                enums.keys(),
+                app_structs.keys(),
+                persistable_structs.keys()
+            ),
+            "define_generation.log"
+        );
+
+        /* --- Start of Iterative Type Conversion Logic --- */
+
+        #[derive(Debug)]
+        enum WorkItem<'a> {
+            Process(&'a FieldType),
+            PushString(String),
+            AssembleOption,
+            AssembleVec,
+            AssembleMap,
+            AssembleTuple { count: usize },
+            AssembleStruct { count: usize, names: Vec<String> },
+            AssembleEnum { count: usize },
+            EnterStructScope { name: String },
+            LeaveStructScope { name: String },
         }
-        
-        // Helper to convert a FieldType to its SurrealDB type string.
-        // Returns (type_string, needs_wildcard_field, wildcard_type)
-        fn field_type_to_surql_type_impl(
-            field_name: &String,
-            table_name: &String,
-            field_type: &FieldType,
-            enums: &HashMap<String, TaggedUnion>,
-            app_structs: &HashMap<String, StructConfig>,
-            persistable_structs: &HashMap<String, TableConfig>,
-            visited_types: &mut HashSet<String>,
-        ) -> (String, bool, Option<String>) {
-            match field_type {
-                FieldType::String | FieldType::Char => ("string".to_string(), false, None),
-                FieldType::Bool => ("bool".to_string(), false, None),
-                FieldType::DateTime => ("datetime".to_string(), false, None),
-                FieldType::Duration => ("duration".to_string(), false, None),
-                FieldType::Timezone => ("string".to_string(), false, None),
-                FieldType::Decimal => ("decimal".to_string(), false, None),
-                FieldType::F32 | FieldType::F64 => ("float".to_string(), false, None),
-                FieldType::OrderedFloat(_inner) => {
-                    tracing::debug!("Converting OrderedFloat to float for field {}", field_name);
-                    ("float".to_string(), false, None)
-                }
-                FieldType::I8
-                | FieldType::I16
-                | FieldType::I32
-                | FieldType::I64
-                | FieldType::I128
-                | FieldType::Isize
-                | FieldType::U8
-                | FieldType::U16
-                | FieldType::U32
-                | FieldType::U64
-                | FieldType::U128
-                | FieldType::Usize => ("int".to_string(), false, None),
-                FieldType::EvenframeRecordId => {
-                    let type_str = if field_name == "id" {
-                        format!("record<{}>", table_name)
-                    } else {
-                        "record<any>".to_string()
-                    };
-                    (type_str, false, None)
-                }
-                FieldType::Unit => ("any".to_string(), false, None),
-                FieldType::HashMap(_key, value) => {
-                    let (value_type, _, _) = field_type_to_surql_type_impl(
-                        field_name,
-                        table_name,
-                        value,
-                        enums,
-                        app_structs,
-                        persistable_structs,
-                        visited_types,
-                    );
-                    ("object".to_string(), true, Some(value_type))
-                }
-                FieldType::BTreeMap(_key, value) => {
-                    let (value_type, _, _) = field_type_to_surql_type_impl(
-                        field_name,
-                        table_name,
-                        value,
-                        enums,
-                        app_structs,
-                        persistable_structs,
-                        visited_types,
-                    );
-                    ("object".to_string(), true, Some(value_type))
-                }
-                FieldType::RecordLink(inner) => {
-                    // RecordLink should always point to a record type
-                    match inner.as_ref() {
-                        FieldType::Other(type_name) => {
-                            // Convert type name to snake_case for table name
-                            (
-                                format!("record<{}>", type_name.to_case(Case::Snake)),
-                                false,
-                                None,
-                            )
-                        }
-                        _ => {
-                            // For other inner types, treat as before
-                            let (inner_type, needs_wildcard, wildcard_type) =
-                                field_type_to_surql_type(
-                                    field_name,
-                                    table_name,
-                                    inner,
-                                    enums,
-                                    app_structs,
-                                    persistable_structs,
-                                );
-                            (inner_type, needs_wildcard, wildcard_type)
-                        }
-                    }
-                }
-                FieldType::Other(name) => {
-                    // If this type name is defined as an enum, output its union literal.
-                    if let Some(enum_def) = enums.get(name) {
-                        let variants: Vec<String> = enum_def
-                            .variants
-                            .iter()
-                            .map(|variant| {
-                                if let Some(variant_data) = &variant.data {
-                                    let variant_data_field_type = match variant_data {
-                                        VariantData::InlineStruct(inline_struct) => {
-                                            &FieldType::Other(inline_struct.struct_name.clone())
-                                        }
-                                        VariantData::DataStructureRef(field_type) => field_type,
-                                    };
-                                    let (variant_type, _, _) = field_type_to_surql_type(
-                                        field_name,
-                                        table_name,
-                                        variant_data_field_type,
-                                        enums,
-                                        app_structs,
-                                        persistable_structs,
-                                    );
-                                    variant_type
+
+        let convert_type_iteratively =
+            |start_field_type: &FieldType| -> Result<(String, bool, Option<String>)> {
+                let mut work_stack: Vec<WorkItem> = vec![WorkItem::Process(start_field_type)];
+                let mut value_stack: Vec<(String, bool, Option<String>)> = Vec::new();
+                let mut visited_types = HashSet::new();
+
+                while let Some(item) = work_stack.pop() {
+                    match item {
+                        WorkItem::Process(field_type) => match field_type {
+                            FieldType::String | FieldType::Char => {
+                                value_stack.push(("string".to_string(), false, None))
+                            }
+                            FieldType::Bool => value_stack.push(("bool".to_string(), false, None)),
+                            FieldType::DateTime => {
+                                value_stack.push(("datetime".to_string(), false, None))
+                            }
+                            FieldType::Duration => {
+                                value_stack.push(("duration".to_string(), false, None))
+                            }
+                            FieldType::Timezone => {
+                                value_stack.push(("string".to_string(), false, None))
+                            }
+                            FieldType::Decimal => {
+                                value_stack.push(("decimal".to_string(), false, None))
+                            }
+                            FieldType::F32 | FieldType::F64 | FieldType::OrderedFloat(_) => {
+                                value_stack.push(("float".to_string(), false, None))
+                            }
+                            // CORRECTED: Expanded the integer types
+                            FieldType::I8
+                            | FieldType::I16
+                            | FieldType::I32
+                            | FieldType::I64
+                            | FieldType::I128
+                            | FieldType::Isize
+                            | FieldType::U8
+                            | FieldType::U16
+                            | FieldType::U32
+                            | FieldType::U64
+                            | FieldType::U128
+                            | FieldType::Usize => {
+                                value_stack.push(("int".to_string(), false, None))
+                            }
+                            FieldType::Unit => value_stack.push(("any".to_string(), false, None)),
+                            FieldType::EvenframeRecordId => {
+                                let type_str = if self.field_name == "id" {
+                                    format!("record<{}>", table_name)
                                 } else {
-                                    format!("\"{}\"", variant.name)
+                                    "record<any>".to_string()
+                                };
+                                value_stack.push((type_str, false, None));
+                            }
+                            FieldType::Option(inner) => {
+                                work_stack.push(WorkItem::AssembleOption);
+                                work_stack.push(WorkItem::Process(inner));
+                            }
+                            FieldType::Vec(inner) => {
+                                work_stack.push(WorkItem::AssembleVec);
+                                work_stack.push(WorkItem::Process(inner));
+                            }
+                            FieldType::HashMap(_, value) | FieldType::BTreeMap(_, value) => {
+                                work_stack.push(WorkItem::AssembleMap);
+                                work_stack.push(WorkItem::Process(value));
+                            }
+                            FieldType::RecordLink(inner) => {
+                                if let FieldType::Other(type_name) = inner.as_ref() {
+                                    let type_str =
+                                        format!("record<{}>", type_name.to_case(Case::Snake));
+                                    value_stack.push((type_str, false, None));
+                                } else {
+                                    work_stack.push(WorkItem::Process(inner));
                                 }
-                            })
-                            .collect();
-                        (variants.join(" | "), false, None)
-                    } else if let Some(app_struct) = app_structs.get(name) {
-                        tracing::debug!("Processing app_struct {} for field {}", name, field_name);
+                            }
+                            FieldType::Tuple(types) => {
+                                work_stack.push(WorkItem::AssembleTuple { count: types.len() });
+                                for t in types.iter().rev() {
+                                    work_stack.push(WorkItem::Process(t));
+                                }
+                            }
+                            FieldType::Struct(fields) => {
+                                let names = fields.iter().map(|(name, _)| name.clone()).collect();
+                                work_stack.push(WorkItem::AssembleStruct {
+                                    count: fields.len(),
+                                    names,
+                                });
+                                for (_, ftype) in fields.iter().rev() {
+                                    work_stack.push(WorkItem::Process(ftype));
+                                }
+                            }
+                            FieldType::Other(name) => {
+                                if let Some(enum_def) = enums.get(name) {
+                                    let total_variants = enum_def.variants.len();
+                                    work_stack.push(WorkItem::AssembleEnum {
+                                        count: total_variants,
+                                    });
 
-                        // Check if we've already visited this type to prevent infinite recursion
-                        if visited_types.contains(name) {
-                            tracing::debug!(
-                                "Detected circular reference to type {}, using 'object' type",
-                                name
-                            );
-                            return ("object".to_string(), false, None);
-                        }
-                        
-                        // Add this type to visited set
-                        visited_types.insert(name.clone());
-
-                        let field_defs: Vec<String> = app_struct
-                            .fields
-                            .iter()
-                            .map(|f: &StructField| {
-                                // Also check for recursive fields within the struct
-                                if let FieldType::Other(ref field_type_name) = f.field_type {
-                                    if field_type_name == name {
-                                        tracing::debug!(
-                                            "  Struct field {} is self-referential, using 'object'",
-                                            f.field_name
-                                        );
-                                        return format!("{}: object", f.field_name);
+                                    for variant in enum_def.variants.iter().rev() {
+                                        if let Some(data) = &variant.data {
+                                            match data {
+                                                VariantData::InlineStruct(s) => {
+                                                    let struct_config = app_structs.get(&s.struct_name)
+                                                        .ok_or_else(|| EvenframeError::FieldDefinition {
+                                                            message: format!("Inline enum struct '{}' should have corresponding object definition", s.struct_name),
+                                                            work_stack: format!("{:#?}", work_stack),
+                                                            value_stack: format!("{:#?}", value_stack),
+                                                            item: format!("{:#?}", item),
+                                                            visited_types: format!("{:#?}", visited_types),
+                                                        })?;
+                                                    let names = struct_config
+                                                        .fields
+                                                        .iter()
+                                                        .map(|f| f.field_name.clone())
+                                                        .collect();
+                                                    work_stack.push(WorkItem::AssembleStruct {
+                                                        count: struct_config.fields.len(),
+                                                        names,
+                                                    });
+                                                    for field in struct_config.fields.iter().rev() {
+                                                        work_stack.push(WorkItem::Process(
+                                                            &field.field_type,
+                                                        ));
+                                                    }
+                                                }
+                                                VariantData::DataStructureRef(ft) => {
+                                                    work_stack.push(WorkItem::Process(ft));
+                                                }
+                                            }
+                                        } else {
+                                            work_stack.push(WorkItem::PushString(format!(
+                                                "\"{}\"",
+                                                variant.name
+                                            )));
+                                        }
                                     }
+                                } else if let Some(app_struct) = app_structs.get(name) {
+                                    if visited_types.contains(name) {
+                                        value_stack.push(("object".to_string(), false, None));
+                                        continue;
+                                    }
+                                    work_stack
+                                        .push(WorkItem::LeaveStructScope { name: name.clone() });
+                                    let names = app_struct
+                                        .fields
+                                        .iter()
+                                        .map(|f| f.field_name.clone())
+                                        .collect();
+                                    work_stack.push(WorkItem::AssembleStruct {
+                                        count: app_struct.fields.len(),
+                                        names,
+                                    });
+                                    for field in app_struct.fields.iter().rev() {
+                                        work_stack.push(WorkItem::Process(&field.field_type));
+                                    }
+                                    work_stack
+                                        .push(WorkItem::EnterStructScope { name: name.clone() });
+                                } else if persistable_structs
+                                    .contains_key(&name.to_case(Case::Snake))
+                                {
+                                    value_stack.push((
+                                        format!("record<{}>", name.to_case(Case::Snake)),
+                                        false,
+                                        None,
+                                    ));
+                                } else {
+                                    value_stack.push((name.clone(), false, None));
                                 }
-
-                                let (field_type, _, _) = field_type_to_surql_type(
-                                    &f.field_name,
-                                    table_name,
-                                    &f.field_type,
-                                    enums,
-                                    app_structs,
-                                    persistable_structs,
+                            }
+                        },
+                        WorkItem::PushString(s) => {
+                            value_stack.push((s, false, None));
+                        }
+                        WorkItem::AssembleOption => {
+                            let (inner_type, needs_wildcard, wildcard_type) = value_stack
+                                .pop()
+                                .ok_or_else(|| EvenframeError::FieldDefinition {
+                                    message: "Stack underflow in AssembleOption".to_string(),
+                                    work_stack: format!("{:#?}", work_stack),
+                                    value_stack: format!("{:#?}", value_stack),
+                                    item: "AssembleOption".to_string(),
+                                    visited_types: format!("{:#?}", visited_types),
+                                })?;
+                            value_stack.push((
+                                format!("null | {}", inner_type),
+                                needs_wildcard,
+                                wildcard_type,
+                            ));
+                        }
+                        WorkItem::AssembleVec => {
+                            let (inner_type, _, _) = value_stack.pop().ok_or_else(|| {
+                                EvenframeError::FieldDefinition {
+                                    message: "Stack underflow in AssembleVec".to_string(),
+                                    work_stack: format!("{:#?}", work_stack),
+                                    value_stack: format!("{:#?}", value_stack),
+                                    item: "AssembleVec".to_string(),
+                                    visited_types: format!("{:#?}", visited_types),
+                                }
+                            })?;
+                            value_stack.push((format!("array<{}>", inner_type), false, None));
+                        }
+                        WorkItem::AssembleMap => {
+                            let (value_type, _, _) = value_stack.pop().ok_or_else(|| {
+                                EvenframeError::FieldDefinition {
+                                    message: "Stack underflow in AssembleMap".to_string(),
+                                    work_stack: format!("{:#?}", work_stack),
+                                    value_stack: format!("{:#?}", value_stack),
+                                    item: "AssembleMap".to_string(),
+                                    visited_types: format!("{:#?}", visited_types),
+                                }
+                            })?;
+                            value_stack.push(("object".to_string(), true, Some(value_type)));
+                        }
+                        WorkItem::AssembleTuple { count } => {
+                            let mut items = Vec::with_capacity(count);
+                            for _ in 0..count {
+                                items.push(
+                                    value_stack
+                                        .pop()
+                                        .ok_or_else(|| EvenframeError::FieldDefinition {
+                                            message: "Stack underflow in AssembleTuple".to_string(),
+                                            work_stack: format!("{:#?}", work_stack),
+                                            value_stack: format!("{:#?}", value_stack),
+                                            item: "AssembleTuple".to_string(),
+                                            visited_types: format!("{:#?}", visited_types),
+                                        })?
+                                        .0,
                                 );
-                                tracing::debug!(
-                                    "  Struct field {}: {:?} -> {}",
-                                    f.field_name,
-                                    &f.field_type,
-                                    field_type
+                            }
+                            items.reverse();
+                            value_stack.push((format!("array<{}>", items.join(", ")), false, None));
+                        }
+                        WorkItem::AssembleStruct { count, names } => {
+                            let mut items = Vec::with_capacity(count);
+                            for i in 0..count {
+                                let (field_type, _, _) = value_stack.pop().ok_or_else(|| {
+                                    EvenframeError::FieldDefinition {
+                                        message: "Stack underflow in AssembleStruct".to_string(),
+                                        work_stack: format!("{:#?}", work_stack),
+                                        value_stack: format!("{:#?}", value_stack),
+                                        item: "AssembleStruct".to_string(),
+                                        visited_types: format!("{:#?}", visited_types),
+                                    }
+                                })?;
+                                items.push(format!("{}: {}", names[count - 1 - i], field_type));
+                            }
+                            items.reverse();
+                            value_stack.push((format!("{{ {} }}", items.join(", ")), false, None));
+                        }
+                        WorkItem::AssembleEnum { count } => {
+                            let mut variants = Vec::with_capacity(count);
+                            for _ in 0..count {
+                                variants.push(
+                                    value_stack
+                                        .pop()
+                                        .ok_or_else(|| EvenframeError::FieldDefinition {
+                                            message: "Stack underflow in AssembleEnum".to_string(),
+                                            work_stack: format!("{:#?}", work_stack),
+                                            value_stack: format!("{:#?}", value_stack),
+                                            item: "AssembleEnum".to_string(),
+                                            visited_types: format!("{:#?}", visited_types),
+                                        })?
+                                        .0,
                                 );
-                                format!("{}: {}", f.field_name, field_type)
-                            })
-                            .collect();
-
-                        (format!("{{ {} }}", field_defs.join(", ")), false, None)
-                    } else if persistable_structs
-                        .get(&name.to_case(Case::Snake))
-                        .is_some()
-                    {
-                        (
-                            format!("record<{}>", name.to_case(Case::Snake)),
-                            false,
-                            None,
-                        )
-                    } else {
-                        (name.clone(), false, None)
+                            }
+                            variants.reverse();
+                            value_stack.push((variants.join(" | "), false, None));
+                        }
+                        WorkItem::EnterStructScope { name } => {
+                            visited_types.insert(name);
+                        }
+                        WorkItem::LeaveStructScope { name } => {
+                            visited_types.remove(&name);
+                        }
                     }
                 }
-                FieldType::Option(inner) => {
-                    let (inner_type, needs_wildcard, wildcard_type) = field_type_to_surql_type(
-                        field_name,
-                        table_name,
-                        inner,
-                        enums,
-                        app_structs,
-                        persistable_structs,
-                    );
-                    (
-                        format!("null | {}", inner_type),
-                        needs_wildcard,
-                        wildcard_type,
-                    )
-                }
-                FieldType::Vec(inner) => {
-                    let (inner_type, _, _) = field_type_to_surql_type(
-                        field_name,
-                        table_name,
-                        inner,
-                        enums,
-                        app_structs,
-                        persistable_structs,
-                    );
-                    (format!("array<{}>", inner_type), false, None)
-                }
-                FieldType::Tuple(inner_types) => {
-                    let inner: Vec<String> = inner_types
-                        .iter()
-                        .map(|t| {
-                            let (inner_type, _, _) = field_type_to_surql_type(
-                                field_name,
-                                table_name,
-                                t,
-                                enums,
-                                app_structs,
-                                persistable_structs,
-                            );
-                            inner_type
-                        })
-                        .collect();
-                    // (SurrealDB does not have a dedicated tuple type so we wrap it as an array)
-                    (format!("array<{}>", inner.join(", ")), false, None)
-                }
-                FieldType::Struct(fields) => {
-                    let field_defs: Vec<String> = fields
-                        .iter()
-                        .map(|(name, t)| {
-                            let (field_type, _, _) = field_type_to_surql_type(
-                                field_name,
-                                table_name,
-                                t,
-                                enums,
-                                app_structs,
-                                persistable_structs,
-                            );
-                            format!("{}: {}", name, field_type)
-                        })
-                        .collect();
-                    (format!("{{ {} }}", field_defs.join(", ")), false, None)
-                }
-            }
-        }
+                value_stack
+                    .pop()
+                    .ok_or_else(|| EvenframeError::FieldDefinition {
+                        message: "Final stack underflow".to_string(),
+                        work_stack: format!("{:#?}", work_stack),
+                        value_stack: format!("{:#?}", value_stack),
+                        item: "(item out of scope)".to_string(),
+                        visited_types: format!("{:#?}", visited_types),
+                    })
+            };
 
-        // Begin building the statement.
         let mut stmt = format!(
             "DEFINE FIELD OVERWRITE {} ON TABLE {}",
             self.field_name, table_name
         );
 
-        // Determine the type clause and check if we need a wildcard field
         let (type_str, needs_wildcard, wildcard_type) = if let Some(ref def) = self.define_config {
             if def.should_skip {
                 ("".to_string(), false, None)
             } else if let Some(ref data_type) = def.data_type {
-                tracing::warn!(
-                    "Field {} has data_type override: {}",
-                    self.field_name,
-                    data_type
-                );
                 (data_type.clone(), false, None)
             } else {
-                field_type_to_surql_type(
-                    &self.field_name,
-                    table_name,
-                    &self.field_type,
-                    &enums,
-                    &app_structs,
-                    &persistable_structs,
-                )
+                convert_type_iteratively(&self.field_type)?
             }
         } else {
-            field_type_to_surql_type(
-                &self.field_name,
-                table_name,
-                &self.field_type,
-                &enums,
-                &app_structs,
-                &persistable_structs,
-            )
+            convert_type_iteratively(&self.field_type)?
         };
 
         if let Some(ref def) = self.define_config {
-            if def.flexible.is_some() && def.flexible.unwrap() {
+            if def.flexible.unwrap_or(false) {
                 stmt.push_str(" FLEXIBLE");
             }
         }
@@ -412,10 +430,8 @@ impl StructField {
             stmt.push_str(&format!(" TYPE {}", type_str));
         }
 
-        // Handle DEFAULT clause.
         if let Some(ref def) = self.define_config {
             if let Some(ref def_val) = def.default {
-                // Use DEFAULT ALWAYS if default_always is provided.
                 let always = if def.default_always.is_some() {
                     " ALWAYS"
                 } else {
@@ -423,6 +439,7 @@ impl StructField {
                 };
                 stmt.push_str(&format!(" DEFAULT{} {}", always, def_val));
             } else {
+                use crate::default::field_type_to_surql_default;
                 stmt.push_str(&format!(
                     " DEFAULT {}",
                     field_type_to_surql_default(
@@ -436,48 +453,39 @@ impl StructField {
                 ));
             }
 
-            // Append READONLY if set.
             if def.readonly.unwrap_or(false) {
                 stmt.push_str(" READONLY");
             }
 
-            // Append VALUE clause.
             if let Some(ref val) = def.value {
                 stmt.push_str(&format!(" VALUE {}", val));
             }
 
-            // Append ASSERT clause.
-            if let Some(ref assertion) = def.assert {
-                stmt.push_str(&format!(" ASSERT {}", assertion));
-                let assert_clause = generate_assert_from_validators(&self.validators, "$value");
-                if !assert_clause.is_empty() {
-                    stmt.push_str(&format!(" AND {}", assert_clause));
-                }
-            } else {
-                let assert_clause = generate_assert_from_validators(&self.validators, "$value");
-                if !assert_clause.is_empty() {
-                    stmt.push_str(&format!(" ASSERT {}", assert_clause));
-                }
-            }
-
-            // Append PERMISSIONS clause if any permission is defined.
-            let mut perms = Vec::new();
-            if let Some(ref sel) = def.select_permissions {
-                perms.push(format!("FOR select {}", sel));
-            }
-            if let Some(ref cre) = def.create_permissions {
-                perms.push(format!("FOR create {}", cre));
-            }
-            if let Some(ref upd) = def.update_permissions {
-                perms.push(format!("FOR update {}", upd));
-            }
-            if !perms.is_empty() {
-                stmt.push_str(&format!(" PERMISSIONS {}", perms.join(" ")));
+            if let Some(ref assert_val) = def.assert {
+                stmt.push_str(&format!(" ASSERT {}", assert_val));
             }
         }
+
+        if let Some(ref def) = self.define_config {
+            let mut permissions = Vec::new();
+
+            if let Some(ref perm) = def.select_permissions {
+                permissions.push(format!("FOR select {}", perm));
+            }
+            if let Some(ref perm) = def.create_permissions {
+                permissions.push(format!("FOR create {}", perm));
+            }
+            if let Some(ref perm) = def.update_permissions {
+                permissions.push(format!("FOR update {}", perm));
+            }
+
+            if !permissions.is_empty() {
+                stmt.push_str(&format!(" PERMISSIONS {}", permissions.join(" ")));
+            }
+        }
+
         stmt.push_str(";\n");
 
-        // Add wildcard field definition for HashMap/BTreeMap
         if needs_wildcard {
             if let Some(wildcard_value_type) = wildcard_type {
                 stmt.push_str(&format!(
@@ -487,7 +495,7 @@ impl StructField {
             }
         }
 
-        stmt
+        Ok(stmt)
     }
 }
 
