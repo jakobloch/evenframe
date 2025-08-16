@@ -7,7 +7,7 @@ use crate::{
 use bon::Builder;
 use chrono_tz::TZ_VARIANTS;
 use convert_case::{Case, Casing};
-use rand::{rngs::ThreadRng, seq::IndexedRandom, Rng};
+use rand::{Rng, rngs::ThreadRng, seq::IndexedRandom};
 use std::collections::HashMap;
 
 #[derive(Debug, Builder)]
@@ -93,7 +93,7 @@ impl<'a> FieldValueGenerator<'a> {
             FieldType::BTreeMap(key, value) => self.handle_b_tree_map(key, value),
             FieldType::RecordLink(inner_type) => self.generate_field_value(inner_type),
             // For other types, try to see if the type is actually a reference to another db table/app struct, a app-only struct, or an enum.
-            FieldType::Other(ref type_name) => self.handle_other(type_name, &mut rng),
+            FieldType::Other(type_name) => self.handle_other(type_name, &mut rng),
         }
     }
 
@@ -189,7 +189,9 @@ impl<'a> FieldValueGenerator<'a> {
                 return format!("r'{}'", ids[rng.random_range(0..ids.len())].clone());
             }
 
-            panic!("EvenframeRecordId used for field other than in, out, or id. Should use RecordLink type")
+            panic!(
+                "EvenframeRecordId used for field other than in, out, or id. Should use RecordLink type"
+            )
         }
     }
 

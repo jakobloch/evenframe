@@ -3,9 +3,9 @@ use crate::{
     types::{StructConfig, TaggedUnion},
 };
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use std::collections::HashMap;
-use syn::{parenthesized, LitStr};
+use syn::{LitStr, parenthesized};
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -27,7 +27,7 @@ impl ToTokens for DefineConfig {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         // Helper closure to convert Option<String> to tokens.
         let opt_lit = |s: &Option<String>| -> TokenStream {
-            if let Some(ref text) = s {
+            if let Some(text) = s {
                 let lit = LitStr::new(text, Span::call_site());
                 // Wrap the literal in String::from to produce a String.
                 quote! { Some(String::from(#lit)) }

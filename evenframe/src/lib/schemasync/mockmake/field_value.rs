@@ -8,7 +8,7 @@ use crate::{
 use bon::Builder;
 use chrono_tz::TZ_VARIANTS;
 use convert_case::{Case, Casing};
-use rand::{rngs::ThreadRng, seq::IndexedRandom, Rng};
+use rand::{Rng, rngs::ThreadRng, seq::IndexedRandom};
 use std::collections::HashSet;
 use tracing;
 
@@ -201,7 +201,10 @@ impl<'a> FieldValueGenerator<'a> {
                                                     );
                                                     value_stack.push(id);
                                                 } else {
-                                                    panic!("No IDs generated for table {} in RecordLink", &table_config.table_name);
+                                                    panic!(
+                                                        "No IDs generated for table {} in RecordLink",
+                                                        &table_config.table_name
+                                                    );
                                                 }
                                             } else {
                                                 panic!(
@@ -224,7 +227,7 @@ impl<'a> FieldValueGenerator<'a> {
                                     }
                                 }
                             }
-                            FieldType::Other(ref type_name) => {
+                            FieldType::Other(type_name) => {
                                 // Check if we've already visited this type to avoid infinite recursion
                                 if ctx.visited_types.contains(type_name) {
                                     tracing::debug!(
