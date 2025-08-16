@@ -8,7 +8,6 @@ path = "src/lib/mod.rs"
 
 
 [dependencies]
-helpers = { path = "../helpers" }
 surrealdb = { workspace = true }
 tokio = { workspace = true }
 regex = { workspace = true }
