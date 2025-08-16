@@ -1,5 +1,5 @@
-use tracing::{debug, trace};
 use quote::quote;
+use tracing::{debug, trace};
 
 /// Generate imports for struct trait implementations
 pub fn generate_struct_trait_imports() -> proc_macro2::TokenStream {

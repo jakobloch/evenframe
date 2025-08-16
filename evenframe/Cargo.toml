@@ -4,38 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-path = "src/lib/mod.rs"
+path = "src/lib.rs"
 
 [dependencies]
 
 # workspace dependencies
-serde_json = { workspace = true }
-regex = { workspace = true }
-try_from_expr = { workspace = true }
+common = { workspace = true }
+syn = { workspace = true }
+tracing = { workspace = true }
+convert_case = { workspace = true }
+tokio = { workspace = true }
 
-surrealdb = { version = "2.3.7", features = ["kv-mem", "protocol-http"] }
-tokio = { version = "1.47.1", features = ["full"] }
-dotenv = "0.15.0"
-syn = { version = "2.0.104", features = ["full"] }
-proc-macro2 = "1.0.95"
-quote = "1.0.40"
-serde = { version = "1.0.219", features = ["derive"] }
-rand = "0.9.2"
-rand_distr = "0.5.1"
-heck = "0.5.0"
-chrono = "0.4.41"
-chrono-tz = "0.10.4"
-derive_more = { version = "2.0.1", features = ["from"] }
-petgraph = "0.8.2"
-toml = "0.9.5"
-tracing = "0.1.41"
+evenframe_derive = { path = "../evenframe_derive" }
 tracing-subscriber = "0.3"
-futures = "0.3.31"
-bon = "3.6.5"
-convert_case = "0.7.1"
-uuid = { version = "1.17", features = ["v4"] }
-axum = { version = "0.8.4", features = ["macros"] }
-serde-value = "0.7.0"
-thiserror = "2.0.12"
-ordered-float = { version = "5.0.0", features = ["serde"] }
-derive-syn-parse = "0.2.0"

@@ -11,11 +11,11 @@ proc-macro = true
 # workspace dependencies
 serde_json = { workspace = true }
 regex = { workspace = true }
+common = { workspace = true }
 
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
 syn = { version = "2.0.104", features = ["full"] }
-evenframe = { path = "../evenframe" }
 
 
 [features]

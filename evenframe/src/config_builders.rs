@@ -1,18 +1,18 @@
 use crate::workspace_scanner::WorkspaceScanner;
-use convert_case::{Case, Casing};
-use evenframe::config::EvenframeConfig;
-use evenframe::{
+use common::config::EvenframeConfig;
+use common::{
     derive::attributes::{
         parse_mock_data_attribute, parse_relation_attribute, parse_table_validators,
     },
     schemasync::table::TableConfig,
     schemasync::{DefineConfig, EdgeConfig, PermissionsConfig},
     types::{FieldType, StructConfig, StructField, TaggedUnion, Variant, VariantData},
-    validator::Validator,
+    validator::{StringValidator, Validator},
 };
+use convert_case::{Case, Casing};
 use std::collections::HashMap;
 use std::fs;
-use syn::{parse_file, Fields, Item, ItemEnum, ItemStruct};
+use syn::{Fields, Item, ItemEnum, ItemStruct, parse_file};
 use tracing::{debug, info, trace, warn};
 
 pub fn build_all_configs() -> (
@@ -92,8 +92,7 @@ pub fn build_all_configs() -> (
                         if let Some(struct_config) = parse_struct_config(&item_struct) {
                             trace!(
                                 "Inserting struct config {:?}: {:#?}",
-                                &struct_config.struct_name,
-                                &struct_config
+                                &struct_config.struct_name, &struct_config
                             );
                             struct_configs
                                 .insert(struct_config.struct_name.clone(), struct_config.clone());
@@ -123,8 +122,7 @@ pub fn build_all_configs() -> (
                                 };
                                 trace!(
                                     "Inserting table config {:?}: {:#?}",
-                                    &table_config.table_name,
-                                    &struct_config
+                                    &table_config.table_name, &struct_config
                                 );
                                 table_configs.insert(table_name, table_config);
                             }
@@ -138,8 +136,7 @@ pub fn build_all_configs() -> (
                         if let Some(tagged_union) = parse_enum_config(&item_enum) {
                             trace!(
                                 "Inserting enum config {:?}: {:#?}",
-                                &tagged_union.enum_name,
-                                &tagged_union
+                                &tagged_union.enum_name, &tagged_union
                             );
                             enum_configs
                                 .insert(tagged_union.enum_name.clone(), tagged_union.clone());
@@ -222,9 +219,7 @@ fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
         fields,
         validators: table_validators
             .into_iter()
-            .map(|v| {
-                Validator::StringValidator(evenframe::validator::StringValidator::StringEmbedded(v))
-            })
+            .map(|v| Validator::StringValidator(StringValidator::StringEmbedded(v)))
             .collect(),
     })
 }

@@ -1,8 +1,8 @@
 mod config_builders;
 mod workspace_scanner;
 
-use evenframe::schemasync::Schemasync; // Import your new struct
-use evenframe::{
+use common::schemasync::Schemasync; // Import your new struct
+use common::{
     config::EvenframeConfig,
     error::Result,
     typesync::{arktype::generate_arktype_type_string, effect::generate_effect_schema_string},
