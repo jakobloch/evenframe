@@ -820,122 +820,126 @@ mod tests {
 
     #[test]
     fn test_literal_pattern() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("hello").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("hello").unwrap();
         assert_eq!(result, "hello");
     }
 
     #[test]
     fn test_digit_class() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate(r"\d").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate(r"\d").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_digit()));
         assert_eq!(result.len(), 1);
     }
 
     #[test]
     fn test_char_range() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("[a-z]").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("[a-z]").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_lowercase()));
         assert_eq!(result.len(), 1);
     }
 
     #[test]
     fn test_invalid_char_range() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("[z-a]");
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("[z-a]");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_quantifier_exact() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate(r"\d{5}").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate(r"\d{5}").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_digit()));
         assert_eq!(result.len(), 5);
     }
 
     #[test]
     fn test_quantifier_range() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("[a-z]{2,4}").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("[a-z]{2,4}").unwrap();
         assert!(result.chars().all(|c| c.is_ascii_lowercase()));
         assert!(result.len() >= 2 && result.len() <= 4);
     }
 
     #[test]
     fn test_invalid_quantifier() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("a{5,3}");
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("a{5,3}");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_optional() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("ab?c").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("ab?c").unwrap();
         assert!(result == "abc" || result == "ac");
     }
 
     #[test]
     fn test_group() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("(abc)def").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("(abc)def").unwrap();
         assert_eq!(result, "abcdef");
     }
 
     #[test]
     fn test_alternation() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("(cat|dog)").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("(cat|dog)").unwrap();
         assert!(result == "cat" || result == "dog");
     }
 
     #[test]
     fn test_escaped_chars() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate(r"\+\*\?").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate(r"\+\*\?").unwrap();
         assert_eq!(result, "+*?");
     }
 
     #[test]
     fn test_complex_pattern() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate(r"[A-Z][a-z]{2,4}\d{2}").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate(r"[A-Z][a-z]{2,4}\d{2}").unwrap();
         let chars: Vec<char> = result.chars().collect();
         assert!(chars[0].is_ascii_uppercase());
-        assert!(chars[1..chars.len() - 2]
-            .iter()
-            .all(|c| c.is_ascii_lowercase()));
+        assert!(
+            chars[1..chars.len() - 2]
+                .iter()
+                .all(|c| c.is_ascii_lowercase())
+        );
         assert!(chars[chars.len() - 2..].iter().all(|c| c.is_ascii_digit()));
     }
 
     #[test]
     fn test_hex_class() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("[0-9a-fA-F]{8}").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("[0-9a-fA-F]{8}").unwrap();
         assert_eq!(result.len(), 8);
         assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
     #[test]
     fn test_base64_class() {
-        let mut gen = RegexValGen::new();
-        let result = gen.generate("[A-Za-z0-9+/]{4}").unwrap();
+        let mut value_generator = RegexValGen::new();
+        let result = value_generator.generate("[A-Za-z0-9+/]{4}").unwrap();
         assert_eq!(result.len(), 4);
-        assert!(result
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/'));
+        assert!(
+            result
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/')
+        );
     }
 
     #[test]
     fn test_ip_address_pattern() {
-        let mut gen = RegexValGen::new();
+        let mut value_generator = RegexValGen::new();
 
         // Test the full IP address pattern
         let ip_pattern = r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
-        let result = gen.generate(ip_pattern);
+        let result = value_generator.generate(ip_pattern);
         match result {
             Ok(ip) => {
                 println!("Generated IP: {}", ip);
@@ -954,7 +958,7 @@ mod tests {
 
         // Run it multiple times to ensure it's stable
         for _ in 0..5 {
-            let ip = gen.generate(ip_pattern).unwrap();
+            let ip = value_generator.generate(ip_pattern).unwrap();
             println!("Additional IP: {}", ip);
             assert!(ip.split('.').count() == 4);
         }
@@ -962,7 +966,7 @@ mod tests {
 
     #[test]
     fn test_numeric_range_patterns() {
-        let mut gen = RegexValGen::new();
+        let mut value_generator = RegexValGen::new();
 
         // Test patterns with numeric ranges
         let test_cases = vec![
@@ -979,7 +983,7 @@ mod tests {
 
             // Generate multiple times to check range
             for _ in 0..10 {
-                let result = gen.generate(pattern).unwrap();
+                let result = value_generator.generate(pattern).unwrap();
                 let num: u32 = result
                     .parse()
                     .unwrap_or_else(|_| panic!("Should be a number: {result}"));
@@ -997,7 +1001,7 @@ mod tests {
 
     #[test]
     fn test_15_minute_intervals() {
-        let mut gen = RegexValGen::new();
+        let mut value_generator = RegexValGen::new();
 
         // Test 15-minute interval patterns
         let patterns = vec![
@@ -1010,7 +1014,7 @@ mod tests {
         for (pattern, desc) in patterns {
             println!("Testing {}: {}", desc, pattern);
             for _ in 0..5 {
-                let result = gen.generate(pattern).unwrap();
+                let result = value_generator.generate(pattern).unwrap();
                 println!("  Generated: {}", result);
 
                 // Validate 15-minute intervals
@@ -1029,7 +1033,7 @@ mod tests {
 
     #[test]
     fn test_duration_pattern() {
-        let mut gen = RegexValGen::new();
+        let mut value_generator = RegexValGen::new();
 
         // Test simpler duration components first
         let simple_patterns = vec![
@@ -1044,7 +1048,7 @@ mod tests {
 
         for (pattern, desc) in simple_patterns {
             println!("Testing {}: {}", desc, pattern);
-            match gen.generate(pattern) {
+            match value_generator.generate(pattern) {
                 Ok(duration) => {
                     println!("  Generated: {}", duration);
                     assert!(duration.starts_with('P'), "Duration should start with P");
@@ -1060,7 +1064,7 @@ mod tests {
 
         println!("\nTesting actual Duration format pattern");
         for i in 0..10 {
-            match gen.generate(duration_pattern) {
+            match value_generator.generate(duration_pattern) {
                 Ok(duration) => {
                     println!("  Duration {}: {}", i + 1, duration);
                     assert!(duration.starts_with('P'), "Duration should start with P");
