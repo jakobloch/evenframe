@@ -1,7 +1,15 @@
 [package]
-name = "common"
+name = "evenframe_core"
 version = "0.1.0"
 edition = "2024"
+authors = ["Jakob Lochinski"]
+license = "MIT"
+description = "Core functionality for Evenframe - TypeScript type generation and database schema synchronization"
+repository = "https://github.com/rymskip/evenframe"
+documentation = "https://docs.rs/evenframe_core"
+readme = "../README.md"
+keywords = ["typescript", "codegen", "surrealdb", "schema", "types"]
+categories = ["development-tools", "database"]
 
 [dependencies]
 # workspace dependencies

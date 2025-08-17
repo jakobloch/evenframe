@@ -1,8 +1,8 @@
-use common::error::{EvenframeError, Result};
+use evenframe_core::error::{EvenframeError, Result};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use syn::{parse_file, Attribute, Item, Meta};
+use syn::{Attribute, Item, Meta, parse_file};
 use tracing::{debug, error, info, trace};
 
 #[allow(unused)]
@@ -70,9 +70,7 @@ impl WorkspaceScanner {
     ) -> Result<()> {
         trace!(
             "Scanning directory: {:?}, module: {}, depth: {}",
-            dir,
-            base_module,
-            depth
+            dir, base_module, depth
         );
 
         // Prevent excessive recursion

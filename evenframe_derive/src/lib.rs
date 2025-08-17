@@ -1,4 +1,4 @@
-use common::derive::{enum_impl, struct_impl};
+use evenframe_core::derive::{enum_impl, struct_impl};
 use proc_macro::TokenStream;
 use syn::{Data, DeriveInput, parse_macro_input};
 

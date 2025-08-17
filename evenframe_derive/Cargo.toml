@@ -2,6 +2,14 @@
 name = "evenframe_derive"
 version = "0.1.0"
 edition = "2024"
+authors = ["Jakob Lochinski"]
+license = "MIT"
+description = "Derive macros for Evenframe - automatic database schema and CRUD generation"
+repository = "https://github.com/rymskip/evenframe"
+documentation = "https://docs.rs/evenframe_derive"
+readme = "../README.md"
+keywords = ["macro", "derive", "surrealdb", "codegen", "database"]
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true
@@ -11,7 +19,7 @@ proc-macro = true
 # workspace dependencies
 serde_json = { workspace = true }
 regex = { workspace = true }
-common = { workspace = true }
+evenframe_core = { version = "0.1.0", path = "../evenframe_core" }
 
 proc-macro2 = "1.0.95"
 quote = "1.0.40"

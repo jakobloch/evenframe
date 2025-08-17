@@ -1,6 +1,6 @@
 use crate::workspace_scanner::WorkspaceScanner;
-use common::config::EvenframeConfig;
-use common::{
+use evenframe_core::config::EvenframeConfig;
+use evenframe_core::{
     derive::attributes::{
         parse_mock_data_attribute, parse_relation_attribute, parse_table_validators,
     },

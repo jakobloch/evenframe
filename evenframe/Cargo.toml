@@ -2,6 +2,15 @@
 name = "evenframe"
 version = "0.1.0"
 edition = "2024"
+authors = ["Jakob Lochinski"]
+license = "MIT"
+description = "A unified framework for TypeScript type generation and database schema synchronization"
+repository = "https://github.com/rymskip/evenframe"
+documentation = "https://docs.rs/evenframe"
+homepage = "https://github.com/rymskip/evenframe"
+readme = "README.md"
+keywords = ["typescript", "codegen", "surrealdb", "schema", "types"]
+categories = ["development-tools", "database"]
 
 [lib]
 path = "src/lib.rs"
@@ -9,11 +18,12 @@ path = "src/lib.rs"
 [dependencies]
 
 # workspace dependencies
-common = { workspace = true }
+evenframe_core = { version = "0.1.0", path = "../evenframe_core" }
 syn = { workspace = true }
 tracing = { workspace = true }
 convert_case = { workspace = true }
 tokio = { workspace = true }
+regex = { workspace = true }
 
-evenframe_derive = { path = "../evenframe_derive" }
+evenframe_derive = { version = "0.1.0", path = "../evenframe_derive" }
 tracing-subscriber = "0.3"
