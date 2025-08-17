@@ -8,7 +8,7 @@ description = "A unified framework for TypeScript type generation and database s
 repository = "https://github.com/rymskip/evenframe"
 documentation = "https://docs.rs/evenframe"
 homepage = "https://github.com/rymskip/evenframe"
-readme = "README.md"
+readme = "../README.md"
 keywords = ["typescript", "codegen", "surrealdb", "schema", "types"]
 categories = ["development-tools", "database"]
 
