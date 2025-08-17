@@ -6,6 +6,7 @@ pub fn generate_struct_trait_imports() -> proc_macro2::TokenStream {
     trace!("Generating struct trait imports");
     quote! {
         use evenframe::{
+            prelude::*,
             traits::EvenframePersistableStruct,
             types::{StructConfig, StructField},
             validator::{StringValidator, Validator},
@@ -18,6 +19,7 @@ pub fn generate_table_config_imports() -> proc_macro2::TokenStream {
     trace!("Generating table config imports");
     quote! {
         use evenframe::{
+            prelude::*,
             config::EvenframeConfig,
             schemasync::{
                 mockmake::MockGenerationConfig,
@@ -34,6 +36,7 @@ pub fn generate_struct_parsing_imports() -> proc_macro2::TokenStream {
     trace!("Generating struct parsing imports");
     quote! {
         use evenframe::{
+            prelude::*,
             schemasync::{
                 DefineConfig, Direction, EdgeConfig, PermissionsConfig,
             },
@@ -51,7 +54,8 @@ pub fn generate_enum_trait_imports() -> proc_macro2::TokenStream {
 pub fn generate_deserialize_imports() -> proc_macro2::TokenStream {
     trace!("Generating deserialize imports");
     quote! {
-        use evenframe::traits::EvenframeDeserialize;
+
+        use evenframe::{traits::EvenframeDeserialize, prelude::*};
     }
 }
 
