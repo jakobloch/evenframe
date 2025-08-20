@@ -1161,13 +1161,16 @@ name = "evenframe"
 version = "0.1.1"
 dependencies = [
  "convert_case",
+ "dotenv",
  "evenframe_core",
  "evenframe_derive",
  "regex",
  "syn 2.0.106",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]

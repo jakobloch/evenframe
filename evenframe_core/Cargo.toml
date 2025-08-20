@@ -20,6 +20,7 @@ syn = { workspace = true }
 tracing = { workspace = true }
 convert_case = { workspace = true }
 tokio = { workspace = true }
+toml = { workspace = true }
 
 surrealdb = { version = "2.3.7", features = ["kv-mem", "protocol-http"] }
 dotenv = "0.15.0"
@@ -33,7 +34,6 @@ chrono = "0.4.41"
 chrono-tz = "0.10.4"
 derive_more = { version = "2.0.1", features = ["from"] }
 petgraph = "0.8.2"
-toml = "0.9.5"
 futures = "0.3.31"
 bon = "3.6.5"
 uuid = { version = "1.17", features = ["v4"] }
