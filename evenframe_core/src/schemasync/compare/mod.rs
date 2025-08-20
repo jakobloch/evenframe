@@ -6,23 +6,22 @@ pub mod import;
 
 pub use crate::schemasync::mockmake::MockGenerationConfig;
 use crate::{
-    compare, evenframe_log,
+    EvenframeError, Result, compare, evenframe_log,
     schemasync::{
+        TableConfig,
         config::{PerformanceConfig, SchemasyncMockGenConfig},
         surql::access::setup_access_definitions,
-        TableConfig,
     },
     types::{FieldType, StructConfig, StructField, TaggedUnion, VariantData},
-    EvenframeError, Result,
 };
 pub use import::SchemaImporter;
 use import::{AccessDefinition, FieldDefinition, ObjectType, SchemaDefinition, TableDefinition};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use surrealdb::engine::local::{Db, Mem};
-use surrealdb::{engine::remote::http::Client, Surreal};
+use surrealdb::{Surreal, engine::remote::http::Client};
 use tracing;
 
 #[derive(Debug)]
@@ -359,10 +358,17 @@ impl<'a> Merger<'a> {
                             existing_count - target_count
                         );
                         eprintln!("\n   Options:");
-                        eprintln!("   1. Change the target count (n) to {} or higher to preserve all records", existing_count);
+                        eprintln!(
+                            "   1. Change the target count (n) to {} or higher to preserve all records",
+                            existing_count
+                        );
                         eprintln!("   2. Use Smart preservation mode instead of Full");
-                        eprintln!("   3. Set preservation_mode to None if you want to regenerate all data");
-                        eprintln!("\n   In a production environment, this would require user confirmation.");
+                        eprintln!(
+                            "   3. Set preservation_mode to None if you want to regenerate all data"
+                        );
+                        eprintln!(
+                            "\n   In a production environment, this would require user confirmation."
+                        );
                         eprintln!(
                             "   For now, proceeding with target count of {} records.\n",
                             target_count
@@ -493,7 +499,7 @@ impl<'a> Merger<'a> {
             | FieldType::Isize => json!(rand::random::<i32>() % 100),
             FieldType::F32 | FieldType::F64 => json!(rand::random::<f64>() * 100.0),
             FieldType::DateTime => json!(chrono::Utc::now().to_rfc3339()),
-            FieldType::Duration => {
+            FieldType::EvenframeDuration => {
                 // Generate random duration in nanoseconds (0 to 1 day)
                 json!(rand::random::<i64>() % 86_400_000_000_000i64)
             }
@@ -572,7 +578,7 @@ impl std::fmt::Display for AccessChangeType {
             AccessChangeType::IssuerKeyChanged => write!(f, "Issuer key changed"),
             AccessChangeType::JwtUrlChanged => write!(f, "JWT URL changed"),
             AccessChangeType::AuthenticateClauseChanged => write!(f, "Authenticate clause changed"),
-            AccessChangeType::DurationChanged => write!(f, "Duration changed"),
+            AccessChangeType::DurationChanged => write!(f, "EvenframeDuration changed"),
             AccessChangeType::SigninChanged => write!(f, "Signin changed"),
             AccessChangeType::SignupChanged => write!(f, "Signup changed"),
             AccessChangeType::OtherChange(msg) => write!(f, "{}", msg),
@@ -1017,11 +1023,7 @@ impl Comparator {
             changed = true;
         }
 
-        if changed {
-            Some(basic_change)
-        } else {
-            None
-        }
+        if changed { Some(basic_change) } else { None }
     }
 
     /// Deep comparison of object types to find granular changes
@@ -1430,33 +1432,10 @@ pub fn filter_changed_tables_and_objects(
                                                     // Find the struct definition and get the nested field type
                                                     if let Some(struct_def) =
                                                         objects.get(struct_name)
-                                                    {
-                                                        if let Some(nested_field_def) = struct_def
+                                                        && let Some(nested_field_def) = struct_def
                                                             .fields
                                                             .iter()
                                                             .find(|f| f.field_name == nested_field)
-                                                        {
-                                                            nested_changes
-                                                                .entry(parent_field.clone())
-                                                                .or_default()
-                                                                .push((
-                                                                    nested_field.clone(),
-                                                                    nested_field_def
-                                                                        .field_type
-                                                                        .clone(),
-                                                                    ChangeType::Added,
-                                                                ));
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            FieldType::Other(struct_name) => {
-                                                // Find the struct definition and get the nested field type
-                                                if let Some(struct_def) = objects.get(struct_name) {
-                                                    if let Some(nested_field_def) = struct_def
-                                                        .fields
-                                                        .iter()
-                                                        .find(|f| f.field_name == nested_field)
                                                     {
                                                         nested_changes
                                                             .entry(parent_field.clone())
@@ -1467,6 +1446,24 @@ pub fn filter_changed_tables_and_objects(
                                                                 ChangeType::Added,
                                                             ));
                                                     }
+                                                }
+                                            }
+                                            FieldType::Other(struct_name) => {
+                                                // Find the struct definition and get the nested field type
+                                                if let Some(struct_def) = objects.get(struct_name)
+                                                    && let Some(nested_field_def) = struct_def
+                                                        .fields
+                                                        .iter()
+                                                        .find(|f| f.field_name == nested_field)
+                                                {
+                                                    nested_changes
+                                                        .entry(parent_field.clone())
+                                                        .or_default()
+                                                        .push((
+                                                            nested_field.clone(),
+                                                            nested_field_def.field_type.clone(),
+                                                            ChangeType::Added,
+                                                        ));
                                                 }
                                             }
                                             _ => {

@@ -1,5 +1,5 @@
 use core::fmt;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use serde::{Deserialize, Serialize};
 use syn::Type as SynType;
 
@@ -25,7 +25,7 @@ pub enum FieldType {
     Usize,
     EvenframeRecordId,
     DateTime,
-    Duration,
+    EvenframeDuration,
     Timezone,
     Decimal,
     OrderedFloat(Box<FieldType>), // Wraps F32 or F64
@@ -61,7 +61,7 @@ impl ToTokens for FieldType {
             FieldType::Usize => tokens.extend(quote! { FieldType::Usize }),
             FieldType::EvenframeRecordId => tokens.extend(quote! { FieldType::EvenframeRecordId }),
             FieldType::DateTime => tokens.extend(quote! { FieldType::DateTime }),
-            FieldType::Duration => tokens.extend(quote! { FieldType::Duration }),
+            FieldType::EvenframeDuration => tokens.extend(quote! { FieldType::EvenframeDuration }),
             FieldType::Timezone => tokens.extend(quote! { FieldType::Timezone }),
             FieldType::Decimal => tokens.extend(quote! { FieldType::Decimal }),
             FieldType::Unit => tokens.extend(quote! { FieldType::Unit }),
@@ -287,7 +287,7 @@ impl FieldType {
             "usize" => FieldType::Usize,
             "EvenframeRecordId" => FieldType::EvenframeRecordId,
             "DateTime" => FieldType::DateTime,
-            "Duration" => FieldType::Duration,
+            "EvenframeDuration" => FieldType::EvenframeDuration,
             "Tz" | "Timezone" => FieldType::Timezone,
             "Decimal" => FieldType::Decimal,
             _ => {
@@ -327,7 +327,7 @@ impl FieldType {
             "usize" => FieldType::Usize,
             "EvenframeRecordId" => FieldType::EvenframeRecordId,
             "DateTime" => FieldType::DateTime,
-            "Duration" => FieldType::Duration,
+            "EvenframeDuration" => FieldType::EvenframeDuration,
             "Tz" => FieldType::Timezone,
             "Decimal" => FieldType::Decimal,
             "()" => FieldType::Unit,
@@ -348,7 +348,7 @@ impl FieldType {
                                 FieldType::Vec(Box::new(inner_type))
                             }
                             "DateTime" => FieldType::DateTime,
-                            "Duration" => FieldType::Duration,
+                            "EvenframeDuration" => FieldType::EvenframeDuration,
                             _ => FieldType::Other(clean_str),
                         }
                     } else {
@@ -423,7 +423,7 @@ impl fmt::Display for FieldType {
             FieldType::Usize => write!(f, "Usize"),
             FieldType::EvenframeRecordId => write!(f, "EvenframeRecordId"),
             FieldType::DateTime => write!(f, "DateTime"),
-            FieldType::Duration => write!(f, "Duration"),
+            FieldType::EvenframeDuration => write!(f, "EvenframeDuration"),
             FieldType::Timezone => write!(f, "Timezone"),
             FieldType::Decimal => write!(f, "Decimal"),
             FieldType::OrderedFloat(inner) => write!(f, "OrderedFloat<{}>", inner),

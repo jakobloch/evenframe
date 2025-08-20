@@ -33,8 +33,8 @@ pub fn field_type_to_arktype(
         | FieldType::Usize => "'number'".to_string(),
         FieldType::EvenframeRecordId => r#""string""#.to_string(),
         FieldType::DateTime => "'string'".to_string(),
-        FieldType::Duration => "'number'".to_string(), // nanoseconds
-        FieldType::Timezone => "'string'".to_string(), // IANA timezone string
+        FieldType::EvenframeDuration => "'number'".to_string(), // nanoseconds
+        FieldType::Timezone => "'string'".to_string(),          // IANA timezone string
 
         FieldType::Tuple(types) => {
             let types_str = types

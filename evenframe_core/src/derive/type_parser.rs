@@ -1,7 +1,7 @@
-use tracing::{debug, trace, warn};
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{GenericArgument, PathArguments, Type};
+use tracing::{debug, trace, warn};
 
 // Remove unused import - type_parser generates tokens that need fully qualified paths
 
@@ -12,7 +12,7 @@ fn unsupported_type_error(ty: &Type, type_str: &str, hint: &str) -> proc_macro2:
         format!(
             "Unsupported type: '{}'. {}\n\nSupported types include:\n\
             - Primitives: bool, char, String, i8-i128, u8-u128, f32, f64\n\
-            - Special: Decimal, DateTime, Duration, EvenframeRecordId\n\
+            - Special: Decimal, DateTime, EvenframeDuration, EvenframeRecordId\n\
             - Containers: Option<T>, Vec<T>, HashMap<K,V>, BTreeMap<K,V>\n\
             - Custom: RecordLink<T>, OrderedFloat<T>, or any custom struct/enum",
             type_str, hint
@@ -27,7 +27,11 @@ fn parse_generic_args(
     type_name: &str,
     args: &syn::punctuated::Punctuated<GenericArgument, syn::token::Comma>,
 ) -> proc_macro2::TokenStream {
-    debug!("Parsing generic arguments for type '{}' with {} arguments", type_name, args.len());
+    debug!(
+        "Parsing generic arguments for type '{}' with {} arguments",
+        type_name,
+        args.len()
+    );
     match (type_name, args.len()) {
         ("Option" | "Vec" | "RecordLink" | "OrderedFloat", 1) => {
             if let Some(GenericArgument::Type(inner_ty)) = args.first() {
@@ -79,11 +83,11 @@ fn parse_generic_args(
                 .to_compile_error(),
             }
         }
-        ("DateTime" | "Duration", _) => {
+        ("DateTime" | "EvenframeDuration", _) => {
             // These can have type params but we ignore them
             match type_name {
                 "DateTime" => quote! { ::evenframe::types::FieldType::DateTime },
-                "Duration" => quote! { ::evenframe::types::FieldType::Duration },
+                "EvenframeDuration" => quote! { ::evenframe::types::FieldType::EvenframeDuration },
                 _ => unreachable!(),
             }
         }
@@ -96,7 +100,7 @@ fn parse_generic_args(
                         ty,
                         &format!("{}<...>", name),
                         "Unknown generic type",
-                    )
+                    );
                 }
             };
             syn::Error::new(
@@ -135,18 +139,16 @@ fn parse_simple_type(name: &str) -> Option<proc_macro2::TokenStream> {
         "u64" => Some(quote! { ::evenframe::types::FieldType::U64 }),
         "u128" => Some(quote! { ::evenframe::types::FieldType::U128 }),
         "usize" => Some(quote! { ::evenframe::types::FieldType::Usize }),
-        "EvenframeRecordId" => {
-            Some(quote! { ::evenframe::types::FieldType::EvenframeRecordId })
-        }
+        "EvenframeRecordId" => Some(quote! { ::evenframe::types::FieldType::EvenframeRecordId }),
         "Decimal" => Some(quote! { ::evenframe::types::FieldType::Decimal }),
         "DateTime" => Some(quote! { ::evenframe::types::FieldType::DateTime }),
-        "Duration" => Some(quote! { ::evenframe::types::FieldType::Duration }),
+        "EvenframeDuration" => Some(quote! { ::evenframe::types::FieldType::EvenframeDuration }),
         "Tz" => Some(quote! { ::evenframe::types::FieldType::Timezone }),
         "()" => Some(quote! { ::evenframe::types::FieldType::Unit }),
         _ => {
             trace!("'{}' is not a simple type", name);
             None
-        },
+        }
     }
 }
 
@@ -179,7 +181,7 @@ pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                 Use owned types instead (e.g., String instead of &str)",
             )
             .to_compile_error()
-        },
+        }
 
         // Handle pointer types
         Type::Ptr(_) => {
@@ -189,7 +191,7 @@ pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                 "Raw pointer types are not supported in Evenframe schemas",
             )
             .to_compile_error()
-        },
+        }
 
         // Handle array types
         Type::Array(arr) => {
@@ -199,7 +201,7 @@ pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                 "Fixed-size arrays are not supported. Use Vec<T> for dynamic arrays instead",
             )
             .to_compile_error()
-        },
+        }
 
         // Handle slice types
         Type::Slice(slice) => {
@@ -209,13 +211,17 @@ pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
                 "Slice types are not supported. Use Vec<T> instead",
             )
             .to_compile_error()
-        },
+        }
 
         // Handle tuple types
         Type::Tuple(tuple) => {
             debug!("Parsing tuple type with {} elements", tuple.elems.len());
             let elems = tuple.elems.iter().enumerate().map(|(index, elem)| {
-                trace!("Processing tuple element {} of {}", index + 1, tuple.elems.len());
+                trace!(
+                    "Processing tuple element {} of {}",
+                    index + 1,
+                    tuple.elems.len()
+                );
                 parse_data_type(elem)
             });
             debug!("Successfully parsed tuple type");
@@ -226,7 +232,7 @@ pub fn parse_data_type(ty: &Type) -> proc_macro2::TokenStream {
         Type::Path(type_path) => {
             trace!("Processing path type: {}", type_str);
             parse_path_type(ty, type_path)
-        },
+        }
 
         // Fallback for any other type
         _ => {
@@ -268,7 +274,9 @@ fn parse_path_type(ty: &Type, type_path: &syn::TypePath) -> proc_macro2::TokenSt
         // Handle known types without generic args that might be namespaced
         match ident_str.as_str() {
             "DateTime" => return quote! { ::evenframe::types::FieldType::DateTime },
-            "Duration" => return quote! { ::evenframe::types::FieldType::Duration },
+            "EvenframeDuration" => {
+                return quote! { ::evenframe::types::FieldType::EvenframeDuration };
+            }
             "Decimal" => return quote! { ::evenframe::types::FieldType::Decimal },
             "Tz" => return quote! { ::evenframe::types::FieldType::Timezone },
             _ => {}

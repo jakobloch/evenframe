@@ -24,8 +24,8 @@ pub fn field_type_to_default_value(
             trace!("Generating default for DateTime type");
             r#""2024-01-01T00:00:00Z""#.to_string()
         }
-        FieldType::Duration => {
-            trace!("Generating default for Duration type");
+        FieldType::EvenframeDuration => {
+            trace!("Generating default for EvenframeDuration type");
             "0".to_string() // nanoseconds
         }
         FieldType::Timezone => {
@@ -111,8 +111,7 @@ pub fn field_type_to_default_value(
             // Return an empty object as default
             trace!(
                 "Generating default for HashMap with key: {:?}, value: {:?}",
-                key,
-                value
+                key, value
             );
             "{}".to_string()
         }
@@ -121,8 +120,7 @@ pub fn field_type_to_default_value(
             // Return an empty object as default
             trace!(
                 "Generating default for BTreeMap with key: {:?}, value: {:?}",
-                key,
-                value
+                key, value
             );
             "{}".to_string()
         }
@@ -217,9 +215,7 @@ pub fn field_type_to_surql_default(
 ) -> String {
     trace!(
         "Generating SURQL default for field '{}' in table '{}', type: {:?}",
-        field_name,
-        table_name,
-        field_type
+        field_name, table_name, field_type
     );
     let result = match field_type {
         FieldType::String | FieldType::Char => {
@@ -235,9 +231,9 @@ pub fn field_type_to_surql_default(
             trace!("Generating SURQL default for DateTime");
             "d'2024-01-01T00:00:00Z'".to_string()
         }
-        FieldType::Duration => {
+        FieldType::EvenframeDuration => {
             // Default duration of 0 nanoseconds
-            trace!("Generating SURQL default for Duration");
+            trace!("Generating SURQL default for EvenframeDuration");
             "duration::from::nanos(0)".to_string()
         }
         FieldType::Timezone => {
@@ -343,8 +339,7 @@ pub fn field_type_to_surql_default(
         FieldType::HashMap(key, value) | FieldType::BTreeMap(key, value) => {
             trace!(
                 "Generating SURQL default for Map with key: {:?}, value: {:?}",
-                key,
-                value
+                key, value
             );
             "{}".to_string()
         }
@@ -441,9 +436,7 @@ pub fn field_type_to_surreal_type(
 ) -> (String, bool, Option<String>) {
     trace!(
         "Converting field '{}' in table '{}' to SurrealDB type, field_type: {:?}",
-        field_name,
-        table_name,
-        field_type
+        field_name, table_name, field_type
     );
     let result = match field_type {
         FieldType::String | FieldType::Char => {
@@ -458,8 +451,8 @@ pub fn field_type_to_surreal_type(
             trace!("Converting DateTime to SurrealDB type");
             ("datetime".to_string(), false, None)
         }
-        FieldType::Duration => {
-            trace!("Converting Duration to SurrealDB type");
+        FieldType::EvenframeDuration => {
+            trace!("Converting EvenframeDuration to SurrealDB type");
             ("duration".to_string(), false, None)
         }
         FieldType::Timezone => {

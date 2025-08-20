@@ -1,7 +1,7 @@
 use core::fmt;
 use serde::{
-    de::{self, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
+    de::{self, MapAccess, Visitor},
 };
 use std::{marker::PhantomData, ops::Deref};
 use surrealdb::RecordId;
@@ -153,5 +153,19 @@ impl EvenframeValue {
 
     pub fn into_inner(self) -> serde_value::Value {
         self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct EvenframeDuration(chrono::TimeDelta);
+
+impl<'de> serde::Deserialize<'de> for EvenframeDuration {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let nanos = i64::deserialize(deserializer)?;
+        let td = chrono::TimeDelta::nanoseconds(nanos);
+        Ok(EvenframeDuration(td))
     }
 }

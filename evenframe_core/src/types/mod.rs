@@ -2,12 +2,11 @@ mod field_type;
 
 pub use crate::types::field_type::FieldType;
 use crate::{
-    evenframe_log,
+    EvenframeError, Result, evenframe_log,
     format::Format,
     schemasync::{DefineConfig, EdgeConfig, TableConfig},
     validator::Validator,
     wrappers::EvenframeRecordId,
-    EvenframeError, Result,
 };
 use convert_case::{Case, Casing};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -134,7 +133,7 @@ impl StructField {
                             FieldType::DateTime => {
                                 value_stack.push(("datetime".to_string(), false, None))
                             }
-                            FieldType::Duration => {
+                            FieldType::EvenframeDuration => {
                                 value_stack.push(("duration".to_string(), false, None))
                             }
                             FieldType::Timezone => {
@@ -420,10 +419,10 @@ impl StructField {
             convert_type_iteratively(&self.field_type)?
         };
 
-        if let Some(ref def) = self.define_config {
-            if def.flexible.unwrap_or(false) {
-                stmt.push_str(" FLEXIBLE");
-            }
+        if let Some(ref def) = self.define_config
+            && def.flexible.unwrap_or(false)
+        {
+            stmt.push_str(" FLEXIBLE");
         }
 
         if !type_str.is_empty() {
@@ -486,13 +485,13 @@ impl StructField {
 
         stmt.push_str(";\n");
 
-        if needs_wildcard {
-            if let Some(wildcard_value_type) = wildcard_type {
-                stmt.push_str(&format!(
-                    "DEFINE FIELD {}.* ON TABLE {} TYPE {};\n",
-                    self.field_name, table_name, wildcard_value_type
-                ));
-            }
+        if let Some(wildcard_value_type) = wildcard_type
+            && needs_wildcard
+        {
+            stmt.push_str(&format!(
+                "DEFINE FIELD {}.* ON TABLE {} TYPE {};\n",
+                self.field_name, table_name, wildcard_value_type
+            ));
         }
 
         Ok(stmt)

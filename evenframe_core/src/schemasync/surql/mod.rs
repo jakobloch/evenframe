@@ -28,16 +28,15 @@ fn is_nullable_partial_struct(field: &StructField, original_table: Option<&Table
     // Check if this is a struct field (partial update)
     if let FieldType::Struct(_) = &field.field_type {
         // Find the original field definition to check if it's nullable
-        if let Some(table) = original_table {
-            if let Some(original_field) = table
+        if let Some(table) = original_table
+            && let Some(original_field) = table
                 .struct_config
                 .fields
                 .iter()
                 .find(|f| f.field_name == field.field_name)
-            {
-                // Check if the original field type is Option<...>
-                return is_nullable_field(original_field);
-            }
+        {
+            // Check if the original field type is Option<...>
+            return is_nullable_field(original_field);
         }
     }
     false
@@ -176,8 +175,8 @@ fn to_surreal_string(field_type: &FieldType, value: &Value) -> String {
                 format!("d'{}'", chrono::Utc::now().to_rfc3339())
             }
         }
-        FieldType::Duration => {
-            // Duration values are stored as nanoseconds (i64)
+        FieldType::EvenframeDuration => {
+            // EvenframeDuration values are stored as nanoseconds (i64)
             // SurrealDB uses duration::from::nanos() to convert
             if let Some(nanos) = value.as_i64() {
                 format!("duration::from::nanos({})", nanos)

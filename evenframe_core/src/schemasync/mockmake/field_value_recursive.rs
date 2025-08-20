@@ -66,7 +66,7 @@ impl<'a> FieldValueGenerator<'a> {
 
             FieldType::DateTime => format!("d'{}'", chrono::Utc::now().to_rfc3339()),
 
-            FieldType::Duration => {
+            FieldType::EvenframeDuration => {
                 // Generate random duration in nanoseconds (0 to 1 day in nanos)
                 let nanos = rng.random_range(0..86_400_000_000_000i64); // 0 to 24 hours
                 format!("duration::from::nanos({})", nanos)
