@@ -1,18 +1,19 @@
 use crate::workspace_scanner::WorkspaceScanner;
+use convert_case::{Case, Casing};
 use evenframe_core::config::EvenframeConfig;
 use evenframe_core::{
     derive::attributes::{
-        parse_mock_data_attribute, parse_relation_attribute, parse_table_validators,
+        parse_format_attribute_bin, parse_mock_data_attribute, parse_relation_attribute,
+        parse_table_validators,
     },
     schemasync::table::TableConfig,
     schemasync::{DefineConfig, EdgeConfig, PermissionsConfig},
     types::{FieldType, StructConfig, StructField, TaggedUnion, Variant, VariantData},
     validator::{StringValidator, Validator},
 };
-use convert_case::{Case, Casing};
 use std::collections::HashMap;
 use std::fs;
-use syn::{Fields, Item, ItemEnum, ItemStruct, parse_file};
+use syn::{Fields, FieldsNamed, Item, ItemEnum, ItemStruct, parse_file};
 use tracing::{debug, info, trace, warn};
 
 pub fn build_all_configs() -> (
@@ -36,7 +37,8 @@ pub fn build_all_configs() -> (
 
     debug!("Creating workspace scanner");
     // Scan the workspace for all Evenframe types
-    let scanner = WorkspaceScanner::new(config.general.apply_aliases);
+    let scanner = WorkspaceScanner::new(config.general.apply_aliases)
+        .expect("Something went wrong initializing the workspace scanner");
     let types = match scanner.scan_for_evenframe_types() {
         Ok(types) => {
             info!("Found {} Evenframe types", types.len());
@@ -181,33 +183,7 @@ fn parse_struct_config(item_struct: &ItemStruct) -> Option<StructConfig> {
             fields_named.named.len(),
             struct_name
         );
-        for field in &fields_named.named {
-            let field_name = field.ident.as_ref()?.to_string();
-            let field_name = field_name.trim_start_matches("r#").to_string();
-
-            // Parse field type directly to FieldType
-            let field_type = FieldType::parse_syn_ty(&field.ty);
-
-            // Parse attributes using the derive module's parsers
-            let edge_config = EdgeConfig::parse(field).ok().flatten();
-            let define_config = DefineConfig::parse(field).ok().flatten();
-
-            // Parse format - simplified for now
-            let format = None;
-
-            // Parse validators - simplified for now
-            let validators = vec![];
-
-            fields.push(StructField {
-                field_name,
-                field_type,
-                edge_config,
-                define_config,
-                format,
-                validators,
-                always_regenerate: false,
-            });
-        }
+        fields = process_struct_fields(fields_named);
     }
 
     let table_validators = parse_table_validators(&item_struct.attrs)
@@ -251,23 +227,13 @@ fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
                     Some(VariantData::DataStructureRef(FieldType::Tuple(field_types)))
                 }
             }
-            Fields::Named(fields) => {
-                let mut struct_fields = Vec::new();
-                for field in &fields.named {
-                    let field_name = field.ident.as_ref()?.to_string();
-                    let field_name = field_name.trim_start_matches("r#").to_string();
-                    let field_type = FieldType::parse_syn_ty(&field.ty);
-
-                    struct_fields.push(StructField {
-                        field_name,
-                        field_type,
-                        edge_config: None,
-                        define_config: None,
-                        format: None,
-                        validators: vec![],
-                        always_regenerate: false,
-                    });
-                }
+            Fields::Named(fields_named) => {
+                debug!(
+                    "Processing {} fields for enum struct {}",
+                    fields_named.named.len(),
+                    variant_name
+                );
+                let struct_fields = process_struct_fields(fields_named);
 
                 Some(VariantData::InlineStruct(StructConfig {
                     struct_name: variant_name.clone(),
@@ -287,6 +253,42 @@ fn parse_enum_config(item_enum: &ItemEnum) -> Option<TaggedUnion> {
         enum_name,
         variants,
     })
+}
+
+fn process_struct_fields(fields_named: &FieldsNamed) -> Vec<StructField> {
+    let mut struct_fields = Vec::new();
+    for field in &fields_named.named {
+        let field_name = field
+            .ident
+            .as_ref()
+            .expect("Something went wrong getting the field name")
+            .to_string();
+        let field_name = field_name.trim_start_matches("r#").to_string();
+
+        // Parse field type directly to FieldType
+        let field_type = FieldType::parse_syn_ty(&field.ty);
+
+        // Parse attributes using the derive module's parsers
+        let edge_config = EdgeConfig::parse(field).ok().flatten();
+        let define_config = DefineConfig::parse(field).ok().flatten();
+
+        // Parse format
+        let format = parse_format_attribute_bin(&field.attrs).ok().flatten();
+
+        // Parse validators - simplified for now
+        let validators = vec![];
+
+        struct_fields.push(StructField {
+            field_name,
+            field_type,
+            edge_config,
+            define_config,
+            format,
+            validators,
+            always_regenerate: false,
+        });
+    }
+    struct_fields
 }
 
 pub fn merge_tables_and_objects(
