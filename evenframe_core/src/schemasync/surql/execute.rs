@@ -80,15 +80,15 @@ pub async fn validate_surql_response(
                 }
 
                 // Check for specific error patterns in string results
-                if let Some(s) = value.as_str() {
-                    if s.contains("error") || s.contains("failed") || s.contains("violation") {
-                        errors.push(QueryValidationError {
-                            statement_index: index,
-                            error_type: QueryErrorType::UnknownError,
-                            message: format!("Potential error in string result: {}", s),
-                            statement: Some(statement.to_string()),
-                        });
-                    }
+                if let Some(s) = value.as_str()
+                    && (s.contains("error") || s.contains("failed") || s.contains("violation"))
+                {
+                    errors.push(QueryValidationError {
+                        statement_index: index,
+                        error_type: QueryErrorType::UnknownError,
+                        message: format!("Potential error in string result: {}", s),
+                        statement: Some(statement.to_string()),
+                    });
                 }
 
                 results.push(value);

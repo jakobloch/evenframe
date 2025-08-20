@@ -1,6 +1,6 @@
 use crate::{
-    schemasync::{config::AccessType, TableConfig},
     EvenframeError, Result,
+    schemasync::{TableConfig, config::AccessType},
 };
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -8,8 +8,8 @@ use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
-use surrealdb::engine::remote::http::Client;
 use surrealdb::Surreal;
+use surrealdb::engine::remote::http::Client;
 use tracing;
 
 /// Represents a complex object type definition in SurrealDB
@@ -951,16 +951,16 @@ impl<'a> SchemaImporter<'a> {
         }
 
         // Parse BEARER specific fields
-        if matches!(access_type, AccessType::Bearer) {
-            if let Some(for_pos) = statement.find(" FOR ") {
-                let after_for = &statement[for_pos + 5..].trim();
-                let bearer_for = after_for
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("")
-                    .to_string();
-                access_def.bearer_for = Some(bearer_for);
-            }
+        if let Some(for_pos) = statement.find(" FOR ")
+            && matches!(access_type, AccessType::Bearer)
+        {
+            let after_for = &statement[for_pos + 5..].trim();
+            let bearer_for = after_for
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_string();
+            access_def.bearer_for = Some(bearer_for);
         }
 
         // Extract DURATION

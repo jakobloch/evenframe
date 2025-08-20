@@ -531,10 +531,10 @@ pub fn sort_tables_by_dependencies(
     for (from, tos) in &dependency_graph {
         if let Some(&from_scc) = scc_map.get(from.as_str()) {
             for to in tos {
-                if let Some(&to_scc) = scc_map.get(to.as_str()) {
-                    if from_scc != to_scc {
-                        condensation.add_edge(from_scc, to_scc, ());
-                    }
+                if let Some(&to_scc) = scc_map.get(to.as_str())
+                    && from_scc != to_scc
+                {
+                    condensation.add_edge(from_scc, to_scc, ());
                 }
             }
         }

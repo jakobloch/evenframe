@@ -658,10 +658,10 @@ impl RegexValGen {
         }
 
         // Try to detect numeric range patterns
-        if self.is_numeric_range_alternation(&alternatives) {
-            if let Some(range) = self.parse_numeric_range_alternation(&alternatives) {
-                return Ok(range);
-            }
+        if self.is_numeric_range_alternation(&alternatives)
+            && let Some(range) = self.parse_numeric_range_alternation(&alternatives)
+        {
+            return Ok(range);
         }
 
         let parsed_alternatives: Result<Vec<Vec<RegexComponent>>> = alternatives
@@ -801,11 +801,12 @@ impl RegexValGen {
                 let num = self.rng.random_range(*min..=*max);
                 let mut result = num.to_string();
 
-                if let Some(d) = digits {
-                    if *leading_zeros && result.len() < *d {
-                        // Pad with leading zeros
-                        result = format!("{:0width$}", num, width = d);
-                    }
+                if let Some(d) = digits
+                    && *leading_zeros
+                    && result.len() < *d
+                {
+                    // Pad with leading zeros
+                    result = format!("{:0width$}", num, width = d);
                 }
 
                 result

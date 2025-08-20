@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{spanned::Spanned, Attribute, Expr, ExprArray, ExprLit, Lit, Meta};
+use syn::{Attribute, Expr, ExprArray, ExprLit, Lit, Meta, spanned::Spanned};
 use tracing::{debug, error, info, trace, warn};
 
 /// Parse coordinate attributes from mock_data attribute
@@ -76,7 +76,7 @@ pub fn parse_coordinate_attribute(
                                     warn!("Coordinate parameter is not an array");
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'coordinate' parameter must be an array of coordination rules.\n\nExample:\n#[mock_data(coordinate = [\n    InitializeEqual([\"field1\", \"field2\"]),\n    InitializeSum { fields: [\"price\", \"tax\"], total: 100.0 }\n])]"
+                                        "The 'coordinate' parameter must be an array of coordination rules.\n\nExample:\n#[mock_data(coordinate = [\n    InitializeEqual([\"field1\", \"field2\"]),\n    InitializeSum { fields: [\"price\", \"tax\"], total: 100.0 }\n])]",
                                     ));
                                 }
                             }
@@ -106,20 +106,20 @@ fn parse_coordinate_expr(expr: &Expr) -> Result<TokenStream, syn::Error> {
     match expr {
         Expr::Call(call) => {
             let func_name = if let Expr::Path(path) = &*call.func {
-                path.path.segments.last()
+                path.path
+                    .segments
+                    .last()
                     .ok_or_else(|| {
                         error!("Invalid coordination function path");
-                        syn::Error::new(
-                            call.func.span(),
-                            "Invalid coordination function path"
-                        )
+                        syn::Error::new(call.func.span(), "Invalid coordination function path")
                     })?
-                    .ident.to_string()
+                    .ident
+                    .to_string()
             } else {
                 warn!("Coordination rule is not a function call");
                 return Err(syn::Error::new(
                     call.func.span(),
-                    "Coordination rule must be a function call like InitializeEqual(...)"
+                    "Coordination rule must be a function call like InitializeEqual(...)",
                 ));
             };
             debug!("Found coordination function: {}", func_name);
@@ -128,32 +128,35 @@ fn parse_coordinate_expr(expr: &Expr) -> Result<TokenStream, syn::Error> {
                 "InitializeEqual" => {
                     debug!("Processing InitializeEqual coordination rule");
                     parse_initialize_equal(call)
-                },
+                }
                 "InitializeSequential" => {
                     debug!("Processing InitializeSequential coordination rule");
                     parse_initialize_sequential(call)
-                },
+                }
                 "InitializeSum" => {
                     debug!("Processing InitializeSum coordination rule");
                     parse_initialize_sum(call)
-                },
+                }
                 "InitializeCoherent" => {
                     debug!("Processing InitializeCoherent coordination rule");
                     parse_initialize_coherent(call)
-                },
+                }
                 _ => {
                     warn!("Unknown coordination rule: {}", func_name);
                     Err(syn::Error::new(
                         call.func.span(),
-                        format!("Unknown coordination rule '{}'. Valid rules are:\n- InitializeEqual\n- InitializeSequential\n- InitializeSum\n- InitializeCoherent", func_name)
+                        format!(
+                            "Unknown coordination rule '{}'. Valid rules are:\n- InitializeEqual\n- InitializeSequential\n- InitializeSum\n- InitializeCoherent",
+                            func_name
+                        ),
                     ))
                 }
             }
         }
         _ => Err(syn::Error::new(
             expr.span(),
-            "Coordination rule must be a function call.\n\nExample: InitializeEqual([\"field1\", \"field2\"])"
-        ))
+            "Coordination rule must be a function call.\n\nExample: InitializeEqual([\"field1\", \"field2\"])",
+        )),
     }
 }
 
@@ -181,7 +184,7 @@ fn parse_initialize_equal(call: &syn::ExprCall) -> Result<TokenStream, syn::Erro
     } else {
         Err(syn::Error::new(
             call.args.span(),
-            "InitializeEqual requires an array of field names.\n\nExample: InitializeEqual([\"field1\", \"field2\"])"
+            "InitializeEqual requires an array of field names.\n\nExample: InitializeEqual([\"field1\", \"field2\"])",
         ))
     }
 }
@@ -231,7 +234,7 @@ fn parse_initialize_sequential(call: &syn::ExprCall) -> Result<TokenStream, syn:
     } else {
         Err(syn::Error::new(
             call.args.span(),
-            "InitializeSequential requires a struct literal.\n\nExample:\nInitializeSequential {\n    fields: [\"date1\", \"date2\"],\n    increment: Days(7)\n}"
+            "InitializeSequential requires a struct literal.\n\nExample:\nInitializeSequential {\n    fields: [\"date1\", \"date2\"],\n    increment: Days(7)\n}",
         ))
     }
 }
@@ -300,7 +303,7 @@ fn parse_initialize_sum(call: &syn::ExprCall) -> Result<TokenStream, syn::Error>
     } else {
         Err(syn::Error::new(
             call.args.span(),
-            "InitializeSum requires a struct literal.\n\nExample:\nInitializeSum {\n    fields: [\"price\", \"tax\", \"shipping\"],\n    total: 100.0\n}"
+            "InitializeSum requires a struct literal.\n\nExample:\nInitializeSum {\n    fields: [\"price\", \"tax\", \"shipping\"],\n    total: 100.0\n}",
         ))
     }
 }
@@ -347,7 +350,7 @@ fn parse_initialize_coherent(call: &syn::ExprCall) -> Result<TokenStream, syn::E
     } else {
         Err(syn::Error::new(
             call.args.span(),
-            "InitializeCoherent requires a struct literal.\n\nExample:\nInitializeCoherent {\n    fields: [\"street\", \"city\", \"state\"],\n    dataset: Address\n}"
+            "InitializeCoherent requires a struct literal.\n\nExample:\nInitializeCoherent {\n    fields: [\"street\", \"city\", \"state\"],\n    dataset: Address\n}",
         ))
     }
 }
@@ -387,12 +390,13 @@ fn extract_field_value<'a>(
     name: &str,
 ) -> Option<&'a Expr> {
     for field in fields {
-        if let syn::Member::Named(ident) = &field.member {
-            if ident == name {
-                return Some(&field.expr);
-            }
+        if let syn::Member::Named(ident) = &field.member
+            && ident == name
+        {
+            return Some(&field.expr);
         }
     }
+
     None
 }
 
@@ -424,56 +428,83 @@ fn parse_increment(expr: &Expr) -> Result<TokenStream, syn::Error> {
 
         match func_name.as_str() {
             "Days" | "Hours" | "Minutes" => {
-                if let Expr::Lit(ExprLit { lit: Lit::Int(n), .. }) = first_arg {
-                    let value: i32 = n.base10_parse()
-                        .map_err(|_| syn::Error::new(
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Int(n), ..
+                }) = first_arg
+                {
+                    let value: i32 = n.base10_parse().map_err(|_| {
+                        syn::Error::new(
                             n.span(),
-                            format!("Invalid integer value: {}. Must be a valid i32.", n.base10_digits())
-                        ))?;
+                            format!(
+                                "Invalid integer value: {}. Must be a valid i32.",
+                                n.base10_digits()
+                            ),
+                        )
+                    })?;
 
                     match func_name.as_str() {
-                        "Days" => Ok(quote! { helpers::schemasync::coordinate::CoordinateIncrement::Days(#value) }),
-                        "Hours" => Ok(quote! { helpers::schemasync::coordinate::CoordinateIncrement::Hours(#value) }),
-                        "Minutes" => Ok(quote! { helpers::schemasync::coordinate::CoordinateIncrement::Minutes(#value) }),
+                        "Days" => Ok(
+                            quote! { helpers::schemasync::coordinate::CoordinateIncrement::Days(#value) },
+                        ),
+                        "Hours" => Ok(
+                            quote! { helpers::schemasync::coordinate::CoordinateIncrement::Hours(#value) },
+                        ),
+                        "Minutes" => Ok(
+                            quote! { helpers::schemasync::coordinate::CoordinateIncrement::Minutes(#value) },
+                        ),
                         _ => unreachable!(),
                     }
                 } else {
                     Err(syn::Error::new(
                         first_arg.span(),
-                        format!("{} requires an integer argument.\n\nExample: {}(7)", func_name, func_name)
+                        format!(
+                            "{} requires an integer argument.\n\nExample: {}(7)",
+                            func_name, func_name
+                        ),
                     ))
                 }
             }
             "Numeric" => {
-                let value = if let Expr::Lit(ExprLit { lit: Lit::Float(f), .. }) = first_arg {
-                    f.base10_parse::<f64>()
-                        .map_err(|_| syn::Error::new(
+                let value = if let Expr::Lit(ExprLit {
+                    lit: Lit::Float(f), ..
+                }) = first_arg
+                {
+                    f.base10_parse::<f64>().map_err(|_| {
+                        syn::Error::new(
                             f.span(),
-                            format!("Invalid float value: {}", f.base10_digits())
-                        ))?
-                } else if let Expr::Lit(ExprLit { lit: Lit::Int(i), .. }) = first_arg {
-                    i.base10_parse::<f64>()
-                        .map_err(|_| syn::Error::new(
+                            format!("Invalid float value: {}", f.base10_digits()),
+                        )
+                    })?
+                } else if let Expr::Lit(ExprLit {
+                    lit: Lit::Int(i), ..
+                }) = first_arg
+                {
+                    i.base10_parse::<f64>().map_err(|_| {
+                        syn::Error::new(
                             i.span(),
-                            format!("Invalid numeric value: {}", i.base10_digits())
-                        ))?
+                            format!("Invalid numeric value: {}", i.base10_digits()),
+                        )
+                    })?
                 } else {
                     return Err(syn::Error::new(
                         first_arg.span(),
-                        "Numeric requires a numeric argument.\n\nExample: Numeric(1.5)"
+                        "Numeric requires a numeric argument.\n\nExample: Numeric(1.5)",
                     ));
                 };
                 Ok(quote! { helpers::schemasync::coordinate::CoordinateIncrement::Numeric(#value) })
             }
             _ => Err(syn::Error::new(
                 call.func.span(),
-                format!("Unknown increment type '{}'. Valid types are:\n- Days(n)\n- Hours(n)\n- Minutes(n)\n- Numeric(n)", func_name)
-            ))
+                format!(
+                    "Unknown increment type '{}'. Valid types are:\n- Days(n)\n- Hours(n)\n- Minutes(n)\n- Numeric(n)",
+                    func_name
+                ),
+            )),
         }
     } else {
         Err(syn::Error::new(
             expr.span(),
-            "Increment must be a function call.\n\nExamples: Days(7), Hours(24), Minutes(30), Numeric(1.5)"
+            "Increment must be a function call.\n\nExamples: Days(7), Hours(24), Minutes(30), Numeric(1.5)",
         ))
     }
 }
@@ -491,14 +522,25 @@ fn parse_coherent_dataset(expr: &Expr) -> Result<TokenStream, syn::Error> {
 
         match dataset_name.as_str() {
             "Address" => Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::Address }),
-            "PersonName" => Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::PersonName }),
-            "GeoLocation" => Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::GeoLocation }),
-            "DateRange" => Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::DateRange }),
-            "Financial" => Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::Financial }),
+            "PersonName" => {
+                Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::PersonName })
+            }
+            "GeoLocation" => {
+                Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::GeoLocation })
+            }
+            "DateRange" => {
+                Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::DateRange })
+            }
+            "Financial" => {
+                Ok(quote! { helpers::schemasync::coordinate::CoherentDataset::Financial })
+            }
             _ => Err(syn::Error::new(
                 path.span(),
-                format!("Unknown dataset type '{}'. Valid datasets are:\n- Address\n- PersonName\n- GeoLocation\n- DateRange\n- Financial", dataset_name)
-            ))
+                format!(
+                    "Unknown dataset type '{}'. Valid datasets are:\n- Address\n- PersonName\n- GeoLocation\n- DateRange\n- Financial",
+                    dataset_name
+                ),
+            )),
         }
     } else {
         Err(syn::Error::new(

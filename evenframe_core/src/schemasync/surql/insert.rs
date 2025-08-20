@@ -1,6 +1,6 @@
 use crate::evenframe_log;
-use crate::mockmake::field_value::FieldValueGenerator;
 use crate::mockmake::Mockmaker;
+use crate::mockmake::field_value::FieldValueGenerator;
 use crate::schemasync::table::TableConfig;
 use crate::types::FieldType;
 use convert_case::{Case, Casing};
@@ -101,15 +101,15 @@ impl Mockmaker {
                         && !table_field.define_config.as_ref().unwrap().should_skip)
                 {
                     // Skip readonly fields
-                    if let Some(ref define_config) = table_field.define_config {
-                        if let Some(true) = define_config.readonly {
-                            evenframe_log!(
-                                format!("Skipping readonly field '{}'", table_field.field_name),
-                                log_name,
-                                true
-                            );
-                            continue;
-                        }
+                    if let Some(ref define_config) = table_field.define_config
+                        && let Some(true) = define_config.readonly
+                    {
+                        evenframe_log!(
+                            format!("Skipping readonly field '{}'", table_field.field_name),
+                            log_name,
+                            true
+                        );
+                        continue;
                     }
 
                     let field_val = FieldValueGenerator::builder()
@@ -120,15 +120,6 @@ impl Mockmaker {
                         .build()
                         .run();
 
-                    // let field_val = self.generate_field_value_with_coordination(
-                    //     table_config,
-                    //     table_field.field_name,
-                    //     Some(&table_name.to_string()),
-                    //     table_field.field_type,
-                    //     &table_field.format,
-                    //     Some(i),
-                    //     &coordinated_values,
-                    // );
                     evenframe_log!(
                         format!(
                             "Generated value for field '{}': {}",
