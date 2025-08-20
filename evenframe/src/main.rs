@@ -1,6 +1,7 @@
 mod config_builders;
 mod workspace_scanner;
 
+use evenframe_core::evenframe_log;
 use evenframe_core::schemasync::Schemasync; // Import your new struct
 use evenframe_core::{
     config::EvenframeConfig,
@@ -11,6 +12,9 @@ use tracing::{debug, error, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv::dotenv().expect("Dotenv failed to initialize env variables");
+
+    evenframe_log!("", "tracing.log");
     // Initialize tracing with environment variable control
     // Set RUST_LOG=debug for debug output, RUST_LOG=info for info only
     tracing_subscriber::fmt::init();
@@ -61,7 +65,7 @@ async fn main() -> Result<()> {
         );
 
         match std::fs::write(
-            "../../frontend/src/lib/core/types/arktype.ts",
+            format!("{}arktype.ts", config.typesync.output_path),
             format!(
                 "import {{ scope }} from 'arktype';\n\n{}\n\n export const validator = scope({{
   ...bindings.export(),
@@ -89,9 +93,9 @@ async fn main() -> Result<()> {
             "Generated Effect content: {} characters",
             effect_content.len()
         );
-
+        //TODO: This should not create directories if they dont exist, it should fail
         match std::fs::write(
-            "../../frontend/src/lib/core/types/bindings.ts",
+            format!("{}bindings.ts", config.typesync.output_path),
             format!("import {{ Schema }} from \"effect\";\n\n{}", effect_content,),
         ) {
             Ok(_) => info!("Effect schemas written successfully to bindings.ts"),
