@@ -2,87 +2,13 @@
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __internal_log_impl {
-    // Helper variant - uses ABSOLUTE_TO_AVEL env var with fallback
-    ($content:expr, $log_subdir:expr, helper) => {{
-        let filename = format!("{}.log", chrono::Local::now().format("%Y_%m_%d_%H_%M_%S"));
-
-        let logs_dir = if let Ok(project_root) = std::env::var("ABSOLUTE_TO_AVEL") {
-            let root = if project_root.starts_with('/') {
-                project_root
-            } else {
-                format!("/{}", project_root)
-            };
-            format!("{}/{}", root, $log_subdir)
-        } else {
-            if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-                let path = std::path::Path::new(&manifest_dir);
-                if let Some(parent) = path.parent().and_then(|p| p.parent()) {
-                    format!("{}/{}", parent.display(), $log_subdir)
-                } else {
-                    panic!("Could not find directory")
-                }
-            } else {
-                panic!("Could not find directory")
-            }
-        };
-
-        $crate::__internal_log_impl!($content, logs_dir, filename, false, impl);
-    }};
-
-    ($content:expr, $log_subdir:expr, $filename:expr, helper) => {{
-        let logs_dir = if let Ok(project_root) = std::env::var("ABSOLUTE_TO_AVEL") {
-            let root = if project_root.starts_with('/') {
-                project_root
-            } else {
-                format!("/{}", project_root)
-            };
-            format!("{}/{}", root, $log_subdir)
-        } else {
-            if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-                let path = std::path::Path::new(&manifest_dir);
-                if let Some(parent) = path.parent().and_then(|p| p.parent()) {
-                    format!("{}/{}", parent.display(), $log_subdir)
-                } else {
-                    panic!("Could not find directory")
-                }
-            } else {
-                panic!("Could not find directory")
-            }
-        };
-
-        $crate::__internal_log_impl!($content, logs_dir, $filename, false, impl);
-    }};
-
-    ($content:expr, $log_subdir:expr, $filename:expr, $append:expr, helper) => {{
-        let logs_dir = if let Ok(project_root) = std::env::var("ABSOLUTE_TO_AVEL") {
-            let root = if project_root.starts_with('/') {
-                project_root
-            } else {
-                format!("/{}", project_root)
-            };
-            format!("{}/{}", root, $log_subdir)
-        } else {
-            if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-                let path = std::path::Path::new(&manifest_dir);
-                if let Some(parent) = path.parent().and_then(|p| p.parent()) {
-                    format!("{}/{}", parent.display(), $log_subdir)
-                } else {
-                    panic!("Could not find directory")
-                }
-            } else {
-                panic!("Could not find directory")
-            }
-        };
-
-        $crate::__internal_log_impl!($content, logs_dir, $filename, $append, impl);
-    }};
-
-    // Standard variant - uses ABSOLUTE_PATH env var
+    // Standard variant - uses ABSOLUTE_PATH_TO_EVENFRAME env var
     ($content:expr, $log_subdir:expr, standard) => {{
         let filename = format!("{}.log", chrono::Local::now().format("%Y_%m_%d_%H_%M_%S"));
         let logs_dir = format!(
             "{}/{}",
-            std::env::var("ABSOLUTE_PATH").expect("ABSOLUTE_PATH not set"),
+            std::env::var("ABSOLUTE_PATH_TO_EVENFRAME")
+                .expect("ABSOLUTE_PATH_TO_EVENFRAME not set"),
             $log_subdir
         );
 
@@ -92,7 +18,8 @@ macro_rules! __internal_log_impl {
     ($content:expr, $log_subdir:expr, $filename:expr, standard) => {{
         let logs_dir = format!(
             "{}/{}",
-            std::env::var("ABSOLUTE_PATH").expect("ABSOLUTE_PATH not set"),
+            std::env::var("ABSOLUTE_PATH_TO_EVENFRAME")
+                .expect("ABSOLUTE_PATH_TO_EVENFRAME not set"),
             $log_subdir
         );
 
@@ -102,7 +29,8 @@ macro_rules! __internal_log_impl {
     ($content:expr, $log_subdir:expr, $filename:expr, $append:expr, standard) => {{
         let logs_dir = format!(
             "{}/{}",
-            std::env::var("ABSOLUTE_PATH").expect("ABSOLUTE_PATH not set"),
+            std::env::var("ABSOLUTE_PATH_TO_EVENFRAME")
+                .expect("ABSOLUTE_PATH_TO_EVENFRAME not set"),
             $log_subdir
         );
 
@@ -168,51 +96,6 @@ macro_rules! __internal_log_impl {
     }};
 }
 
-/// Logging macro for the evenframe_derive crate.
-///
-/// # Examples
-///
-/// Log to a timestamp-based file (e.g., "2024_01_12_14_30_52.log"):
-/// ```no_run
-/// # use helpers::evenframe_derive_log;
-/// evenframe_derive_log!("Derive macro invoked");
-/// ```
-///
-/// Log to a specific file (overwrites existing content):
-/// ```no_run
-/// # use helpers::evenframe_derive_log;
-/// evenframe_derive_log!("Generated code", "codegen.log");
-/// ```
-///
-/// Log to a specific file with append mode:
-/// ```no_run
-/// # use helpers::evenframe_derive_log;
-/// evenframe_derive_log!("New derive", "codegen.log", true);
-/// ```
-#[macro_export]
-macro_rules! evenframe_derive_log {
-    ($content:expr) => {{
-        $crate::__internal_log_impl!($content, "backend/evenframe_derive/logs", standard);
-    }};
-    ($content:expr, $filename:expr) => {{
-        $crate::__internal_log_impl!(
-            $content,
-            "backend/evenframe_derive/logs",
-            $filename,
-            standard
-        );
-    }};
-    ($content:expr, $filename:expr, $append:expr) => {{
-        $crate::__internal_log_impl!(
-            $content,
-            "backend/evenframe_derive/logs",
-            $filename,
-            $append,
-            standard
-        );
-    }};
-}
-
 /// Logging macro for the evenframe crate.
 ///
 /// # Examples
@@ -237,18 +120,12 @@ macro_rules! evenframe_derive_log {
 #[macro_export]
 macro_rules! evenframe_log {
     ($content:expr) => {{
-        $crate::__internal_log_impl!($content, "backend/evenframe/logs", standard);
+        $crate::__internal_log_impl!($content, "evenframe/logs", standard);
     }};
     ($content:expr, $filename:expr) => {{
-        $crate::__internal_log_impl!($content, "backend/evenframe/logs", $filename, standard);
+        $crate::__internal_log_impl!($content, "evenframe/logs", $filename, standard);
     }};
     ($content:expr, $filename:expr, $append:expr) => {{
-        $crate::__internal_log_impl!(
-            $content,
-            "backend/evenframe/logs",
-            $filename,
-            $append,
-            standard
-        );
+        $crate::__internal_log_impl!($content, "evenframe/logs", $filename, $append, standard);
     }};
 }
