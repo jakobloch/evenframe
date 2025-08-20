@@ -1,10 +1,10 @@
 use quote::quote;
-use syn::{spanned::Spanned, Attribute, Expr, ExprArray, ExprLit, Lit, Meta};
+use syn::{Attribute, Expr, ExprArray, ExprLit, Lit, Meta, spanned::Spanned};
 use tracing::{debug, error, info, trace};
 
 use crate::{
     format::Format,
-    mockmake::{coordinate::Coordination, MockGenerationConfig},
+    mockmake::{MockGenerationConfig, coordinate::Coordination},
     schemasync::{Direction, EdgeConfig},
     types::StructField,
 };
@@ -66,14 +66,17 @@ pub fn parse_mock_data_attribute(
                                             );
                                             return Err(syn::Error::new(
                                                 lit.span(),
-                                                format!("Invalid value for 'n': '{}'. Expected a positive integer.\n\nExample: #[mock_data(n = 1000)]", lit.base10_digits())
+                                                format!(
+                                                    "Invalid value for 'n': '{}'. Expected a positive integer.\n\nExample: #[mock_data(n = 1000)]",
+                                                    lit.base10_digits()
+                                                ),
                                             ));
                                         }
                                     }
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'n' parameter must be an integer literal.\n\nExample: #[mock_data(n = 1000)]"
+                                        "The 'n' parameter must be an integer literal.\n\nExample: #[mock_data(n = 1000)]",
                                     ));
                                 }
                             }
@@ -86,7 +89,7 @@ pub fn parse_mock_data_attribute(
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'overrides' parameter must be a string literal.\n\nExample: #[mock_data(overrides = \"custom_config\")]"
+                                        "The 'overrides' parameter must be a string literal.\n\nExample: #[mock_data(overrides = \"custom_config\")]",
                                     ));
                                 }
                             }
@@ -101,13 +104,16 @@ pub fn parse_mock_data_attribute(
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
                                     nv.path.span(),
-                                    format!("Unknown parameter '{}' in mock_data attribute.\n\nValid parameters are: n, overrides, coordinate\n\nExample: #[mock_data(n = 1000, overrides = \"config\", coordinate = [InitializeEqual([\"field1\", \"field2\"])])]", param_name)
+                                    format!(
+                                        "Unknown parameter '{}' in mock_data attribute.\n\nValid parameters are: n, overrides, coordinate\n\nExample: #[mock_data(n = 1000, overrides = \"config\", coordinate = [InitializeEqual([\"field1\", \"field2\"])])]",
+                                        param_name
+                                    ),
                                 ));
                             }
                             _ => {
                                 return Err(syn::Error::new(
                                     meta.span(),
-                                    "Invalid syntax in mock_data attribute.\n\nExpected format: #[mock_data(n = 1000, overrides = \"config\")]"
+                                    "Invalid syntax in mock_data attribute.\n\nExpected format: #[mock_data(n = 1000, overrides = \"config\")]",
                                 ));
                             }
                         }
@@ -118,30 +124,26 @@ pub fn parse_mock_data_attribute(
 
                     // Look for coordinate parameter in the metas we already have
                     for meta in metas.iter() {
-                        if let Meta::NameValue(nv) = meta {
-                            if nv.path.is_ident("coordinate") {
-                                // coordinate = [...]
-                                if let Expr::Array(ExprArray { elems, .. }) = &nv.value {
-                                    // Convert each expression to Coordination using TryFrom
-                                    for elem in elems {
-                                        match Coordination::try_from(elem) {
-                                            Ok(coord) => {
-                                                debug!(
-                                                    "Successfully parsed coordination rule: {:?}",
-                                                    coord
-                                                );
-                                                coordination_rules.push(coord);
-                                            }
-                                            Err(e) => {
-                                                error!("Failed to parse coordination rule: {}", e);
-                                                return Err(syn::Error::new(
-                                                    elem.span(),
-                                                    format!(
-                                                        "Failed to parse coordination rule: {}",
-                                                        e
-                                                    ),
-                                                ));
-                                            }
+                        if let Meta::NameValue(nv) = meta
+                            && nv.path.is_ident("coordinate")
+                        {
+                            // coordinate = [...]
+                            if let Expr::Array(ExprArray { elems, .. }) = &nv.value {
+                                for elem in elems {
+                                    match Coordination::try_from(elem) {
+                                        Ok(coord) => {
+                                            debug!(
+                                                "Successfully parsed coordination rule: {:?}",
+                                                coord
+                                            );
+                                            coordination_rules.push(coord);
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to parse coordination rule: {}", e);
+                                            return Err(syn::Error::new(
+                                                elem.span(),
+                                                format!("Failed to parse coordination rule: {}", e),
+                                            ));
                                         }
                                     }
                                 }
@@ -149,7 +151,12 @@ pub fn parse_mock_data_attribute(
                         }
                     }
 
-                    info!("Successfully parsed mock_data attribute: n={}, overrides={:?}, coordination_rules_count={}", base_config.n, overrides_name, coordination_rules.len());
+                    info!(
+                        "Successfully parsed mock_data attribute: n={}, overrides={:?}, coordination_rules_count={}",
+                        base_config.n,
+                        overrides_name,
+                        coordination_rules.len()
+                    );
 
                     // Parse overrides from config if specified
                     let table_level_override: Option<HashMap<StructField, Format>> =
@@ -175,7 +182,10 @@ pub fn parse_mock_data_attribute(
                     error!("Failed to parse mock_data attribute arguments: {}", err);
                     return Err(syn::Error::new(
                         attr.span(),
-                        format!("Failed to parse mock_data attribute: {}\n\nExample usage:\n#[mock_data(n = 1000)]\n#[mock_data(n = 500, overrides = \"custom_config\")]", err)
+                        format!(
+                            "Failed to parse mock_data attribute: {}\n\nExample usage:\n#[mock_data(n = 1000)]\n#[mock_data(n = 500, overrides = \"custom_config\")]",
+                            err
+                        ),
                     ));
                 }
             }
@@ -213,7 +223,7 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'custom' parameter must be a string literal containing a validation expression.\n\nExample: #[validators(custom = \"$value > 0 AND $value < 100\")]"
+                                        "The 'custom' parameter must be a string literal containing a validation expression.\n\nExample: #[validators(custom = \"$value > 0 AND $value < 100\")]",
                                     ));
                                 }
                             }
@@ -225,13 +235,16 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
                                     nv.path.span(),
-                                    format!("Unknown parameter '{}' in validators attribute.\n\nValid parameter is: custom\n\nExample: #[validators(custom = \"$value > 0\")]", param_name)
+                                    format!(
+                                        "Unknown parameter '{}' in validators attribute.\n\nValid parameter is: custom\n\nExample: #[validators(custom = \"$value > 0\")]",
+                                        param_name
+                                    ),
                                 ));
                             }
                             _ => {
                                 return Err(syn::Error::new(
                                     meta.span(),
-                                    "Invalid syntax in validators attribute.\n\nExpected format: #[validators(custom = \"validation_expression\")]"
+                                    "Invalid syntax in validators attribute.\n\nExpected format: #[validators(custom = \"validation_expression\")]",
                                 ));
                             }
                         }
@@ -240,7 +253,10 @@ pub fn parse_table_validators(attrs: &[Attribute]) -> Result<Vec<String>, syn::E
                 Err(err) => {
                     return Err(syn::Error::new(
                         attr.span(),
-                        format!("Failed to parse validators attribute: {}\n\nExample usage:\n#[validators(custom = \"$value > 0\")]\n#[validators(custom = \"string::len($value) > 5\")]", err)
+                        format!(
+                            "Failed to parse validators attribute: {}\n\nExample usage:\n#[validators(custom = \"$value > 0\")]\n#[validators(custom = \"string::len($value) > 5\")]",
+                            err
+                        ),
                     ));
                 }
             }
@@ -280,7 +296,7 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'edge_name' parameter must be a string literal.\n\nExample: edge_name = \"has_user\""
+                                        "The 'edge_name' parameter must be a string literal.\n\nExample: edge_name = \"has_user\"",
                                     ));
                                 }
                             }
@@ -293,7 +309,7 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'from' parameter must be a string literal.\n\nExample: from = \"Order\""
+                                        "The 'from' parameter must be a string literal.\n\nExample: from = \"Order\"",
                                     ));
                                 }
                             }
@@ -306,7 +322,7 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'to' parameter must be a string literal.\n\nExample: to = \"User\""
+                                        "The 'to' parameter must be a string literal.\n\nExample: to = \"User\"",
                                     ));
                                 }
                             }
@@ -321,14 +337,17 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                                         other => {
                                             return Err(syn::Error::new(
                                                 lit.span(),
-                                                format!("Invalid direction '{}'. Valid values are: \"from\", \"to\"\n\nExample: direction = \"from\"", other)
+                                                format!(
+                                                    "Invalid direction '{}'. Valid values are: \"from\", \"to\"\n\nExample: direction = \"from\"",
+                                                    other
+                                                ),
                                             ));
                                         }
                                     };
                                 } else {
                                     return Err(syn::Error::new(
                                         nv.value.span(),
-                                        "The 'direction' parameter must be a string literal with value \"from\" or \"to\".\n\nExample: direction = \"from\""
+                                        "The 'direction' parameter must be a string literal with value \"from\" or \"to\".\n\nExample: direction = \"from\"",
                                     ));
                                 }
                             }
@@ -340,13 +359,16 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                                     .unwrap_or_else(|| "unknown".to_string());
                                 return Err(syn::Error::new(
                                     nv.path.span(),
-                                    format!("Unknown parameter '{}' in relation attribute.\n\nValid parameters are: edge_name, from, to, direction\n\nExample: #[relation(edge_name = \"has_user\", from = \"Order\", to = \"User\", direction = \"from\")]", param_name)
+                                    format!(
+                                        "Unknown parameter '{}' in relation attribute.\n\nValid parameters are: edge_name, from, to, direction\n\nExample: #[relation(edge_name = \"has_user\", from = \"Order\", to = \"User\", direction = \"from\")]",
+                                        param_name
+                                    ),
                                 ));
                             }
                             _ => {
                                 return Err(syn::Error::new(
                                     meta.span(),
-                                    "Invalid syntax in relation attribute.\n\nExpected format: #[relation(edge_name = \"...\", from = \"...\", to = \"...\", direction = \"...\")]"
+                                    "Invalid syntax in relation attribute.\n\nExpected format: #[relation(edge_name = \"...\", from = \"...\", to = \"...\", direction = \"...\")]",
                                 ));
                             }
                         }
@@ -354,7 +376,10 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
 
                     match (&edge_name, &from, &to, &direction) {
                         (Some(edge_name), Some(from), Some(to), Some(direction)) => {
-                            info!("Successfully parsed relation attribute: edge_name={}, from={}, to={}, direction={:?}", edge_name, from, to, direction);
+                            info!(
+                                "Successfully parsed relation attribute: edge_name={}, from={}, to={}, direction={:?}",
+                                edge_name, from, to, direction
+                            );
                             return Ok(Some(EdgeConfig {
                                 edge_name: edge_name.to_owned(),
                                 from: from.to_owned(),
@@ -376,7 +401,10 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
 
                             return Err(syn::Error::new(
                                 attr.span(),
-                                format!("Missing required parameters in relation attribute: {}\n\nAll parameters are required:\n#[relation(\n    edge_name = \"has_user\",\n    from = \"Order\",\n    to = \"User\",\n    direction = \"from\"\n)]", missing)
+                                format!(
+                                    "Missing required parameters in relation attribute: {}\n\nAll parameters are required:\n#[relation(\n    edge_name = \"has_user\",\n    from = \"Order\",\n    to = \"User\",\n    direction = \"from\"\n)]",
+                                    missing
+                                ),
                             ));
                         }
                     }
@@ -384,7 +412,10 @@ pub fn parse_relation_attribute(attrs: &[Attribute]) -> Result<Option<EdgeConfig
                 Err(err) => {
                     return Err(syn::Error::new(
                         attr.span(),
-                        format!("Failed to parse relation attribute: {}\n\nExample usage:\n#[relation(\n    edge_name = \"has_user\",\n    from = \"Order\",\n    to = \"User\",\n    direction = \"from\"\n)]", err)
+                        format!(
+                            "Failed to parse relation attribute: {}\n\nExample usage:\n#[relation(\n    edge_name = \"has_user\",\n    from = \"Order\",\n    to = \"User\",\n    direction = \"from\"\n)]",
+                            err
+                        ),
                     ));
                 }
             }
@@ -474,7 +505,101 @@ pub fn parse_format_attribute(
                     error!("Failed to parse format expression: {}", e);
                     return Err(syn::Error::new(
                         expr.span(),
-                        format!("{}\n\nValid formats:\n- Simple: DateTime, Date, Time, Currency, Percentage, Phone, Email, FirstName, LastName, CompanyName, PhoneNumber, ColorHex, JwtToken, Oklch, PostalCode\n- With parameter: Url(\"domain.com\")", e)
+                        format!(
+                            "{}\n\nValid formats:\n- Simple: DateTime, Date, Time, Currency, Percentage, Phone, Email, FirstName, LastName, CompanyName, PhoneNumber, ColorHex, JwtToken, Oklch, PostalCode\n- With parameter: Url(\"domain.com\")",
+                            e
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+    debug!("No format attribute found");
+    Ok(None)
+}
+
+pub fn parse_format_attribute_bin(attrs: &[Attribute]) -> Result<Option<Format>, syn::Error> {
+    use syn::{Expr, ExprCall, ExprPath, Path, PathSegment};
+
+    info!(
+        "Starting format attribute parsing for {} attributes",
+        attrs.len()
+    );
+    for attr in attrs {
+        if attr.path().is_ident("format") {
+            debug!("Found format attribute");
+            // Parse the attribute content as an expression
+            let expr: syn::Expr = attr.parse_args()
+                .map_err(|e| syn::Error::new(
+                    attr.span(),
+                    format!("Failed to parse format attribute: {}\n\nExamples:\n#[format(DateTime)]\n#[format(Url(\"example.com\"))]", e)
+                ))?;
+
+            // Transform the expression to add Format:: prefix if needed
+            let format_expr = match &expr {
+                // If it's just an identifier like DateTime, convert to Format::DateTime
+                Expr::Path(path_expr) if path_expr.path.segments.len() == 1 => {
+                    let variant = &path_expr.path.segments[0];
+                    let mut segments = syn::punctuated::Punctuated::new();
+                    segments.push(PathSegment::from(syn::Ident::new("Format", variant.span())));
+                    segments.push(variant.clone());
+                    Expr::Path(ExprPath {
+                        attrs: vec![],
+                        qself: None,
+                        path: Path {
+                            leading_colon: None,
+                            segments,
+                        },
+                    })
+                }
+                // If it's a call like Url("domain"), convert to Format::Url("domain")
+                Expr::Call(call_expr) => {
+                    if let Expr::Path(path_expr) = &*call_expr.func {
+                        if path_expr.path.segments.len() == 1 {
+                            let variant = &path_expr.path.segments[0];
+                            let mut segments = syn::punctuated::Punctuated::new();
+                            segments
+                                .push(PathSegment::from(syn::Ident::new("Format", variant.span())));
+                            segments.push(variant.clone());
+                            Expr::Call(ExprCall {
+                                attrs: call_expr.attrs.clone(),
+                                func: Box::new(Expr::Path(ExprPath {
+                                    attrs: vec![],
+                                    qself: None,
+                                    path: Path {
+                                        leading_colon: None,
+                                        segments,
+                                    },
+                                })),
+                                paren_token: call_expr.paren_token,
+                                args: call_expr.args.clone(),
+                            })
+                        } else {
+                            expr.clone()
+                        }
+                    } else {
+                        expr.clone()
+                    }
+                }
+                // Otherwise keep as is
+                _ => expr.clone(),
+            };
+
+            // Use the TryFrom implementation to parse the Format
+            match Format::try_from(&format_expr) {
+                Ok(format) => {
+                    debug!("Successfully parsed format: {:?}", format);
+                    // Since Format implements ToTokens, we can just quote it directly
+                    return Ok(Some(format));
+                }
+                Err(e) => {
+                    error!("Failed to parse format expression: {}", e);
+                    return Err(syn::Error::new(
+                        expr.span(),
+                        format!(
+                            "{}\n\nValid formats:\n- Simple: DateTime, Date, Time, Currency, Percentage, Phone, Email, FirstName, LastName, CompanyName, PhoneNumber, ColorHex, JwtToken, Oklch, PostalCode\n- With parameter: Url(\"domain.com\")",
+                            e
+                        ),
                     ));
                 }
             }
