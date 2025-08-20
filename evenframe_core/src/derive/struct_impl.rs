@@ -6,12 +6,12 @@ use crate::{
         type_parser::parse_data_type,
         validator_parser::parse_field_validators,
     },
-    schemasync::{DefineConfig, Direction, EdgeConfig, PermissionsConfig},
+    schemasync::{DefineConfig, EdgeConfig, PermissionsConfig},
 };
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Fields, LitStr};
+use syn::{Data, DeriveInput, Fields};
 use tracing::{debug, error, info, trace};
 
 pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
@@ -92,8 +92,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
         debug!("Processing {} fields", fields_named.named.len());
         let mut table_field_tokens = Vec::new();
         let mut json_assignments = Vec::new();
-        let mut fetch_fields = Vec::new(); // For fields marked with #[fetch]
-        let mut subqueries: Vec<String> = Vec::new();
+
         for (field_index, field) in fields_named.named.iter().enumerate() {
             trace!(
                 "Processing field {} of {}",
@@ -169,55 +168,6 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 }
             };
 
-            // Parse any subquery attribute, overrides default edge subquery if found
-            let has_explicit_subquery = field
-                .attrs
-                .iter()
-                .find(|a| a.path().is_ident("subquery"))
-                .map(|attr| {
-                    match attr.parse_args::<LitStr>() {
-                        Ok(lit) => {
-                            subqueries.push(lit.value());
-                            Ok(())
-                        }
-                        Err(e) => {
-                            Err(syn::Error::new(
-                                attr.span(),
-                                format!("Invalid subquery attribute format: {}\n\nThe subquery attribute requires a string literal:\n#[subquery(\"SELECT * FROM users WHERE active = true\")]\n\nMake sure to use double quotes around the SQL query.", e),
-                            ))
-                        }
-                    }
-                })
-                .transpose();
-
-            match has_explicit_subquery {
-                Err(err) => return err.to_compile_error(),
-                Ok(Some(())) => {} // Explicit subquery was added
-                Ok(None) => {
-                    // No explicit subquery attribute, generate default from edge config
-                    if let Some(ref details) = edge_config {
-                        let subquery = if details.direction == Direction::From {
-                            format!(
-                                "(SELECT ->{}.* AS data FROM $parent.id FETCH data.out)[0].data as {}",
-                                details.edge_name, field_name
-                            )
-                        } else if details.direction == Direction::To {
-                            format!(
-                                "(SELECT <-{}.* AS data FROM $parent.id FETCH data.in)[0].data as {}",
-                                details.edge_name, field_name
-                            )
-                        } else {
-                            "".to_string()
-                        };
-
-                        subqueries.push(subquery);
-                    }
-                }
-            }
-
-            // Check for a fetch attribute.
-            let has_fetch = field.attrs.iter().any(|a| a.path().is_ident("fetch"));
-
             // Build the schema token for this field.
             let edge_config_tokens = if let Some(ref details) = edge_config {
                 quote! {
@@ -267,11 +217,6 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 json_assignments.push(quote! {
                     #field_name: payload.#field_ident,
                 });
-            }
-
-            // If the field has a fetch attribute, add its name for the FETCH clause.
-            if has_fetch {
-                fetch_fields.push(field_name);
             }
         }
 
@@ -346,7 +291,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
             quote! {}
         };
 
-        let output = if has_id {
+        if has_id {
             info!(
                 "Successfully generated persistable struct implementation for: {}",
                 ident
@@ -376,9 +321,7 @@ pub fn generate_struct_impl(input: DeriveInput) -> TokenStream {
                 );
                 quote! {}
             }
-        };
-
-        output
+        }
     } else {
         error!(
             "Attempted to use derive macro on non-struct type: {}",
