@@ -1,6 +1,6 @@
 use crate::error::EvenframeError;
 use crate::format::Format;
-use crate::mockmake::{field_value::FieldValueGenerator, Mockmaker};
+use crate::mockmake::{Mockmaker, field_value::FieldValueGenerator};
 use crate::types::{FieldType, StructField};
 use bon::Builder;
 use chrono::{DateTime, Duration, NaiveDate, Utc};
@@ -256,10 +256,10 @@ impl Mockmaker {
                             );
 
                             // Store the derived value
-                            if let Some(target_id) = target_coord_id {
-                                if let Some(value) = derived_values.get(target_field_name) {
-                                    self.coordinated_values.insert(target_id, value.clone());
-                                }
+                            if let (Some(target_id), Some(value)) =
+                                (target_coord_id, derived_values.get(target_field_name))
+                            {
+                                self.coordinated_values.insert(target_id, value.clone());
                             }
                         }
                         Coordination::InitializeCoherent(coherent_dataset) => {
@@ -500,69 +500,67 @@ impl Mockmaker {
                 values.insert(target_field.to_string(), concatenated);
             }
             DerivationType::Extract(extract_type) => {
-                if let Some(first_field) = source_fields.first() {
-                    if let Some(source_value) = source_values.get(&first_field.field_name) {
-                        let extracted = match extract_type {
-                            ExtractType::FirstWord => source_value
+                if let Some(first_field) = source_fields.first()
+                    && let Some(source_value) = source_values.get(&first_field.field_name)
+                {
+                    let extracted = match extract_type {
+                        ExtractType::FirstWord => source_value
+                            .split_whitespace()
+                            .next()
+                            .unwrap_or("")
+                            .to_string(),
+                        ExtractType::LastWord => source_value
+                            .split_whitespace()
+                            .last()
+                            .unwrap_or("")
+                            .to_string(),
+                        ExtractType::Domain => {
+                            // Extract domain from email
+                            source_value.split('@').nth(1).unwrap_or("").to_string()
+                        }
+                        ExtractType::Username => {
+                            // Extract username from email
+                            source_value.split('@').next().unwrap_or("").to_string()
+                        }
+                        ExtractType::Initials => {
+                            // Extract initials from words
+                            source_value
                                 .split_whitespace()
-                                .next()
-                                .unwrap_or("")
-                                .to_string(),
-                            ExtractType::LastWord => source_value
-                                .split_whitespace()
-                                .last()
-                                .unwrap_or("")
-                                .to_string(),
-                            ExtractType::Domain => {
-                                // Extract domain from email
-                                source_value.split('@').nth(1).unwrap_or("").to_string()
-                            }
-                            ExtractType::Username => {
-                                // Extract username from email
-                                source_value.split('@').next().unwrap_or("").to_string()
-                            }
-                            ExtractType::Initials => {
-                                // Extract initials from words
-                                source_value
-                                    .split_whitespace()
-                                    .filter_map(|word| word.chars().next())
-                                    .collect::<String>()
-                                    .to_uppercase()
-                            }
-                        };
-                        values.insert(target_field.to_string(), extracted);
-                    }
+                                .filter_map(|word| word.chars().next())
+                                .collect::<String>()
+                                .to_uppercase()
+                        }
+                    };
+                    values.insert(target_field.to_string(), extracted);
                 }
             }
             DerivationType::Transform(transform_type) => {
-                if let Some(first_field) = source_fields.first() {
-                    if let Some(source_value) = source_values.get(&first_field.field_name) {
-                        let transformed = match transform_type {
-                            TransformType::Uppercase => source_value.to_uppercase(),
-                            TransformType::Lowercase => source_value.to_lowercase(),
-                            TransformType::Capitalize => {
-                                let mut chars = source_value.chars();
-                                match chars.next() {
-                                    None => String::new(),
-                                    Some(first) => {
-                                        first.to_uppercase().collect::<String>() + chars.as_str()
-                                    }
+                if let Some(first_field) = source_fields.first()
+                    && let Some(source_value) = source_values.get(&first_field.field_name)
+                {
+                    let transformed = match transform_type {
+                        TransformType::Uppercase => source_value.to_uppercase(),
+                        TransformType::Lowercase => source_value.to_lowercase(),
+                        TransformType::Capitalize => {
+                            let mut chars = source_value.chars();
+                            match chars.next() {
+                                None => String::new(),
+                                Some(first) => {
+                                    first.to_uppercase().collect::<String>() + chars.as_str()
                                 }
                             }
-                            TransformType::Truncate(len) => {
-                                source_value.chars().take(*len).collect()
-                            }
-                            TransformType::Hash => {
-                                // Simple hash representation
-                                format!(
-                                    "{:x}",
-                                    source_value.len() * 31
-                                        + source_value.chars().map(|c| c as usize).sum::<usize>()
-                                )
-                            }
-                        };
-                        values.insert(target_field.to_string(), transformed);
-                    }
+                        }
+                        TransformType::Truncate(len) => source_value.chars().take(*len).collect(),
+                        TransformType::Hash => {
+                            // Simple hash representation
+                            format!(
+                                "{:x}",
+                                source_value.len() * 31
+                                    + source_value.chars().map(|c| c as usize).sum::<usize>()
+                            )
+                        }
+                    };
+                    values.insert(target_field.to_string(), transformed);
                 }
             }
         }
@@ -776,10 +774,10 @@ impl Coordination {
                             current_fields = &obj.fields;
                         }
                         _ => {
-                            return Err(EvenframeError::Validation(
-                                format!("Field '{}' in path '{}' is not a struct type and cannot have nested fields",
-                                    part, coord_id.field_name)
-                            ));
+                            return Err(EvenframeError::Validation(format!(
+                                "Field '{}' in path '{}' is not a struct type and cannot have nested fields",
+                                part, coord_id.field_name
+                            )));
                         }
                     }
                 }
@@ -806,17 +804,17 @@ impl Coordination {
 
                 for (coord_id, field) in &fields[1..] {
                     if !field_types_compatible(first_type, &field.field_type) {
-                        return Err(EvenframeError::Validation(
-                            format!("InitializeEqual: Field '{}' has incompatible type {:?}, expected type compatible with {:?}",
-                                coord_id.field_name, field.field_type, first_type)
-                        ));
+                        return Err(EvenframeError::Validation(format!(
+                            "InitializeEqual: Field '{}' has incompatible type {:?}, expected type compatible with {:?}",
+                            coord_id.field_name, field.field_type, first_type
+                        )));
                     }
 
                     if first_format != &field.format {
-                        return Err(EvenframeError::Validation(
-                            format!("InitializeEqual: Field '{}' has format {:?}, but expected format {:?} to match other fields",
-                                coord_id.field_name, field.format, first_format)
-                        ));
+                        return Err(EvenframeError::Validation(format!(
+                            "InitializeEqual: Field '{}' has format {:?}, but expected format {:?} to match other fields",
+                            coord_id.field_name, field.format, first_format
+                        )));
                     }
                 }
             }
@@ -831,18 +829,18 @@ impl Coordination {
                             FieldType::DateTime => {}
                             FieldType::Option(inner) if matches!(**inner, FieldType::DateTime) => {}
                             _ => {
-                                return Err(EvenframeError::Validation(
-                                        format!("InitializeSequential with time increment: Field '{}' must be DateTime type, got {:?}",
-                                            coord_id.field_name, field.field_type)
-                                    ));
+                                return Err(EvenframeError::Validation(format!(
+                                    "InitializeSequential with time increment: Field '{}' must be DateTime type, got {:?}",
+                                    coord_id.field_name, field.field_type
+                                )));
                             }
                         },
                         CoordinateIncrement::Numeric(_) => {
                             if !is_numeric_type(&field.field_type) {
-                                return Err(EvenframeError::Validation(
-                                    format!("InitializeSequential with numeric increment: Field '{}' must be numeric type, got {:?}",
-                                        coord_id.field_name, field.field_type)
-                                ));
+                                return Err(EvenframeError::Validation(format!(
+                                    "InitializeSequential with numeric increment: Field '{}' must be numeric type, got {:?}",
+                                    coord_id.field_name, field.field_type
+                                )));
                             }
                         }
                         CoordinateIncrement::Custom(_) => {
@@ -858,10 +856,10 @@ impl Coordination {
                     if fields.len() > 1 {
                         let first_format = &fields[0].1.format;
                         if &field.format != first_format {
-                            return Err(EvenframeError::Validation(
-                                format!("InitializeSequential: Field '{}' has format {:?}, but expected format {:?} to match other fields",
-                                    coord_id.field_name, field.format, first_format)
-                            ));
+                            return Err(EvenframeError::Validation(format!(
+                                "InitializeSequential: Field '{}' has format {:?}, but expected format {:?} to match other fields",
+                                coord_id.field_name, field.format, first_format
+                            )));
                         }
                     }
                 }
@@ -871,10 +869,10 @@ impl Coordination {
                 // All fields must be numeric
                 for (coord_id, field) in &fields {
                     if !is_numeric_type(&field.field_type) {
-                        return Err(EvenframeError::Validation(
-                            format!("InitializeSum: Field '{}' must be numeric type to participate in sum, got {:?}",
-                                coord_id.field_name, field.field_type)
-                        ));
+                        return Err(EvenframeError::Validation(format!(
+                            "InitializeSum: Field '{}' must be numeric type to participate in sum, got {:?}",
+                            coord_id.field_name, field.field_type
+                        )));
                     }
                 }
 
@@ -907,10 +905,10 @@ impl Coordination {
                                 })?;
 
                             if !is_string_like(&source_field.1.field_type) {
-                                return Err(EvenframeError::Validation(
-                                    format!("InitializeDerive with Concatenate: Source field '{}' should be string-like, got {:?}",
-                                        source_name, source_field.1.field_type)
-                                ));
+                                return Err(EvenframeError::Validation(format!(
+                                    "InitializeDerive with Concatenate: Source field '{}' should be string-like, got {:?}",
+                                    source_name, source_field.1.field_type
+                                )));
                             }
                         }
 
@@ -952,15 +950,18 @@ impl Coordination {
                                         })?;
 
                                     if !is_string_like(&source_field.1.field_type) {
-                                        return Err(EvenframeError::Validation(
-                                            format!("Extract Domain/Username requires string field, got {:?}",
-                                                source_field.1.field_type)
-                                        ));
+                                        return Err(EvenframeError::Validation(format!(
+                                            "Extract Domain/Username requires string field, got {:?}",
+                                            source_field.1.field_type
+                                        )));
                                     }
 
                                     // Ideally should have Email format
                                     if !matches!(&source_field.1.format, Some(Format::Email)) {
-                                        tracing::warn!("Field '{}' used for email extraction but doesn't have Email format", source_name);
+                                        tracing::warn!(
+                                            "Field '{}' used for email extraction but doesn't have Email format",
+                                            source_name
+                                        );
                                     }
                                 }
                             }
