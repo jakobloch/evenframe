@@ -1,6 +1,6 @@
 use crate::error::{EvenframeError, Result};
 use serde::{Deserialize, Serialize};
-use std::{env, fs, path::Path};
+use std::{env, fs, path::PathBuf};
 use toml;
 use tracing::{debug, error, info, trace, warn};
 
@@ -27,52 +27,39 @@ pub struct EvenframeConfig {
 }
 
 impl EvenframeConfig {
-    /// Load configuration from evenframe.toml
+    /// Load configuration by searching for evenframe.toml in the current
+    /// directory and its ancestors.
     pub fn new() -> Result<EvenframeConfig> {
         info!("Loading Evenframe configuration");
         dotenv::dotenv().ok();
-        debug!("Environment variables loaded from .env");
+        debug!("Environment variables loaded from .env if present");
 
-        let absolute_path = env::var("ABSOLUTE_PATH").map_err(|e| {
-            error!("ABSOLUTE_PATH environment variable not set: {}", e);
-            EvenframeError::EnvVarNotSet("ABSOLUTE_PATH".to_string())
-        })?;
-
-        let config_path_string = format!("{}{}", absolute_path, "/backend/evenframe.toml");
-        debug!("Looking for config file at: {}", config_path_string);
-
-        // Try to find evenframe.toml in the backend directory
-        let config_path = Path::new(&config_path_string);
-
-        if !config_path.exists() {
-            error!("Configuration file not found at: {:?}", config_path);
-            return Err(EvenframeError::config(
-                "evenframe.toml not found. Configuration file is required.",
-            ));
-        }
+        let config_path = Self::find_config_file()?;
         info!("Found configuration file at: {:?}", config_path);
 
-        let contents = fs::read_to_string(config_path).map_err(|e| {
+        let contents = fs::read_to_string(&config_path).map_err(|e| {
             error!("Failed to read configuration file: {}", e);
-            e
+            EvenframeError::from(e)
         })?;
 
         debug!("Configuration file size: {} bytes", contents.len());
 
         let mut config: EvenframeConfig = toml::from_str(&contents).map_err(|e| {
             error!("Failed to parse TOML configuration: {}", e);
-            e
+            EvenframeError::config(e.to_string())
         })?;
 
         debug!("Successfully parsed TOML configuration");
 
         // Process environment variable substitutions for all database-related fields
+        // TODO: This should find all environment variable references in the config, not just these hardcoded ones
         debug!("Substituting environment variables in configuration");
         config.schemasync.database.url = Self::substitute_env_vars(&config.schemasync.database.url);
         config.schemasync.database.namespace =
             Self::substitute_env_vars(&config.schemasync.database.namespace);
         config.schemasync.database.database =
             Self::substitute_env_vars(&config.schemasync.database.database);
+        config.typesync.output_path = Self::substitute_env_vars(&config.typesync.output_path);
 
         info!("Configuration loaded successfully");
         debug!(
@@ -85,6 +72,25 @@ impl EvenframeConfig {
         Ok(config)
     }
 
+    /// Searches for `evenframe.toml` starting from the current directory
+    /// and traversing up to the root.
+    fn find_config_file() -> Result<PathBuf> {
+        let current_dir = env::current_dir()?;
+        debug!("Starting config file search from: {:?}", current_dir);
+
+        for path in current_dir.ancestors() {
+            let config_path = path.join("evenframe.toml");
+            trace!("Checking for config at: {:?}", config_path);
+            if config_path.exists() {
+                return Ok(config_path);
+            }
+        }
+
+        error!("Configuration file 'evenframe.toml' not found in any parent directory.");
+        Err(EvenframeError::config(
+            "evenframe.toml not found in current or any parent directory.",
+        ))
+    }
     /// Substitute environment variables in config strings
     /// Supports ${VAR_NAME:-default} syntax
     fn substitute_env_vars(value: &str) -> String {
