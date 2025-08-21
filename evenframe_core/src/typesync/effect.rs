@@ -238,9 +238,9 @@ fn field_type_to_effect_schema(
         | FieldType::U128
         | FieldType::Usize => "Schema.Number".to_string(),
         FieldType::EvenframeRecordId => "Schema.String".to_string(),
-        FieldType::DateTime => "Schema.Date".to_string(), // Changed from DateTimeUtc for better compatibility
-        FieldType::EvenframeDuration => "Schema.Duration".to_string(),
-        FieldType::Timezone => "Schema.String".to_string(), // IANA timezone string
+        FieldType::DateTime => "Schema.DateTimeUtc".to_string(),
+        FieldType::EvenframeDuration => "Schema.DurationFromNanos".to_string(),
+        FieldType::Timezone => "Schema.TimeZoneNamed".to_string(),
         FieldType::Option(i) => format!("Schema.OptionFromNullishOr({}, null)", field(i)),
         FieldType::Vec(i) => format!("Schema.Array({})", field(i)),
         FieldType::Tuple(v) => format!(
@@ -303,7 +303,7 @@ fn field_type_to_ts_encoded(ft: &FieldType) -> String {
         | FieldType::Timezone => "string".into(),
         FieldType::Bool => "boolean".into(),
         FieldType::DateTime => "string".into(), // ISO 8601 string
-        FieldType::EvenframeDuration => "Schema.DurationEncoded".into(),
+        FieldType::EvenframeDuration => "bigint".into(),
         FieldType::Unit => "null".into(),
         FieldType::Decimal
         | FieldType::OrderedFloat(_)

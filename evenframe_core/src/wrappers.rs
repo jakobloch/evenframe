@@ -156,10 +156,33 @@ impl EvenframeValue {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct EvenframeDuration(chrono::TimeDelta);
+// We remove `Serialize` from the derive macro to provide a custom implementation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EvenframeDuration(pub chrono::TimeDelta);
 
-impl<'de> serde::Deserialize<'de> for EvenframeDuration {
+// Manually implement `Serialize` to control the output format.
+impl Serialize for EvenframeDuration {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // `num_nanoseconds()` returns an `Option<i64>` to prevent overflow,
+        // as TimeDelta can represent a duration too large for an i64 of nanoseconds
+        // (roughly +/- 292 years).
+        match self.0.num_nanoseconds() {
+            Some(nanos) => serializer.serialize_i64(nanos),
+            None => {
+                // If the duration is too large, it's best to return a serialization error.
+                let msg =
+                    "EvenframeDuration is too large to serialize as nanoseconds (i64 overflow)";
+                Err(serde::ser::Error::custom(msg))
+            }
+        }
+    }
+}
+
+// Your original `Deserialize` implementation remains correct.
+impl<'de> Deserialize<'de> for EvenframeDuration {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

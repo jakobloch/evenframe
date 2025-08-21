@@ -328,7 +328,7 @@ impl FieldType {
             "EvenframeRecordId" => FieldType::EvenframeRecordId,
             "DateTime" => FieldType::DateTime,
             "EvenframeDuration" => FieldType::EvenframeDuration,
-            "Tz" => FieldType::Timezone,
+            "Tz" | "Timezone" => FieldType::Timezone,
             "Decimal" => FieldType::Decimal,
             "()" => FieldType::Unit,
             _ => {
