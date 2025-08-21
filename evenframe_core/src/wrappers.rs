@@ -166,29 +166,96 @@ impl Serialize for EvenframeDuration {
     where
         S: serde::Serializer,
     {
-        // `num_nanoseconds()` returns an `Option<i64>` to prevent overflow,
-        // as TimeDelta can represent a duration too large for an i64 of nanoseconds
-        // (roughly +/- 292 years).
-        match self.0.num_nanoseconds() {
-            Some(nanos) => serializer.serialize_i64(nanos),
-            None => {
-                // If the duration is too large, it's best to return a serialization error.
-                let msg =
-                    "EvenframeDuration is too large to serialize as nanoseconds (i64 overflow)";
-                Err(serde::ser::Error::custom(msg))
-            }
-        }
+        // Serialize as a tuple [seconds, nanos]
+        use serde::ser::SerializeTuple;
+        
+        // Get the total seconds and the nanosecond part
+        let total_seconds = self.0.num_seconds();
+        let nanos = self.0.subsec_nanos();
+        
+        // Create a 2-element tuple
+        let mut tuple = serializer.serialize_tuple(2)?;
+        tuple.serialize_element(&total_seconds)?;
+        tuple.serialize_element(&nanos)?;
+        tuple.end()
     }
 }
 
-// Your original `Deserialize` implementation remains correct.
+// Deserialize implementation that handles both formats:
+// - i64: total nanoseconds (legacy format)
+// - [i64, i32]: tuple of [seconds, nanos] (new format)
 impl<'de> Deserialize<'de> for EvenframeDuration {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let nanos = i64::deserialize(deserializer)?;
-        let td = chrono::TimeDelta::nanoseconds(nanos);
-        Ok(EvenframeDuration(td))
+        struct DurationVisitor;
+
+        impl<'de> Visitor<'de> for DurationVisitor {
+            type Value = EvenframeDuration;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("either an i64 (nanoseconds) or a tuple [seconds, nanos]")
+            }
+
+            // Handle the legacy format: single i64 representing total nanoseconds
+            fn visit_i64<E>(self, nanos: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let td = chrono::TimeDelta::nanoseconds(nanos);
+                Ok(EvenframeDuration(td))
+            }
+
+            // Also handle u64 for large positive values
+            fn visit_u64<E>(self, nanos: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let td = chrono::TimeDelta::nanoseconds(nanos as i64);
+                Ok(EvenframeDuration(td))
+            }
+
+            // Handle i32
+            fn visit_i32<E>(self, nanos: i32) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let td = chrono::TimeDelta::nanoseconds(nanos as i64);
+                Ok(EvenframeDuration(td))
+            }
+
+            // Handle u32
+            fn visit_u32<E>(self, nanos: u32) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let td = chrono::TimeDelta::nanoseconds(nanos as i64);
+                Ok(EvenframeDuration(td))
+            }
+
+            // Handle the new format: tuple of [seconds, nanos]
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let seconds = seq
+                    .next_element::<i64>()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let nanos = seq
+                    .next_element::<i32>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                
+                // Ensure no extra elements
+                if seq.next_element::<de::IgnoredAny>()?.is_some() {
+                    return Err(de::Error::invalid_length(3, &self));
+                }
+
+                let td = chrono::TimeDelta::seconds(seconds) + chrono::TimeDelta::nanoseconds(nanos as i64);
+                Ok(EvenframeDuration(td))
+            }
+        }
+
+        deserializer.deserialize_any(DurationVisitor)
     }
 }
