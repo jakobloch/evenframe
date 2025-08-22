@@ -8,10 +8,11 @@ pub mod surql;
 pub mod table;
 
 use crate::{
+    compare::SchemaChanges,
+    config::EvenframeConfig,
     error::{EvenframeError, Result},
     schemasync::surql::{define::generate_define_statements, execute::execute_and_validate},
 };
-use convert_case::{Case, Casing};
 use std::collections::HashMap;
 use tracing::{debug, error, info, trace};
 
@@ -19,14 +20,11 @@ use tracing::{debug, error, info, trace};
 pub use edge::{Direction, EdgeConfig, Subquery};
 pub use mockmake::{coordinate, format};
 pub use permissions::PermissionsConfig;
-pub use surql::{define::DefineConfig, generate_query, QueryType};
+pub use surql::{QueryType, define::DefineConfig, generate_query};
 use surrealdb::{
-    engine::{
-        local::Db,
-        remote::http::{Client, Http},
-    },
-    opt::auth::Root,
     Surreal,
+    engine::remote::http::{Client, Http},
+    opt::auth::Root,
 };
 pub use table::TableConfig;
 
@@ -89,7 +87,7 @@ impl<'a> Schemasync<'a> {
         dotenv::dotenv().ok();
         debug!("Loaded environment variables from .env file");
 
-        let config = crate::config::EvenframeConfig::new()?;
+        let config = EvenframeConfig::new()?;
         debug!("Loaded Evenframe configuration successfully");
         trace!("Database URL: {}", config.schemasync.database.url);
         trace!(
@@ -178,8 +176,43 @@ impl<'a> Schemasync<'a> {
 
         evenframe_log!("", "all_statements.surql");
         evenframe_log!("", "results.log");
+        evenframe_log!("", "all_define_statements.surql");
         debug!("Initialized logging files");
 
+        debug!("Generating table and field definition statements");
+        debug!(
+            "Defining tables with full_refresh_mode: {}",
+            config.mock_gen_config.full_refresh_mode
+        );
+        trace!(
+            "Table definitions for: {:?}",
+            tables.keys().collect::<Vec<_>>()
+        );
+        let mut define_statements: HashMap<&String, String> = HashMap::new();
+        for (table_name, table) in tables {
+            define_statements.insert(
+                table_name,
+                generate_define_statements(
+                    table_name,
+                    table,
+                    tables,
+                    objects,
+                    enums,
+                    config.mock_gen_config.full_refresh_mode,
+                ),
+            );
+        }
+
+        let define_statements_string = define_statements
+            .values()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        evenframe_log!(
+            &define_statements_string,
+            "all_define_statements.surql",
+            true
+        );
         // Create Mockmaker instance (which contains Comparator)
         info!("Creating Mockmaker instance for data generation and comparison");
         let mut mockmaker = Mockmaker::new(
@@ -199,7 +232,7 @@ impl<'a> Schemasync<'a> {
         // Run the comparator pipeline
         info!("Running schema comparison pipeline");
         let comparator = mockmaker.comparator.take().unwrap();
-        mockmaker.comparator = Some(comparator.run().await?);
+        mockmaker.comparator = Some(comparator.run(&define_statements_string).await?);
         debug!("Schema comparison completed");
 
         // Continue with the rest of the mockmaker pipeline
@@ -210,28 +243,26 @@ impl<'a> Schemasync<'a> {
         })?;
         debug!("Old data removal completed");
 
-        // Define tables (this stays in Schemasync)
-        info!("Defining database tables and schema");
-        self.define_tables(
-            &db,
-            mockmaker.get_new_schema().unwrap(),
-            tables,
-            objects,
-            enums,
-            &config,
-        )
-        .await
-        .map_err(|e| {
-            error!("Failed to define tables: {}", e);
-            e
-        })?;
-        debug!("Table definitions completed successfully");
-
         info!("Executing access control setup");
         mockmaker.execute_access().await.map_err(|e| {
             error!("Failed to execute access setup: {}", e);
             e
         })?;
+
+        let comparator = mockmaker.comparator.take().unwrap();
+        let comparator_clone = comparator.clone();
+        let schema_changes = comparator.get_schema_changes().unwrap();
+        mockmaker.comparator = Some(comparator_clone);
+
+        info!("Defining database tables and schema");
+        self.define_tables(&db, define_statements, schema_changes)
+            .await
+            .map_err(|e| {
+                error!("Failed to define tables: {}", e);
+                e
+            })?;
+        debug!("Table definitions completed successfully");
+
         debug!("Access control setup completed");
 
         info!("Filtering schema changes");
@@ -241,11 +272,18 @@ impl<'a> Schemasync<'a> {
         })?;
         debug!("Schema changes filtering completed");
 
-        info!("Generating mock data");
-        mockmaker.generate_mock_data().await.map_err(|e| {
-            error!("Failed to generate mock data: {}", e);
-            e
-        })?;
+        if self
+            .schemasync_config
+            .unwrap_or(EvenframeConfig::new()?.schemasync)
+            .should_generate_mocks
+        {
+            info!("Generating mock data");
+            mockmaker.generate_mock_data().await.map_err(|e| {
+                error!("Failed to generate mock data: {}", e);
+                e
+            })?;
+        }
+
         debug!("Mock data generation completed");
 
         info!("Schemasync pipeline execution completed successfully");
@@ -256,60 +294,143 @@ impl<'a> Schemasync<'a> {
     async fn define_tables(
         &self,
         db: &Surreal<Client>,
-        new_schema: &Surreal<Db>,
-        tables: &HashMap<String, TableConfig>,
-        objects: &HashMap<String, StructConfig>,
-        enums: &HashMap<String, TaggedUnion>,
-        config: &crate::schemasync::config::SchemasyncConfig,
+        define_statments: HashMap<&String, String>,
+        schema_changes: &SchemaChanges,
     ) -> Result<()> {
+        info!("Defining tables based on schema changes");
         debug!(
-            "Defining tables with full_refresh_mode: {}",
-            config.mock_gen_config.full_refresh_mode
-        );
-        trace!(
-            "Table definitions for: {:?}",
-            tables.keys().collect::<Vec<_>>()
+            "Schema changes before define statement execution: {:?}",
+            schema_changes
         );
 
-        evenframe_log!("", "define_statements.surql");
-        for (table_name, table) in tables {
-            let snake_table_name = &table_name.to_case(Case::Snake);
-            let define_stmts = generate_define_statements(
-                snake_table_name,
-                table,
-                tables,
-                objects,
-                enums,
-                config.mock_gen_config.full_refresh_mode,
-            );
-            evenframe_log!(&define_stmts, "define_statements.surql", true);
-
-            // Execute and check define statements
-            let _ = new_schema.query(&define_stmts).await.map_err(|e| {
-                EvenframeError::database(format!(
-                    "There was a problem executing the define statements on the new_schema embedded db: {e}"
-                ))
-            });
-            let define_result = execute_and_validate(db, &define_stmts, "define", "all").await;
+        let execute = async |name, stmt: &str| -> Result<()> {
+            let define_result = execute_and_validate(db, stmt, "define", name).await;
             match define_result {
-                Ok(_) => evenframe_log!(
-                    &format!(
-                        "Successfully executed define statements for table {}",
-                        table_name
-                    ),
-                    "results.log",
-                    true
-                ),
-                Err(e) => {
-                    let error_msg = format!(
-                        "Failed to execute define statements for table {}: {}",
-                        table_name, e
+                Ok(_) => {
+                    evenframe_log!(
+                        &format!("Successfully executed define statements for statements:\n{stmt}",),
+                        "results.log",
+                        true
                     );
+                    Ok(())
+                }
+                Err(e) => {
+                    let error_msg =
+                        format!("Failed to execute define statements for table\n{e}:\n{stmt}",);
                     evenframe_log!(&error_msg, "results.log", true);
                     return Err(e.into());
                 }
             }
+        };
+
+        // Process new tables first
+        if !schema_changes.new_tables.is_empty() {
+            info!("Defining {} new tables", schema_changes.new_tables.len());
+            for table_name in &schema_changes.new_tables {
+                if let Some(define_stmt) = define_statments.get(table_name) {
+                    debug!("Defining new table: {}", table_name);
+                    for stmt in define_stmt.split_inclusive(';') {
+                        if stmt.starts_with("DEFINE TABLE") || stmt.starts_with("DEFINE FIELD") {
+                            execute(table_name, stmt).await?;
+                        }
+                    }
+                }
+            }
         }
+
+        // Process modified tables - only define changed fields
+        if !schema_changes.modified_tables.is_empty() {
+            info!(
+                "Processing {} modified tables",
+                schema_changes.modified_tables.len()
+            );
+            for table_change in &schema_changes.modified_tables {
+                let table_name = &table_change.table_name;
+
+                if let Some(define_stmt) = define_statments.get(table_name) {
+                    debug!("Processing modified table: {}", table_name);
+
+                    // Always redefine the table itself if it has changes
+                    for stmt in define_stmt.split_inclusive(';') {
+                        if stmt.starts_with("DEFINE TABLE") {
+                            debug!("Redefining table structure for: {}", table_name);
+                            execute(table_name, stmt).await?;
+                        }
+                    }
+
+                    // Only define new or modified fields
+                    if !table_change.new_fields.is_empty()
+                        || !table_change.modified_fields.is_empty()
+                    {
+                        debug!(
+                            "Defining {} new fields and {} modified fields for table {}",
+                            table_change.new_fields.len(),
+                            table_change.modified_fields.len(),
+                            table_name
+                        );
+
+                        for stmt in define_stmt.split_inclusive(';') {
+                            if stmt.starts_with("DEFINE FIELD") {
+                                // Extract field name from the statement
+                                // DEFINE FIELD field_name ON TABLE ...
+                                let parts: Vec<&str> = stmt.split_whitespace().collect();
+                                if parts.len() > 2 {
+                                    let field_name = parts[2];
+
+                                    // Check if this field is new or modified
+                                    if table_change.new_fields.contains(&field_name.to_string())
+                                        || table_change
+                                            .modified_fields
+                                            .iter()
+                                            .any(|fc| fc.field_name == field_name)
+                                    {
+                                        trace!(
+                                            "Defining field: {} on table: {}",
+                                            field_name, table_name
+                                        );
+                                        execute(table_name, stmt).await?;
+                                    } else {
+                                        trace!(
+                                            "Skipping unchanged field: {} on table: {}",
+                                            field_name, table_name
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process new accesses if any
+        if !schema_changes.new_accesses.is_empty() {
+            info!(
+                "Defining {} new accesses",
+                schema_changes.new_accesses.len()
+            );
+            // Access definitions would be handled separately if needed
+        }
+
+        // Process modified accesses that need recreation
+        if !schema_changes.modified_accesses.is_empty() {
+            for access_change in &schema_changes.modified_accesses {
+                // Check if all changes are ignorable
+                let only_ignorable_changes = access_change
+                    .changes
+                    .iter()
+                    .all(|change| change.is_ignorable());
+
+                if !only_ignorable_changes {
+                    debug!(
+                        "Access {} has non-ignorable changes, needs recreation",
+                        access_change.access_name
+                    );
+                    // Access recreation would be handled here if needed
+                }
+            }
+        }
+
         Ok(())
     }
 }

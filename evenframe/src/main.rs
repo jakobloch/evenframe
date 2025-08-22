@@ -34,13 +34,12 @@ async fn main() -> Result<()> {
         }
     };
 
-    let generate_dummy_values = config.schemasync.should_generate_mocks;
     let generate_arktype_types = config.typesync.should_generate_arktype_types;
     let generate_effect_schemas = config.typesync.should_generate_effect_types;
 
     debug!(
-        "Configuration flags - mocks: {}, arktype: {}, effect: {}",
-        generate_dummy_values, generate_arktype_types, generate_effect_schemas
+        "Configuration flags - arktype: {}, effect: {}",
+        generate_arktype_types, generate_effect_schemas
     );
 
     // Get the config builder closure
@@ -108,31 +107,27 @@ async fn main() -> Result<()> {
         debug!("Skipping Effect schema generation (disabled in config)");
     }
 
-    if generate_dummy_values {
-        info!("Starting Schemasync for mock data generation");
-        // Much simpler now!
-        let schemasync = Schemasync::new()
-            .with_tables(&tables)
-            .with_objects(&objects)
-            .with_enums(&enums);
+    info!("Starting Schemasync");
+    // Much simpler now!
+    let schemasync = Schemasync::new()
+        .with_tables(&tables)
+        .with_objects(&objects)
+        .with_enums(&enums);
 
-        debug!(
-            "Initialized Schemasync with {} tables, {} objects, {} enums",
-            tables.len(),
-            objects.len(),
-            enums.len()
-        );
+    debug!(
+        "Initialized Schemasync with {} tables, {} objects, {} enums",
+        tables.len(),
+        objects.len(),
+        enums.len()
+    );
 
-        info!("Running Schemasync...");
-        match schemasync.run().await {
-            Ok(_) => info!("Schemasync completed successfully"),
-            Err(e) => {
-                error!("Schemasync failed: {}", e);
-                return Err(e);
-            }
+    info!("Running Schemasync...");
+    match schemasync.run().await {
+        Ok(_) => info!("Schemasync completed successfully"),
+        Err(e) => {
+            error!("Schemasync failed: {}", e);
+            return Err(e);
         }
-    } else {
-        debug!("Skipping mock data generation (disabled in config)");
     }
 
     info!("Evenframe code generation completed successfully");
