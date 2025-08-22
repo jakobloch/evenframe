@@ -5,7 +5,7 @@ pub mod format;
 pub mod regex_val_gen;
 
 use crate::{
-    compare::{filter_changed_tables_and_objects, Comparator},
+    compare::Comparator,
     coordinate::{
         CoherentDataset, Coordination, CoordinationGroup, CoordinationId, CoordinationPair,
     },
@@ -13,19 +13,18 @@ use crate::{
     evenframe_log,
     mockmake::format::Format,
     schemasync::{
-        compare::PreservationMode, surql::access::execute_access_query, StructConfig, TableConfig,
-        TaggedUnion,
+        StructConfig, TableConfig, TaggedUnion, compare::PreservationMode,
+        surql::access::execute_access_query,
     },
     types::StructField,
     wrappers::EvenframeRecordId,
 };
 use bon::Builder;
-use convert_case::{Case, Casing};
 use rand::Rng;
 use std::collections::{HashMap, HashSet};
+use surrealdb::Surreal;
 use surrealdb::engine::local::Db;
 use surrealdb::engine::remote::http::Client;
-use surrealdb::Surreal;
 use tracing;
 use uuid::Uuid;
 
@@ -76,10 +75,7 @@ impl Mockmaker {
         tracing::debug!("Step 1: Generating IDs for mock data");
         self.generate_ids().await?;
 
-        // Step 2: Run comparator pipeline
-        tracing::debug!("Step 2: Running comparator pipeline");
-        let comparator = self.comparator.take().unwrap();
-        self.comparator = Some(comparator.run().await?);
+        tracing::debug!("Step 2: ??");
 
         // Step 3: Run remaining mockmaker steps
         tracing::debug!("Step 3: Removing old data based on schema changes");
@@ -103,6 +99,7 @@ impl Mockmaker {
 
     /// Generate IDs for tables
     pub async fn generate_ids(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        evenframe_log!("", "record_diffs.log");
         tracing::trace!("Starting ID generation for all tables");
         let mut map = HashMap::new();
         let mut record_diffs = HashMap::new();
@@ -111,7 +108,6 @@ impl Mockmaker {
         // Since these are just SELECT queries, they should be fast enough
         for (table_name, table_config) in &self.tables {
             tracing::trace!(table = %table_name, "Generating IDs for table");
-            let snake_case_table_name = table_name.to_case(Case::Snake);
 
             // Determine desired count from config or default
             let desired_count =
@@ -122,14 +118,21 @@ impl Mockmaker {
                 };
 
             // Query existing IDs
-            let query = format!("SELECT id FROM {snake_case_table_name};",);
-            tracing::trace!(query = %query, "Querying existing IDs");
+            let query = format!("SELECT id FROM {table_name};",);
+            tracing::trace!("Querying existing IDs {query}");
             let mut response = self.db.query(query).await.expect(
                 "Something went wrong getting the ids from the db for mock data generation",
             );
+            evenframe_log!(&format!("{:?}", response), "record_diffs.log", true);
 
-            let existing_ids: Vec<EvenframeRecordId> =
-                response.take(0).unwrap_or_else(|_| Vec::new());
+            #[derive(serde::Deserialize, Debug)]
+            struct IdResponse {
+                id: EvenframeRecordId,
+            }
+
+            let existing_ids: Vec<IdResponse> = response.take(0).unwrap_or_else(|_| {
+                panic!("Something went wrong getting the record ids: {response:?}")
+            });
 
             let mut ids = Vec::new();
             let existing_count = existing_ids.len();
@@ -147,14 +150,13 @@ impl Mockmaker {
 
             // Store the difference in the record_diffs map
             record_diffs.insert(table_name.clone(), record_diff);
-            record_diffs.insert(snake_case_table_name.clone(), record_diff);
 
             if existing_count >= desired_count {
                 // We have enough or more IDs than needed
                 // Just use the first desired_count IDs
-                for (i, record_id) in existing_ids.into_iter().enumerate() {
+                for (i, record) in existing_ids.into_iter().enumerate() {
                     if i < desired_count {
-                        let id_string = record_id.to_string();
+                        let id_string = record.id.to_string();
                         ids.push(id_string);
                     } else {
                         // Stop after we have enough
@@ -164,21 +166,20 @@ impl Mockmaker {
             } else {
                 // We need to use existing IDs and generate more
                 // First, use all existing IDs
-                for record_id in existing_ids {
-                    ids.push(record_id.to_string());
+                for record in existing_ids {
+                    ids.push(record.id.to_string());
                 }
 
                 // Generate additional IDs
                 let mut next_id = existing_count + 1;
                 while ids.len() < desired_count {
-                    ids.push(format!("{snake_case_table_name}:{next_id}"));
+                    ids.push(format!("{table_name}:{next_id}"));
                     next_id += 1;
                 }
             }
 
             // Store with both the original key and snake_case key for easier lookup
             map.insert(table_name.clone(), ids.clone());
-            map.insert(snake_case_table_name, ids);
         }
 
         self.id_map = map;
@@ -188,7 +189,8 @@ impl Mockmaker {
 
         evenframe_log!(
             format!("Record count differences: {:#?}", self.record_diffs),
-            "record_diffs.log"
+            "record_diffs.log",
+            true
         );
 
         Ok(())
@@ -241,7 +243,7 @@ impl Mockmaker {
                 (self.tables.clone(), self.objects.clone())
             } else {
                 tracing::debug!("Incremental mode - filtering changed items only");
-                filter_changed_tables_and_objects(
+                self.filter_changed_tables_and_objects(
                     schema_changes,
                     &self.tables,
                     &self.objects,
@@ -281,14 +283,12 @@ impl Mockmaker {
 
         evenframe_log!(
             &format!("Sorted table order: {sorted_table_names:?}"),
-            "results.log",
+            "table_order.log",
             true
         );
 
-        for table_name in sorted_table_names {
-            if let Some(table) = &self.filtered_tables.get(&table_name) {
-                let snake_table_name = &table_name.to_case(Case::Snake);
-
+        for table_name in &sorted_table_names {
+            if let Some(table) = &self.filtered_tables.get(table_name) {
                 tracing::trace!(
                     table = %table_name,
                     is_relation = table.relation.is_some(),
@@ -298,10 +298,10 @@ impl Mockmaker {
                 if self.schemasync_config.should_generate_mocks {
                     let stmts = if table.relation.is_some() {
                         tracing::trace!(table = %table_name, "Generating INSERT statements for relation");
-                        self.generate_insert_statements(snake_table_name, table)
+                        self.generate_insert_statements(table_name, table)
                     } else {
                         tracing::trace!(table = %table_name, "Generating UPSERT statements for table");
-                        self.generate_upsert_statements(snake_table_name, table)
+                        self.generate_upsert_statements(table_name, table)
                     };
 
                     tracing::debug!(
@@ -614,8 +614,10 @@ impl Mockmaker {
                                     e
                                 );
                                 evenframe_log!(
-                                    format!("ERROR: Invalid coordination skipped\nTables: {:?}\nCoordination: {:?}\nError: {}\n",
-                                        group_tables, coordination, e),
+                                    format!(
+                                        "ERROR: Invalid coordination skipped\nTables: {:?}\nCoordination: {:?}\nError: {}\n",
+                                        group_tables, coordination, e
+                                    ),
                                     "coordination_validation_errors.log",
                                     true
                                 );
