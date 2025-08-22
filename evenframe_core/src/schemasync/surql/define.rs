@@ -252,7 +252,7 @@ impl DefineConfig {
 
 pub fn generate_define_statements(
     table_name: &str,
-    ds: &TableConfig,
+    table_config: &TableConfig,
     query_details: &HashMap<String, TableConfig>,
     server_only: &HashMap<String, StructConfig>,
     enums: &HashMap<String, TaggedUnion>,
@@ -265,31 +265,31 @@ pub fn generate_define_statements(
         enum_count = enums.len(),
         "Context sizes"
     );
-    trace!("Table config: {:?}", ds);
-    let table_type = if ds.relation.is_some() {
-        let relation = ds.relation.as_ref().unwrap();
+    trace!("Table config: {:?}", table_config);
+    let table_type = if table_config.relation.is_some() {
+        let relation = table_config.relation.as_ref().unwrap();
         debug!(table_name = %table_name, from = %relation.from, to = %relation.to, "Table is a relation");
         &format!("RELATION FROM {} TO {}", relation.from, relation.to)
     } else {
         debug!(table_name = %table_name, "Table is normal type");
         "NORMAL"
     };
-    let select_permissions = ds
+    let select_permissions = table_config
         .permissions
         .as_ref()
         .and_then(|p| p.select_permissions.as_deref())
         .unwrap_or("FULL");
-    let create_permissions = ds
+    let create_permissions = table_config
         .permissions
         .as_ref()
         .and_then(|p| p.create_permissions.as_deref())
         .unwrap_or("FULL");
-    let update_permissions = ds
+    let update_permissions = table_config
         .permissions
         .as_ref()
         .and_then(|p| p.update_permissions.as_deref())
         .unwrap_or("FULL");
-    let delete_permissions = ds
+    let delete_permissions = table_config
         .permissions
         .as_ref()
         .and_then(|p| p.delete_permissions.as_deref())
@@ -302,8 +302,8 @@ pub fn generate_define_statements(
         "DEFINE TABLE OVERWRITE {table_name} SCHEMAFULL TYPE {table_type} CHANGEFEED 3d PERMISSIONS FOR select {select_permissions} FOR update {update_permissions} FOR create {create_permissions} FOR delete {delete_permissions};\n"
     ));
 
-    debug!(table_name = %table_name, field_count = ds.struct_config.fields.len(), "Processing table fields");
-    for table_field in &ds.struct_config.fields {
+    debug!(table_name = %table_name, field_count = table_config.struct_config.fields.len(), "Processing table fields");
+    for table_field in &table_config.struct_config.fields {
         // if struct field is an edge it should not be defined in the table itself
         if table_field.edge_config.is_none()
             && (table_field.field_name != "in"
