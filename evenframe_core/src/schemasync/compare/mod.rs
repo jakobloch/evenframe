@@ -2,6 +2,7 @@
 // This module provides a simplified schema synchronization system
 // that leverages SurrealDB's native export/import functionality
 
+pub mod filter;
 pub mod import;
 
 pub use crate::schemasync::mockmake::MockGenerationConfig;
@@ -12,7 +13,7 @@ use crate::{
         config::{PerformanceConfig, SchemasyncMockGenConfig},
         surql::access::setup_access_definitions,
     },
-    types::{FieldType, StructConfig, StructField, TaggedUnion, VariantData},
+    types::{FieldType, TaggedUnion, VariantData},
 };
 pub use import::SchemaImporter;
 use import::{AccessDefinition, FieldDefinition, ObjectType, SchemaDefinition, TableDefinition};
@@ -24,7 +25,7 @@ use surrealdb::engine::local::{Db, Mem};
 use surrealdb::{Surreal, engine::remote::http::Client};
 use tracing;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Comparator {
     db: Surreal<Client>,
     schemasync_config: crate::schemasync::config::SchemasyncConfig,
@@ -55,11 +56,11 @@ impl Comparator {
         }
     }
 
-    pub async fn run(mut self) -> Result<Self> {
+    pub async fn run(mut self, define_statements: &str) -> Result<Self> {
         tracing::info!("Starting Comparator pipeline");
 
         tracing::debug!("Setting up schemas");
-        self.setup_schemas().await?;
+        self.setup_schemas(define_statements).await?;
 
         tracing::debug!("Setting up access definitions");
         self.setup_access().await?;
@@ -75,11 +76,19 @@ impl Comparator {
     }
 
     /// Setup backup and create in-memory schemas
-    async fn setup_schemas(&mut self) -> Result<()> {
+    async fn setup_schemas(&mut self, define_statements: &str) -> Result<()> {
         tracing::trace!("Creating backup and in-memory schemas");
         let (remote_schema, new_schema) = setup_backup_and_schemas(&self.db).await?;
         self.remote_schema = Some(remote_schema);
+        // Execute and check define statements
+        let _ = new_schema.query(define_statements).await.map_err(|e| {
+            EvenframeError::database(format!(
+                "There was a problem executing the define statements on the new_schema embedded db: {e}"
+            ))
+        });
+
         self.new_schema = Some(new_schema);
+
         tracing::trace!("Schemas setup complete");
         Ok(())
     }
@@ -1225,386 +1234,8 @@ impl Comparator {
     }
 }
 
-/// Filter tables and objects to only include those with changes that need to be regenerated
-///
-/// This function takes a SchemaChanges instance and the full tables and objects hashmaps,
-/// then returns new hashmaps containing only the tables and fields that have been changed
-/// and need to be regenerated.
-///
-/// # Arguments
-/// * `schema_changes` - The schema changes detected between old and new schemas
-/// * `tables` - The full HashMap of table configurations
-/// * `objects` - The full HashMap of object/struct configurations
-/// * `enums` - The full HashMap of enum configurations
-/// * `record_diffs` - Map of table names to record count differences
-///
-/// # Returns
-/// A tuple of (filtered_tables, filtered_objects) containing only changed elements
-pub fn filter_changed_tables_and_objects(
-    schema_changes: &SchemaChanges,
-    tables: &HashMap<String, TableConfig>,
-    objects: &HashMap<String, StructConfig>,
-    enums: &HashMap<String, TaggedUnion>,
-    record_diffs: &HashMap<String, i32>,
-) -> (HashMap<String, TableConfig>, HashMap<String, StructConfig>) {
-    tracing::debug!("Filtering changed tables and objects");
-
-    let mut filtered_tables = HashMap::new();
-    let mut filtered_objects = HashMap::new();
-
-    // Process new tables - these need full regeneration
-    for table_name in &schema_changes.new_tables {
-        if let Some(table_config) = tables.get(table_name) {
-            tracing::trace!(table = %table_name, "Adding new table for full regeneration");
-            filtered_tables.insert(table_name.clone(), table_config.clone());
-        }
-    }
-
-    // Process tables that need more records (positive diffs)
-    for (table_name, diff) in record_diffs {
-        if *diff > 0 {
-            tracing::trace!(
-                table = %table_name,
-                record_diff = diff,
-                "Table needs additional records"
-            );
-            // This table needs additional records, so include it for regeneration
-            if let Some(table_config) = tables.get(table_name) {
-                // Only add if not already included from new_tables
-                if !filtered_tables.contains_key(table_name) {
-                    let mut modified_config = table_config.clone();
-                    // Set n to the number of records we need to generate
-                    if let Some(ref mut mock_config) = modified_config.mock_generation_config {
-                        mock_config.n = *diff as usize;
-                    }
-                    filtered_tables.insert(table_name.clone(), modified_config);
-                }
-            }
-        }
-    }
-
-    // Process all tables based on their PreservationMode
-    for (table_name, table_config) in tables {
-        // Skip if already processed as new table
-        if schema_changes.new_tables.contains(table_name) {
-            continue;
-        }
-
-        // Get preservation mode from table's mock generation config
-        let preservation_mode = table_config
-            .mock_generation_config
-            .as_ref()
-            .map(|config| config.preservation_mode.clone())
-            .unwrap_or(PreservationMode::Smart);
-
-        match preservation_mode {
-            PreservationMode::None => {
-                // Return the full unfiltered table
-                filtered_tables.insert(table_name.clone(), table_config.clone());
-            }
-            PreservationMode::Full => {
-                // Only generate for new items (new fields and fields with always_regenerate)
-                if let Some(table_change) = schema_changes
-                    .modified_tables
-                    .iter()
-                    .find(|tc| &tc.table_name == table_name)
-                {
-                    if !table_change.new_fields.is_empty()
-                        || table_config
-                            .struct_config
-                            .fields
-                            .iter()
-                            .any(|f| f.always_regenerate)
-                    {
-                        let mut filtered_table = table_config.clone();
-                        let mut filtered_fields = Vec::new();
-
-                        // Only include new fields
-                        for field_name in &table_change.new_fields {
-                            if let Some(field) = table_config
-                                .struct_config
-                                .fields
-                                .iter()
-                                .find(|f| &f.field_name == field_name)
-                            {
-                                filtered_fields.push(field.clone());
-                            }
-                        }
-
-                        // Include fields with always_regenerate
-                        for field in &table_config.struct_config.fields {
-                            if field.always_regenerate
-                                && !filtered_fields
-                                    .iter()
-                                    .any(|f| f.field_name == field.field_name)
-                            {
-                                filtered_fields.push(field.clone());
-                            }
-                        }
-
-                        if !filtered_fields.is_empty() {
-                            filtered_table.struct_config.fields = filtered_fields;
-                            filtered_tables.insert(table_name.clone(), filtered_table);
-                        }
-                    }
-                } else {
-                    // Check if any fields have always_regenerate
-                    if table_config
-                        .struct_config
-                        .fields
-                        .iter()
-                        .any(|f| f.always_regenerate)
-                    {
-                        let mut filtered_table = table_config.clone();
-                        let mut filtered_fields = Vec::new();
-
-                        // Only include fields with always_regenerate
-                        for field in &table_config.struct_config.fields {
-                            if field.always_regenerate {
-                                filtered_fields.push(field.clone());
-                            }
-                        }
-
-                        if !filtered_fields.is_empty() {
-                            filtered_table.struct_config.fields = filtered_fields;
-                            filtered_tables.insert(table_name.clone(), filtered_table);
-                        }
-                    }
-                }
-            }
-            PreservationMode::Smart => {
-                // Process as currently implemented (default behavior)
-                // Check if this table has modifications
-                if let Some(table_change) = schema_changes
-                    .modified_tables
-                    .iter()
-                    .find(|tc| &tc.table_name == table_name)
-                {
-                    let mut filtered_table = table_config.clone();
-                    let mut filtered_fields = Vec::new();
-
-                    // Collect all field names that need regeneration
-                    let mut fields_to_include = HashSet::new();
-
-                    // Add new fields
-                    for field_name in &table_change.new_fields {
-                        fields_to_include.insert(field_name.clone());
-                    }
-
-                    // Track nested field changes to build partial objects
-                    let mut nested_changes: HashMap<
-                        String,
-                        Vec<(String, FieldType, crate::schemasync::compare::ChangeType)>,
-                    > = HashMap::new();
-
-                    // Add modified fields
-                    for field_change in &table_change.modified_fields {
-                        use crate::schemasync::compare::ChangeType;
-
-                        if field_change.field_name.contains('.') {
-                            // Parse nested field (e.g., "recurrence_rule.interval")
-                            let parts: Vec<&str> = field_change.field_name.split('.').collect();
-                            let parent_field = parts[0].to_string();
-                            let nested_field = parts[1].to_string();
-
-                            match field_change.change_type {
-                                ChangeType::Removed => {
-                                    // Track removed nested fields
-                                    nested_changes.entry(parent_field).or_default().push((
-                                        nested_field,
-                                        FieldType::Unit,
-                                        ChangeType::Removed,
-                                    ));
-                                }
-                                ChangeType::Added => {
-                                    // For added nested fields, create partial struct similar to removed fields
-                                    // We need to find the actual field type from the table definition
-                                    if let Some(parent_field_def) = table_config
-                                        .struct_config
-                                        .fields
-                                        .iter()
-                                        .find(|f| f.field_name == parent_field)
-                                    {
-                                        // Extract the nested field type from the parent field
-                                        match &parent_field_def.field_type {
-                                            FieldType::Option(inner) => {
-                                                if let FieldType::Other(struct_name) = &**inner {
-                                                    // Find the struct definition and get the nested field type
-                                                    if let Some(struct_def) =
-                                                        objects.get(struct_name)
-                                                        && let Some(nested_field_def) = struct_def
-                                                            .fields
-                                                            .iter()
-                                                            .find(|f| f.field_name == nested_field)
-                                                    {
-                                                        nested_changes
-                                                            .entry(parent_field.clone())
-                                                            .or_default()
-                                                            .push((
-                                                                nested_field.clone(),
-                                                                nested_field_def.field_type.clone(),
-                                                                ChangeType::Added,
-                                                            ));
-                                                    }
-                                                }
-                                            }
-                                            FieldType::Other(struct_name) => {
-                                                // Find the struct definition and get the nested field type
-                                                if let Some(struct_def) = objects.get(struct_name)
-                                                    && let Some(nested_field_def) = struct_def
-                                                        .fields
-                                                        .iter()
-                                                        .find(|f| f.field_name == nested_field)
-                                                {
-                                                    nested_changes
-                                                        .entry(parent_field.clone())
-                                                        .or_default()
-                                                        .push((
-                                                            nested_field.clone(),
-                                                            nested_field_def.field_type.clone(),
-                                                            ChangeType::Added,
-                                                        ));
-                                                }
-                                            }
-                                            _ => {
-                                                // Fallback to including the parent field
-                                                fields_to_include.insert(parent_field);
-                                            }
-                                        }
-                                    }
-                                }
-                                ChangeType::Modified => {
-                                    // For modified nested fields, include the parent field
-                                    fields_to_include.insert(parent_field);
-                                }
-                            }
-                        } else {
-                            // For non-nested fields, include them normally
-                            fields_to_include.insert(field_change.field_name.clone());
-                        }
-                    }
-
-                    // Build partial struct fields for nested changes
-                    for (parent_field_name, changes) in nested_changes {
-                        // Create a struct with only the changed nested fields
-                        let mut nested_fields = Vec::new();
-                        for (nested_field_name, field_type, _change_type) in changes {
-                            nested_fields.push((nested_field_name, field_type));
-                        }
-
-                        // Create a field representing the partial object
-                        let partial_struct_field = StructField {
-                            field_name: parent_field_name,
-                            field_type: FieldType::Struct(nested_fields),
-                            edge_config: None,
-                            define_config: None,
-                            format: None,
-                            validators: Vec::new(),
-                            always_regenerate: false,
-                        };
-                        filtered_fields.push(partial_struct_field);
-                    }
-
-                    // Add removed fields as Unit type
-                    for removed_field_name in &table_change.removed_fields {
-                        let unit_field = StructField {
-                            field_name: removed_field_name.clone(),
-                            field_type: FieldType::Unit,
-                            edge_config: None,
-                            define_config: None,
-                            format: None,
-                            validators: Vec::new(),
-                            always_regenerate: false,
-                        };
-                        filtered_fields.push(unit_field);
-                    }
-
-                    // Filter the fields in the struct config
-                    for field in &table_config.struct_config.fields {
-                        if fields_to_include.contains(&field.field_name) || field.always_regenerate
-                        {
-                            filtered_fields.push(field.clone());
-                        }
-                    }
-
-                    // Only add the table if it has fields that need regeneration or removal
-                    if !filtered_fields.is_empty()
-                        || table_change.permission_changed
-                        || table_change.schema_type_changed
-                        || !table_change.removed_fields.is_empty()
-                    {
-                        filtered_table.struct_config.fields = filtered_fields;
-                        filtered_tables.insert(table_name.clone(), filtered_table);
-                    }
-                } else {
-                    // No changes in schema, but check if any fields have always_regenerate
-                    if table_config
-                        .struct_config
-                        .fields
-                        .iter()
-                        .any(|f| f.always_regenerate)
-                    {
-                        let mut filtered_table = table_config.clone();
-                        let mut filtered_fields = Vec::new();
-
-                        // Only include fields with always_regenerate
-                        for field in &table_config.struct_config.fields {
-                            if field.always_regenerate {
-                                filtered_fields.push(field.clone());
-                            }
-                        }
-
-                        if !filtered_fields.is_empty() {
-                            filtered_table.struct_config.fields = filtered_fields;
-                            filtered_tables.insert(table_name.clone(), filtered_table);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Process objects - check if any referenced objects need to be included
-    // This handles nested structs that might be used by changed tables
-    let mut processed_objects = HashSet::new();
-    let mut objects_to_process = Vec::new();
-
-    // Collect all object types referenced by filtered tables
-    for table in filtered_tables.values() {
-        for field in &table.struct_config.fields {
-            collect_referenced_objects(&field.field_type, &mut objects_to_process, enums);
-        }
-    }
-
-    // Process all referenced objects
-    while let Some(object_name) = objects_to_process.pop() {
-        if processed_objects.contains(&object_name) {
-            continue;
-        }
-
-        processed_objects.insert(object_name.clone());
-
-        if let Some(object_config) = objects.get(&object_name) {
-            filtered_objects.insert(object_name.clone(), object_config.clone());
-
-            // Check for nested object references
-            for field in &object_config.fields {
-                collect_referenced_objects(&field.field_type, &mut objects_to_process, enums);
-            }
-        }
-    }
-
-    tracing::debug!(
-        filtered_table_count = filtered_tables.len(),
-        filtered_object_count = filtered_objects.len(),
-        "Filtering complete"
-    );
-
-    (filtered_tables, filtered_objects)
-}
-
 /// Helper function to collect object type names referenced in a field type
-fn collect_referenced_objects(
+pub fn collect_referenced_objects(
     field_type: &FieldType,
     objects_to_process: &mut Vec<String>,
     enums: &HashMap<String, TaggedUnion>,
@@ -1679,9 +1310,11 @@ pub async fn export_schemas(
     remote_schema: &Surreal<Db>,
     new_schema: &Surreal<Db>,
 ) -> Result<(String, String)> {
+    use futures::StreamExt;
+
     tracing::trace!("Exporting remote schema");
-    remote_schema
-        .export("remote_schema.surql")
+    let mut remote_stream = remote_schema
+        .export(())
         .with_config()
         .versions(false)
         .accesses(true)
@@ -1696,16 +1329,20 @@ pub async fn export_schemas(
                 "There was a problem exporting the 'remote_schema' embedded database's schema: {e}"
             ))
         })?;
+
     let mut remote_schema_string = String::new();
-    std::io::Read::read_to_string(
-        &mut std::fs::File::open("remote_schema.surql")?,
-        &mut remote_schema_string,
-    )
-    .expect("Something went wrong reading the file to string");
+    while let Some(result) = remote_stream.next().await {
+        let line = result.map_err(|e| {
+            EvenframeError::database(format!("Error reading remote schema stream: {e}"))
+        })?;
+        remote_schema_string.push_str(&String::from_utf8_lossy(&line));
+    }
+
+    evenframe_log!(remote_schema_string, "remote_schema.surql");
 
     tracing::trace!("Exporting new schema");
-    new_schema
-        .export("new_schema.surql")
+    let mut new_stream = new_schema
+        .export(())
         .with_config()
         .versions(false)
         .accesses(true)
@@ -1720,31 +1357,43 @@ pub async fn export_schemas(
                 "There was a problem exporting the 'new_schema' embedded database's schema: {e}"
             ))
         })?;
+
     let mut new_schema_string = String::new();
-    std::io::Read::read_to_string(
-        &mut std::fs::File::open("new_schema.surql")?,
-        &mut new_schema_string,
-    )
-    .expect("Something went wrong reading the file to string");
+    while let Some(result) = new_stream.next().await {
+        let line = result.map_err(|e| {
+            EvenframeError::database(format!("Error reading new schema stream: {e}"))
+        })?;
+        new_schema_string.push_str(&String::from_utf8_lossy(&line));
+    }
+
+    evenframe_log!(new_schema_string, "new_schema.surql");
 
     tracing::trace!("Schema export complete");
     Ok((remote_schema_string, new_schema_string))
 }
 
 pub async fn setup_backup_and_schemas(db: &Surreal<Client>) -> Result<(Surreal<Db>, Surreal<Db>)> {
+    use futures::StreamExt;
+
     tracing::trace!("Creating database backup");
-    db.export("backup.surql").await.map_err(|e| {
+    let mut backup_stream = db.export(()).await.map_err(|e| {
         EvenframeError::database(format!(
-            "There was a problem exporting the remote database to 'backup.surql': {e}"
+            "There was a problem exporting the remote database: {e}"
         ))
     })?;
+
+    let mut backup = String::new();
+    while let Some(result) = backup_stream.next().await {
+        let line = result
+            .map_err(|e| EvenframeError::database(format!("Error reading backup stream: {e}")))?;
+        backup.push_str(&String::from_utf8_lossy(&line));
+    }
+
+    evenframe_log!(backup, "backup.surql");
+
     let remote_schema = Surreal::new::<Mem>(())
         .await
         .expect("Something went wrong starting the remote_schema in-memory db");
-
-    let mut backup = String::new();
-    std::io::Read::read_to_string(&mut std::fs::File::open("backup.surql")?, &mut backup)
-        .expect("Something went wrong reading the file to string");
 
     tracing::trace!("Importing backup to remote in-memory schema");
     remote_schema
