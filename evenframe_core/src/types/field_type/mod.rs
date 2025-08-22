@@ -3,11 +3,12 @@ use quote::{ToTokens, quote};
 use serde::{Deserialize, Serialize};
 use syn::Type as SynType;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FieldType {
     String,
     Char,
     Bool,
+    #[default]
     Unit,
     F32,
     F64,

@@ -72,7 +72,7 @@ pub enum VariantData {
     DataStructureRef(FieldType),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StructField {
     pub field_name: String,
     pub field_type: FieldType,
@@ -84,6 +84,29 @@ pub struct StructField {
 }
 
 impl StructField {
+    pub fn unit(field_name: String) -> Self {
+        Self {
+            field_name,
+            field_type: FieldType::Unit,
+            edge_config: None,
+            define_config: None,
+            format: None,
+            validators: Vec::new(),
+            always_regenerate: false,
+        }
+    }
+
+    pub fn partial(field_name: &str) -> Self {
+        Self {
+            field_name: field_name.to_string(),
+            field_type: FieldType::Struct(Vec::new()),
+            edge_config: None,
+            define_config: None,
+            format: None,
+            validators: Vec::new(),
+            always_regenerate: false,
+        }
+    }
     pub fn generate_define_statement(
         &self,
         enums: HashMap<String, TaggedUnion>,
@@ -145,7 +168,6 @@ impl StructField {
                             FieldType::F32 | FieldType::F64 | FieldType::OrderedFloat(_) => {
                                 value_stack.push(("float".to_string(), false, None))
                             }
-                            // CORRECTED: Expanded the integer types
                             FieldType::I8
                             | FieldType::I16
                             | FieldType::I32
