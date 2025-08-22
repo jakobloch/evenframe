@@ -18,7 +18,10 @@ impl Mockmaker {
     /// A string containing all REMOVE and DELETE statements to be executed
     pub fn generate_remove_statements(&self, schema_changes: &SchemaChanges) -> String {
         info!("Generating remove statements based on schema changes");
-        debug!("Schema changes: {:?}", schema_changes);
+        debug!(
+            "Schema changes before remove statement gen: {:?}",
+            schema_changes
+        );
         let mut output = String::new();
 
         // Process removed accesses first
