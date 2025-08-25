@@ -61,21 +61,20 @@ impl Mockmaker {
 
         // 2. Pre-populate filtered_tables with tables that need more records.
         for (table_name, diff) in record_diffs {
-            if *diff > 0 {
-                if let Some(table_config) = tables.get(table_name) {
-                    if !filtered_tables.contains_key(table_name) {
-                        tracing::trace!(
-                            table = %table_name,
-                            record_diff = diff,
-                            "Table needs additional records, setting 'n'"
-                        );
-                        let mut modified_config = table_config.clone();
-                        if let Some(ref mut mock_config) = modified_config.mock_generation_config {
-                            mock_config.n = *diff as usize;
-                        }
-                        filtered_tables.insert(table_name.clone(), modified_config);
-                    }
+            if *diff > 0
+                && let Some(table_config) = tables.get(table_name)
+                && !filtered_tables.contains_key(table_name)
+            {
+                tracing::trace!(
+                    table = %table_name,
+                    record_diff = diff,
+                    "Table needs additional records, setting 'n'"
+                );
+                let mut modified_config = table_config.clone();
+                if let Some(ref mut mock_config) = modified_config.mock_generation_config {
+                    mock_config.n = *diff as usize;
                 }
+                filtered_tables.insert(table_name.clone(), modified_config);
             }
         }
 
@@ -209,11 +208,14 @@ impl Mockmaker {
                         }
                     }
 
-                    let has_other_changes = table_change.map_or(false, |c| {
-                        c.permission_changed
-                            || c.schema_type_changed
-                            || !c.removed_fields.is_empty()
-                    });
+                    let has_other_changes = table_change.map_or_else(
+                        || false,
+                        |c| {
+                            c.permission_changed
+                                || c.schema_type_changed
+                                || !c.removed_fields.is_empty()
+                        },
+                    );
 
                     if !field_map.is_empty() || has_other_changes {
                         let entry = filtered_tables

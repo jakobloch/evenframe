@@ -315,7 +315,7 @@ impl Mockmaker {
                     // Execute and validate upsert statements
                     use crate::schemasync::surql::execute::execute_and_validate;
 
-                    match execute_and_validate(&self.db, &stmts, "UPSERT", &table_name).await {
+                    match execute_and_validate(&self.db, &stmts, "UPSERT", table_name).await {
                         Ok(_results) => {
                             tracing::debug!(table = %table_name, "Mock data inserted successfully");
                         }
