@@ -318,7 +318,7 @@ impl<'a> Schemasync<'a> {
                     let error_msg =
                         format!("Failed to execute define statements for table\n{e}:\n{stmt}",);
                     evenframe_log!(&error_msg, "results.log", true);
-                    return Err(e.into());
+                    Err(e.into())
                 }
             }
         };
@@ -330,7 +330,8 @@ impl<'a> Schemasync<'a> {
                 if let Some(define_stmt) = define_statments.get(table_name) {
                     debug!("Defining new table: {}", table_name);
                     for stmt in define_stmt.split_inclusive(';') {
-                        if stmt.starts_with("DEFINE TABLE") || stmt.starts_with("DEFINE FIELD") {
+                        let trimmed = stmt.trim_start();
+                        if trimmed.starts_with("DEFINE TABLE") || trimmed.starts_with("DEFINE FIELD") {
                             execute(table_name, stmt).await?;
                         }
                     }
@@ -352,7 +353,8 @@ impl<'a> Schemasync<'a> {
 
                     // Always redefine the table itself if it has changes
                     for stmt in define_stmt.split_inclusive(';') {
-                        if stmt.starts_with("DEFINE TABLE") {
+                        let trimmed = stmt.trim_start();
+                        if trimmed.starts_with("DEFINE TABLE") {
                             debug!("Redefining table structure for: {}", table_name);
                             execute(table_name, stmt).await?;
                         }
@@ -370,10 +372,11 @@ impl<'a> Schemasync<'a> {
                         );
 
                         for stmt in define_stmt.split_inclusive(';') {
-                            if stmt.starts_with("DEFINE FIELD") {
+                            let trimmed = stmt.trim_start();
+                            if trimmed.starts_with("DEFINE FIELD") {
                                 // Extract field name from the statement
                                 // DEFINE FIELD field_name ON TABLE ...
-                                let parts: Vec<&str> = stmt.split_whitespace().collect();
+                                let parts: Vec<&str> = trimmed.split_whitespace().collect();
                                 if parts.len() > 2 {
                                     let field_name = parts[2];
 
